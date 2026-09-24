@@ -22,6 +22,7 @@ import {
   INITIAL_WAITLIST,
   SPORT_PRICING
 } from '../data/mockData';
+import { torneosApi, canchasApi } from '../api/endpoints';
 
 export type UserRole = 'cliente' | 'admin' | 'arbitro';
 
@@ -45,10 +46,10 @@ interface ComplejoContextType {
   bookCourt: (courtId: string, courtName: string, sport: SportType, date: string, time: string) => BookingItem;
   cancelBooking: (bookingId: string) => { refunded: boolean; depositAmount: number; message: string };
   joinWaitlist: (courtName: string, date: string, time: string, userName: string, userPhone: string) => number;
-  addCourt: (court: Omit<Court, 'id' | 'nextSlot'>) => void;
+  addCourt: (court: Omit<Court, 'id' | 'nextSlot'>) => void | Promise<void>;
   toggleCourtStatus: (courtId: string) => void;
-  createTournament: (tourney: Omit<Tournament, 'id' | 'registeredTeams'>) => void;
-  deleteTournament: (tournamentId: string) => void;
+  createTournament: (tourney: Omit<Tournament, 'id' | 'registeredTeams'>) => void | Promise<void>;
+  deleteTournament: (tournamentId: string) => void | Promise<void>;
   registerTeam: (tournamentId: string, teamName: string, players: { name: string; dni: string; position: string }[]) => { success: boolean; error?: string };
   saveMatchResult: (matchId: number, homeScore: number, awayScore: number, status: FixtureMatch['status'], yellowCards?: FixtureMatch['yellowCards'], redCards?: FixtureMatch['redCards'], observations?: string) => void;
   assignReferee: (matchId: number, refereeName: string) => void;
@@ -80,6 +81,63 @@ function saveTo<T>(key: string, val: T) {
   }
 }
 
+function mapSportFromApi(s: string): SportType {
+  const norm = (s || '').toLowerCase();
+  if (norm.includes('5')) return 'Fútbol 5';
+  if (norm.includes('8')) return 'Fútbol 8';
+  if (norm.includes('11')) return 'Fútbol 11';
+  if (norm.includes('padel') || norm.includes('pádel')) return 'Pádel';
+  if (norm.includes('tenis')) return 'Tenis';
+  return 'Fútbol 5';
+}
+
+function mapTorneoFromApi(t: any): Tournament {
+  const estadoMap: Record<string, Tournament['status']> = {
+    'INSCRIPCION_ABIERTA': 'Inscripciones abiertas',
+    'EN_CURSO': 'En curso',
+    'FINALIZADO': 'Finalizado',
+    'CANCELADO': 'Finalizado',
+  };
+
+  let formattedDates = 'Octubre - Noviembre 2026';
+  if (t.fecha_inicio && t.fecha_fin) {
+    try {
+      const d1 = new Date(t.fecha_inicio).toLocaleDateString('es-AR', { month: 'short', day: 'numeric' });
+      const d2 = new Date(t.fecha_fin).toLocaleDateString('es-AR', { month: 'short', day: 'numeric' });
+      formattedDates = `${d1} al ${d2}`;
+    } catch {
+      // fallback
+    }
+  }
+
+  return {
+    id: String(t.id),
+    name: t.nombre,
+    sport: mapSportFromApi(t.deporte),
+    status: estadoMap[t.estado] || 'Inscripciones abiertas',
+    entryFee: Number(t.costo_inscripcion) || 15000,
+    matchFee: Number(t.valor_partido) || 4000,
+    maxTeams: Number(t.max_equipos) || 8,
+    registeredTeams: [],
+    dates: formattedDates,
+    prize: t.reglamento || '$100.000 + Medallas y Trofeo Oficial',
+    format: 'Liga (Todos contra todos)',
+  };
+}
+
+function mapCanchaFromApi(c: any): Court {
+  return {
+    id: String(c.id),
+    name: c.nombre,
+    sport: mapSportFromApi(c.deporte),
+    surface: c.superficie || 'Sintético',
+    hasLighting: Boolean(c.iluminacion),
+    pricePerHour: Number(c.precio_hora) || 15000,
+    status: c.activa ? 'activa' : 'mantenimiento',
+    nextSlot: '19:00 hs',
+  };
+}
+
 export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [userRole, setUserRole] = useState<UserRole>(() => loadOr('userRole', 'cliente'));
   const [courts, setCourts] = useState<Court[]>(() => loadOr('courts', INITIAL_COURTS));
@@ -92,6 +150,25 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => loadOr('auditLogs', INITIAL_AUDIT_LOGS));
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => loadOr('notifications', INITIAL_NOTIFICATIONS));
   const [userAbsences, setUserAbsences] = useState<number>(() => loadOr('userAbsences', 0));
+
+  // Carga y sincronización inicial con la API backend (Base de Datos MySQL)
+  useEffect(() => {
+    canchasApi.getAll().then((data) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setCourts(data.map(mapCanchaFromApi));
+      }
+    }).catch((err) => {
+      console.warn('[ComplejoContext] Usando canchas locales (Backend no disponible):', err?.message);
+    });
+
+    torneosApi.getAll().then((data) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setTournaments(data.map(mapTorneoFromApi));
+      }
+    }).catch((err) => {
+      console.warn('[ComplejoContext] Usando torneos locales (Backend no disponible):', err?.message);
+    });
+  }, []);
 
   useEffect(() => saveTo('userRole', userRole), [userRole]);
   useEffect(() => saveTo('courts', courts), [courts]);
@@ -208,7 +285,26 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   // Gestión de canchas
-  const addCourt = (courtData: Omit<Court, 'id' | 'nextSlot'>) => {
+  const addCourt = async (courtData: Omit<Court, 'id' | 'nextSlot'>) => {
+    try {
+      const created = await canchasApi.create({
+        nombre: courtData.name,
+        deporte: courtData.sport.replace('ú', 'u').replace('á', 'a'),
+        superficie: courtData.surface,
+        iluminacion: courtData.hasLighting,
+        precio_hora: courtData.pricePerHour
+      });
+      if (created) {
+        const mapped = mapCanchaFromApi(created);
+        setCourts((prev) => [...prev, mapped]);
+        logAudit('Cancha Creada', `Admin dio de alta ${mapped.name} (${mapped.sport}) en base de datos.`, 'cancha');
+        addNotification('Nueva Cancha Habilitada', `${mapped.name} disponible para reservas.`, 'info');
+        return;
+      }
+    } catch (err: any) {
+      console.warn('[ComplejoContext] canchasApi.create falló, usando guardado local:', err?.message);
+    }
+
     const newCourt: Court = {
       ...courtData,
       id: 'c-' + (courts.length + 1),
@@ -241,7 +337,27 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   // Creación de torneos
-  const createTournament = (tourneyData: Omit<Tournament, 'id' | 'registeredTeams'>) => {
+  const createTournament = async (tourneyData: Omit<Tournament, 'id' | 'registeredTeams'>) => {
+    try {
+      const created = await torneosApi.create({
+        nombre: tourneyData.name,
+        deporte: tourneyData.sport.replace('ú', 'u').replace('á', 'a'),
+        costo_inscripcion: tourneyData.entryFee,
+        valor_partido: tourneyData.matchFee,
+        max_equipos: tourneyData.maxTeams,
+        reglamento: tourneyData.prize
+      });
+      if (created) {
+        const mapped = mapTorneoFromApi(created);
+        setTournaments((prev) => [mapped, ...prev]);
+        logAudit('Torneo Creado', `Se creó el torneo "${mapped.name}" (${mapped.sport}) en base de datos.`, 'torneo');
+        addNotification('Nuevo Torneo Abierto', `Inscripciones abiertas para "${mapped.name}".`, 'torneo');
+        return;
+      }
+    } catch (err: any) {
+      console.warn('[ComplejoContext] torneosApi.create falló, usando guardado local:', err?.message);
+    }
+
     const newT: Tournament = {
       ...tourneyData,
       id: 't-' + (tournaments.length + 1),
@@ -253,9 +369,18 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   // Eliminación de torneos
-  const deleteTournament = (tournamentId: string) => {
+  const deleteTournament = async (tournamentId: string) => {
     const target = tournaments.find((t) => t.id === tournamentId);
     if (!target) return;
+
+    const numericId = parseInt(tournamentId.replace(/\D/g, ''), 10);
+    if (!isNaN(numericId)) {
+      try {
+        await torneosApi.delete(numericId);
+      } catch (err: any) {
+        console.warn('[ComplejoContext] torneosApi.delete falló:', err?.message);
+      }
+    }
 
     setTournaments((prev) => prev.filter((t) => t.id !== tournamentId));
     setFixtures((prev) => prev.filter((f) => f.tournamentId !== tournamentId && f.tournamentName !== target.name));
