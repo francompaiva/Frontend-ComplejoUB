@@ -48,6 +48,7 @@ interface ComplejoContextType {
   addCourt: (court: Omit<Court, 'id' | 'nextSlot'>) => void;
   toggleCourtStatus: (courtId: string) => void;
   createTournament: (tourney: Omit<Tournament, 'id' | 'registeredTeams'>) => void;
+  deleteTournament: (tournamentId: string) => void;
   registerTeam: (tournamentId: string, teamName: string, players: { name: string; dni: string; position: string }[]) => { success: boolean; error?: string };
   saveMatchResult: (matchId: number, homeScore: number, awayScore: number, status: FixtureMatch['status'], yellowCards?: FixtureMatch['yellowCards'], redCards?: FixtureMatch['redCards'], observations?: string) => void;
   assignReferee: (matchId: number, refereeName: string) => void;
@@ -249,6 +250,26 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setTournaments((prev) => [...prev, newT]);
     logAudit('Torneo Creado', `Se creó el torneo "${newT.name}" (${newT.sport}) con cupo para ${newT.maxTeams} equipos en modalidad Liga.`, 'torneo');
     addNotification('Nuevo Torneo Abierto', `Inscripciones abiertas para "${newT.name}".`, 'torneo');
+  };
+
+  // Eliminación de torneos
+  const deleteTournament = (tournamentId: string) => {
+    const target = tournaments.find((t) => t.id === tournamentId);
+    if (!target) return;
+
+    setTournaments((prev) => prev.filter((t) => t.id !== tournamentId));
+    setFixtures((prev) => prev.filter((f) => f.tournamentId !== tournamentId && f.tournamentName !== target.name));
+
+    logAudit(
+      'Torneo Eliminado',
+      `Se eliminó el torneo "${target.name}" (${target.sport}) y todos sus registros vinculados.`,
+      'torneo'
+    );
+    addNotification(
+      'Torneo Eliminado',
+      `El torneo "${target.name}" fue eliminado del sistema por el Administrador.`,
+      'torneo'
+    );
   };
 
   // Inscripción de equipos y control de participación
@@ -469,6 +490,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         addCourt,
         toggleCourtStatus,
         createTournament,
+        deleteTournament,
         registerTeam,
         saveMatchResult,
         assignReferee,

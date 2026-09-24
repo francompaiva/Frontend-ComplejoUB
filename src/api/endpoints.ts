@@ -31,6 +31,7 @@ export const torneosApi = {
   getFixture: (id: number) => apiClient.get(`/torneos/${id}/fixture`),
   create: (data: any) => apiClient.post('/torneos', data),
   generarFixture: (id: number, fechaInicio?: string) => apiClient.post(`/torneos/${id}/generar-fixture`, { fechaInicio }),
+  delete: (id: number) => apiClient.delete(`/torneos/${id}`),
 };
 
 export const equiposApi = {

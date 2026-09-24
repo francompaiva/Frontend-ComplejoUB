@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
-import { type SportType, SQUAD_LIMITS } from '../data/mockData';
+import { type SportType, type Tournament, SQUAD_LIMITS } from '../data/mockData';
+import { torneosApi } from '../api/endpoints';
 
 export interface AdminTorneoProps {
   onOpenInscripcion?: () => void;
@@ -13,11 +14,19 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
     standings,
     referees,
     createTournament,
+    deleteTournament,
     assignReferee
   } = useComplejo();
 
   const [activeTab, setActiveTab] = useState<'torneos' | 'fixture' | 'tabla'>('torneos');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // Deletion States (2-step confirmation)
+  const [tournamentToDelete, setTournamentToDelete] = useState<Tournament | null>(null);
+  const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState<string | null>(null);
 
   // New Tournament Form
   const [tName, setTName] = useState('');
@@ -62,6 +71,44 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
     setIsCreateModalOpen(false);
   };
 
+  const handleDeleteInitiate = (tournament: Tournament) => {
+    setTournamentToDelete(tournament);
+    setDeleteStep(1);
+    setDeleteConfirmationText('');
+  };
+
+  const handleCancelDelete = () => {
+    setTournamentToDelete(null);
+    setDeleteStep(1);
+    setDeleteConfirmationText('');
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!tournamentToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      // 1. Eliminar del contexto y almacenamiento local
+      deleteTournament(tournamentToDelete.id);
+
+      // 2. Notificar / sincronizar con API backend si cuenta con id numérico
+      const numericId = parseInt(tournamentToDelete.id.replace(/\D/g, ''), 10);
+      if (!isNaN(numericId)) {
+        try {
+          await torneosApi.delete(numericId);
+        } catch {
+          // Backend en memoria/mock o desconectado
+        }
+      }
+
+      setDeleteSuccessMsg(`El torneo "${tournamentToDelete.name}" fue eliminado exitosamente.`);
+      setTimeout(() => setDeleteSuccessMsg(null), 4500);
+      handleCancelDelete();
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 p-6 lg:p-8 bg-[#293827] min-h-full text-white font-['Inter',sans-serif]">
       {/* Header */}
@@ -97,6 +144,22 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
         </div>
       </div>
 
+      {/* Banner de confirmación de acción */}
+      {deleteSuccessMsg && (
+        <div className="p-3.5 rounded-xl bg-emerald-950/70 border border-emerald-500/50 text-emerald-200 text-xs flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-2">
+            <span className="text-base">✅</span>
+            <span className="font-semibold">{deleteSuccessMsg}</span>
+          </div>
+          <button
+            onClick={() => setDeleteSuccessMsg(null)}
+            className="text-emerald-400 hover:text-white bg-transparent border-none cursor-pointer text-sm"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-[#5a7056] pb-3">
         {[
@@ -122,72 +185,108 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
 
       {/* TAB 1: TORNEOS */}
       {activeTab === 'torneos' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {tournaments.map((t) => (
-            <div
-              key={t.id}
-              className="bg-[#1e281d] rounded-2xl p-6 border border-[#5a7056] flex flex-col justify-between gap-4 shadow-xl"
-            >
-              <div>
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-[#65c556] tracking-wider">
-                      {t.sport} • {t.format}
-                    </span>
-                    <h3 className="text-xl font-bold text-white mt-1">{t.name}</h3>
-                  </div>
-
-                  <span className="bg-[rgba(101,197,86,0.15)] text-[#65c556] text-xs font-bold px-3 py-1 rounded-full border border-[#65c556]/30">
-                    {t.status}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs my-4 bg-[#293827] p-3.5 rounded-xl border border-[#5a7056]">
-                  <div>
-                    <span className="text-[#a0a0a0] block">Inscripción por equipo:</span>
-                    <span className="text-white font-bold">${t.entryFee.toLocaleString('es-AR')}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#a0a0a0] block">Arancel por partido:</span>
-                    <span className="text-white font-bold">${t.matchFee.toLocaleString('es-AR')}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#a0a0a0] block">Cupo de equipos:</span>
-                    <span className="text-[#65c556] font-bold">{t.registeredTeams.length} / {t.maxTeams} inscriptos</span>
-                  </div>
-                  <div>
-                    <span className="text-[#a0a0a0] block">Límites de plantel:</span>
-                    <span className="text-white font-medium">
-                      {SQUAD_LIMITS[t.sport].min} a {SQUAD_LIMITS[t.sport].max} jugadores
-                    </span>
-                  </div>
-                </div>
-
-                <p className="text-xs text-[#c0c0c0] flex items-center gap-1.5">
-                  <span>🎁</span>
-                  <span><strong>Premio:</strong> {t.prize}</span>
-                </p>
-              </div>
-
-              {/* Inscribed teams list preview */}
-              <div className="border-t border-[#3b4d38] pt-3">
-                <span className="text-[11px] font-bold text-[#a0a0a0] uppercase block mb-2">
-                  Equipos en competencia ({t.registeredTeams.length})
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {t.registeredTeams.map((team) => (
-                    <span
-                      key={team.id}
-                      className="bg-[#293827] border border-[#5a7056] text-xs px-2.5 py-1 rounded-lg text-white font-medium"
-                    >
-                      {team.name} ({team.playersCount} jug.)
-                    </span>
-                  ))}
-                </div>
-              </div>
+        <>
+          {tournaments.length === 0 ? (
+            <div className="bg-[#1e281d] border border-[#5a7056] rounded-2xl p-12 text-center text-[#a0a0a0] flex flex-col items-center justify-center gap-2 shadow-xl">
+              <span className="text-4xl block">🏆</span>
+              <h3 className="text-base font-bold text-white">No hay torneos registrados actualmente</h3>
+              <p className="text-xs text-[#a0a0a0] max-w-md">
+                No se encontraron torneos activos en el complejo. Puedes dar de alta uno nuevo haciendo clic en "+ Nuevo Torneo".
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(true)}
+                className="mt-3 px-4 py-2 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs transition-colors cursor-pointer border-none"
+              >
+                + Crear Primer Torneo
+              </button>
             </div>
-          ))}
-        </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {tournaments.map((t) => (
+                <div
+                  key={t.id}
+                  className="bg-[#1e281d] rounded-2xl p-6 border border-[#5a7056] flex flex-col justify-between gap-4 shadow-xl relative"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-[#65c556] tracking-wider">
+                          {t.sport} • {t.format}
+                        </span>
+                        <h3 className="text-xl font-bold text-white mt-1">{t.name}</h3>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="bg-[rgba(101,197,86,0.15)] text-[#65c556] text-xs font-bold px-3 py-1 rounded-full border border-[#65c556]/30">
+                          {t.status}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteInitiate(t)}
+                          className="px-2.5 py-1 rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/20 hover:border-red-400 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          title={`Eliminar torneo "${t.name}"`}
+                        >
+                          <span>🗑️</span>
+                          <span className="hidden sm:inline">Eliminar</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs my-4 bg-[#293827] p-3.5 rounded-xl border border-[#5a7056]">
+                      <div>
+                        <span className="text-[#a0a0a0] block">Inscripción por equipo:</span>
+                        <span className="text-white font-bold">${t.entryFee.toLocaleString('es-AR')}</span>
+                      </div>
+                      <div>
+                        <span className="text-[#a0a0a0] block">Arancel por partido:</span>
+                        <span className="text-white font-bold">${t.matchFee.toLocaleString('es-AR')}</span>
+                      </div>
+                      <div>
+                        <span className="text-[#a0a0a0] block">Cupo de equipos:</span>
+                        <span className="text-[#65c556] font-bold">{t.registeredTeams.length} / {t.maxTeams} inscriptos</span>
+                      </div>
+                      <div>
+                        <span className="text-[#a0a0a0] block">Límites de plantel:</span>
+                        <span className="text-white font-medium">
+                          {SQUAD_LIMITS[t.sport].min} a {SQUAD_LIMITS[t.sport].max} jugadores
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-[#c0c0c0] flex items-center gap-1.5">
+                      <span>🎁</span>
+                      <span><strong>Premio:</strong> {t.prize}</span>
+                    </p>
+                  </div>
+
+                  {/* Inscribed teams list preview */}
+                  <div className="border-t border-[#3b4d38] pt-3">
+                    <span className="text-[11px] font-bold text-[#a0a0a0] uppercase block mb-2">
+                      Equipos en competencia ({t.registeredTeams.length})
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {t.registeredTeams.length > 0 ? (
+                        t.registeredTeams.map((team) => (
+                          <span
+                            key={team.id}
+                            className="bg-[#293827] border border-[#5a7056] text-xs px-2.5 py-1 rounded-lg text-white font-medium"
+                          >
+                            {team.name} ({team.playersCount} jug.)
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-[#808080] italic">
+                          Sin equipos inscriptos aún
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* TAB 2: FIXTURE OFICIAL */}
@@ -497,6 +596,191 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmación de Eliminación en Dos Pantallas */}
+      {tournamentToDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={(e) => e.target === e.currentTarget && handleCancelDelete()}
+        >
+          <div className="bg-[#1e281d] rounded-2xl border border-red-500/50 w-full max-w-[540px] p-6 shadow-2xl text-white font-['Inter',sans-serif] relative">
+            {/* Header / Stepper */}
+            <div className="flex items-center justify-between border-b border-[#5a7056] pb-3 mb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">{deleteStep === 1 ? '⚠️' : '🚨'}</span>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    {deleteStep === 1 ? 'Eliminar Torneo — Verificación Inicial' : 'Confirmación Definitiva de Eliminación'}
+                  </h3>
+                  <span className="text-[11px] text-[#a0a0a0]">
+                    Pantalla de confirmación {deleteStep} de 2
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCancelDelete}
+                className="text-[#a0a0a0] hover:text-white cursor-pointer bg-transparent border-none text-lg p-1"
+                aria-label="Cerrar modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Stepper Visual Indicator */}
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <div
+                className={`py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                  deleteStep === 1
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    : 'bg-[#293827] text-emerald-400 border border-emerald-500/30'
+                }`}
+              >
+                <span>{deleteStep === 2 ? '✓' : '1'}</span>
+                <span>Paso 1: Advertencia</span>
+              </div>
+              <div
+                className={`py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                  deleteStep === 2
+                    ? 'bg-red-500/25 text-red-300 border border-red-500/60'
+                    : 'bg-[#293827]/60 text-[#808080] border border-[#5a7056]/40'
+                }`}
+              >
+                <span>2</span>
+                <span>Paso 2: Confirmación Final</span>
+              </div>
+            </div>
+
+            {/* PANTALLA 1: Advertencia e Impacto */}
+            {deleteStep === 1 && (
+              <div className="flex flex-col gap-4">
+                <div className="bg-[#293827] rounded-xl p-4 border border-[#5a7056]">
+                  <span className="text-[10px] uppercase font-bold text-[#65c556] tracking-wider block">
+                    {tournamentToDelete.sport} • {tournamentToDelete.format}
+                  </span>
+                  <h4 className="text-lg font-bold text-white mt-0.5">{tournamentToDelete.name}</h4>
+
+                  <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-[#3b4d38] text-xs">
+                    <div>
+                      <span className="text-[#a0a0a0] block">Estado del certamen:</span>
+                      <span className="font-semibold text-white">{tournamentToDelete.status}</span>
+                    </div>
+                    <div>
+                      <span className="text-[#a0a0a0] block">Equipos inscriptos:</span>
+                      <span className="font-semibold text-[#65c556]">
+                        {tournamentToDelete.registeredTeams.length} / {tournamentToDelete.maxTeams}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[#a0a0a0] block">Inscripción por equipo:</span>
+                      <span className="font-medium text-white">${tournamentToDelete.entryFee.toLocaleString('es-AR')}</span>
+                    </div>
+                    <div>
+                      <span className="text-[#a0a0a0] block">Arancel por partido:</span>
+                      <span className="font-medium text-white">${tournamentToDelete.matchFee.toLocaleString('es-AR')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-amber-500/10 border border-amber-500/40 rounded-xl p-3.5 text-xs text-amber-200 flex items-start gap-2.5">
+                  <span className="text-base leading-none">⚠️</span>
+                  <div className="leading-relaxed">
+                    <strong>Atención Administrador:</strong> Esta acción dará de baja el torneo y desvinculará sus fixtures generados, resultados disputados y listas de planteles inscriptos.
+                    <p className="mt-1 text-amber-300/80">
+                      Para evitar borrados accidentales, se requiere avanzar a una segunda pantalla de confirmación antes de aplicar los cambios de manera definitiva.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 mt-1">
+                  <button
+                    type="button"
+                    onClick={handleCancelDelete}
+                    className="px-4 py-2.5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold text-xs transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteStep(2)}
+                    className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs shadow-lg transition-all flex items-center gap-1.5 cursor-pointer border-none"
+                  >
+                    <span>Continuar al Paso 2</span>
+                    <span>→</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* PANTALLA 2: Segunda Pantalla de Confirmación Definitiva */}
+            {deleteStep === 2 && (
+              <div className="flex flex-col gap-4">
+                <div className="bg-red-950/40 border border-red-500/60 rounded-xl p-4 text-xs text-red-200">
+                  <div className="flex items-center gap-2 text-red-400 font-bold text-sm mb-1">
+                    <span>🚨</span>
+                    <span>Acción Irreversible</span>
+                  </div>
+                  <p className="leading-relaxed text-red-200/90">
+                    Estás a punto de borrar de forma permanente el torneo <strong>«{tournamentToDelete.name}»</strong>.
+                    Todos los datos asociados se eliminarán inmediatamente y no podrán recuperarse.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-[#c0c0c0]">
+                    Para confirmar la eliminación definitiva, escribe <strong className="text-red-400 tracking-wider">ELIMINAR</strong> a continuación:
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteConfirmationText}
+                    onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                    placeholder="Escribe ELIMINAR"
+                    autoFocus
+                    className="w-full bg-[#293827] border border-red-500/50 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-red-400 font-mono tracking-wider"
+                  />
+                  <span className="text-[11px] text-[#a0a0a0]">
+                    * El botón de confirmación se habilitará cuando escribas <strong>ELIMINAR</strong>.
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 mt-2 pt-3 border-t border-[#3b4d38]">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteStep(1)}
+                    className="px-3.5 py-2 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <span>←</span>
+                    <span>Volver al Paso 1</span>
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCancelDelete}
+                      className="px-3.5 py-2 rounded-xl text-[#a0a0a0] hover:text-white font-semibold text-xs transition-colors cursor-pointer bg-transparent border-none"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deleteConfirmationText.trim().toUpperCase() !== 'ELIMINAR' || isDeleting}
+                      onClick={handleConfirmDelete}
+                      className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg transition-all flex items-center gap-1.5 border-none ${
+                        deleteConfirmationText.trim().toUpperCase() === 'ELIMINAR' && !isDeleting
+                          ? 'bg-red-600 hover:bg-red-500 text-white cursor-pointer shadow-red-900/40'
+                          : 'bg-red-950/60 text-red-400/40 cursor-not-allowed border border-red-900/30'
+                      }`}
+                    >
+                      <span>🗑️</span>
+                      <span>{isDeleting ? 'Eliminando...' : 'Sí, Eliminar Definitivamente'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
