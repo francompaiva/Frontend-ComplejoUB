@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import type { StandingRow, FixtureMatch } from '../data/mockData';
 
@@ -8,12 +8,23 @@ interface MisTorneosProps {
 }
 
 export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscripcion }) => {
-  const { tournaments, standings, fixtures, userRole } = useComplejo();
-  const [selectedTorneoId, setSelectedTorneoId] = useState<string>('tourney-1');
+  const { tournaments, standings, fixtures, userRole, fetchTorneoData } = useComplejo();
+  const [selectedTorneoId, setSelectedTorneoId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'posiciones' | 'fixture'>('posiciones');
 
+  useEffect(() => {
+    if (tournaments.length > 0) {
+      const exists = tournaments.some(t => t.id === selectedTorneoId);
+      const targetId = exists ? selectedTorneoId : tournaments[0].id;
+      if (targetId !== selectedTorneoId) {
+        setSelectedTorneoId(targetId);
+      }
+      fetchTorneoData(targetId);
+    }
+  }, [tournaments, selectedTorneoId, fetchTorneoData]);
+
   const selectedTorneo = tournaments.find(t => t.id === selectedTorneoId) || tournaments[0] || {
-    id: 'tourney-1',
+    id: '1',
     name: 'Copa Verano - Fútbol 5',
     sport: 'Fútbol 5',
     status: 'En curso',
@@ -26,7 +37,9 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
     format: 'Liga (Todos contra todos)',
   };
 
-  const filteredFixtures = fixtures.filter(f => f.tournamentId === selectedTorneoId || f.tournamentName.includes(selectedTorneo.name));
+  const filteredFixtures = fixtures.filter(
+    f => String(f.tournamentId) === String(selectedTorneo.id) || f.tournamentName.includes(selectedTorneo.name)
+  );
 
   const handleBrandClick = () => {
     if (userRole === 'arbitro') onNavigate('arbitro');

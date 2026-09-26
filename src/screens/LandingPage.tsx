@@ -17,7 +17,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onOpenInscripcion,
   onOpenPago
 }) => {
-  const { tournaments, standings, courts, unreadNotifsCount, joinWaitlist } = useComplejo();
+  const { tournaments, standings, courts, bookings, fixtures, unreadNotifsCount, joinWaitlist } = useComplejo();
   const [selectedSport, setSelectedSport] = useState<SportType>('Fútbol 5');
   const [selectedDay, setSelectedDay] = useState<'Hoy' | 'Mañana' | 'Sábado' | 'Domingo'>('Hoy');
 
@@ -39,14 +39,54 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   // Canchas filtradas por deporte
   const filteredCourts = courts.filter((c) => c.sport === selectedSport);
 
-  const getSlotStatus = (courtName: string, hour: string) => {
-    // Torneo de fin de semana bloquea canchas 1 y 2 en horarios de torneo
-    if (isWeekend && (courtName.includes('Cancha 1') || courtName.includes('Cancha 2')) && (hour === '18:00 hs' || hour === '19:00 hs' || hour === '20:00 hs')) {
-      return { status: 'Torneo', label: '🏆 Torneo Oficial' };
+  const getTargetDate = (day: 'Hoy' | 'Mañana' | 'Sábado' | 'Domingo'): string => {
+    const d = new Date();
+    if (day === 'Mañana') {
+      d.setDate(d.getDate() + 1);
+    } else if (day === 'Sábado') {
+      const diff = (6 - d.getDay() + 7) % 7 || 7;
+      d.setDate(d.getDate() + diff);
+    } else if (day === 'Domingo') {
+      const diff = (7 - d.getDay()) % 7 || 7;
+      d.setDate(d.getDate() + diff);
     }
-    if (hour === '20:00 hs' || hour === '18:00 hs') {
+    return d.toISOString().split('T')[0];
+  };
+
+  const targetDateStr = getTargetDate(selectedDay);
+
+  const getSlotStatus = (courtName: string, hour: string) => {
+    const cleanHour = hour.replace(' hs', '').trim();
+
+    // 1. Partido de torneo en esa cancha y horario
+    const matchOnCourt = fixtures.find(
+      (m) =>
+        !m.isFreeDate &&
+        (m.court === courtName || courtName.includes(m.court) || m.court.includes(courtName)) &&
+        m.time?.slice(0, 5) === cleanHour &&
+        (m.date === targetDateStr || isWeekend)
+    );
+
+    if (matchOnCourt) {
+      return {
+        status: 'Torneo',
+        label: `🏆 ${matchOnCourt.homeTeam} vs ${matchOnCourt.awayTeam}`
+      };
+    }
+
+    // 2. Reserva activa en esa cancha y horario en la base de datos
+    const bookingOnCourt = bookings.find(
+      (b) =>
+        (b.courtName === courtName || courtName.includes(b.courtName) || b.courtName.includes(courtName)) &&
+        b.time?.slice(0, 5) === cleanHour &&
+        (b.date === targetDateStr || b.date === selectedDay) &&
+        b.status !== 'Cancelada'
+    );
+
+    if (bookingOnCourt) {
       return { status: 'Ocupado', label: 'Ocupado' };
     }
+
     return { status: 'Libre', label: 'Disponible' };
   };
 
@@ -227,7 +267,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                                   court: c.name,
                                   courtId: c.id,
                                   sport: selectedSport,
-                                  date: selectedDay,
+                                  date: targetDateStr,
                                   time: hour,
                                   price: c.pricePerHour
                                 })

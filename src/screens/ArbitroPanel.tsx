@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import { type FixtureMatch } from '../data/mockData';
 
@@ -9,12 +9,48 @@ export interface ArbitroPanelProps {
 export const ArbitroPanel: React.FC<ArbitroPanelProps> = ({ onNavigate }) => {
   const { fixtures, saveMatchResult, tournaments } = useComplejo();
 
-  // Filtrar partidos asignados a este árbitro (o todos para la demo si no hay filtro)
+  const [refereeName, setRefereeName] = useState('Sebastian Norjean (Árbitro)');
+  const [refereeMatricula, setRefereeMatricula] = useState('ARB-F5-091');
+
+  useEffect(() => {
+    try {
+      const u = localStorage.getItem('complejo_user');
+      if (u) {
+        const parsed = JSON.parse(u);
+        if (parsed.nombre) setRefereeName(parsed.nombre);
+        if (parsed.dni) setRefereeMatricula(`ARB-DNI-${parsed.dni}`);
+      }
+    } catch {}
+  }, []);
+
+  // Filtrar partidos asignados a este árbitro o disponibles para arbitraje
   const myMatches = fixtures.filter(
-    (m) => m.refereeName?.includes('Castrilli') || !m.isFreeDate
-  );
+    (m) =>
+      !m.isFreeDate &&
+      (m.refereeName?.toLowerCase().includes('sebastian') ||
+       m.refereeName?.toLowerCase().includes('árbitro') ||
+       m.refereeName?.toLowerCase().includes(refereeName.toLowerCase().split(' ')[0]) ||
+       m.refereeName?.toLowerCase().includes('sin') ||
+       m.refereeName?.toLowerCase().includes('designado'))
+  ).length > 0
+    ? fixtures.filter(
+        (m) =>
+          !m.isFreeDate &&
+          (m.refereeName?.toLowerCase().includes('sebastian') ||
+           m.refereeName?.toLowerCase().includes('árbitro') ||
+           m.refereeName?.toLowerCase().includes(refereeName.toLowerCase().split(' ')[0]) ||
+           m.refereeName?.toLowerCase().includes('sin') ||
+           m.refereeName?.toLowerCase().includes('designado'))
+      )
+    : fixtures.filter((m) => !m.isFreeDate);
 
   const [selectedMatch, setSelectedMatch] = useState<FixtureMatch>(myMatches[0] || fixtures[0]);
+
+  useEffect(() => {
+    if ((!selectedMatch || !myMatches.some(m => m.id === selectedMatch.id)) && myMatches.length > 0) {
+      handleSelectMatch(myMatches[0]);
+    }
+  }, [myMatches, selectedMatch]);
   const [homeScore, setHomeScore] = useState<number>(selectedMatch?.homeScore ?? 0);
   const [awayScore, setAwayScore] = useState<number>(selectedMatch?.awayScore ?? 0);
   const [matchStatus, setMatchStatus] = useState<FixtureMatch['status']>(selectedMatch?.status || 'Programado');
@@ -98,7 +134,7 @@ export const ArbitroPanel: React.FC<ArbitroPanelProps> = ({ onNavigate }) => {
               </span>
             </div>
             <p className="text-sm text-[#a0a0a0] mt-0.5">
-              Árbitro Asignado: <strong className="text-white">Carlos Castrilli</strong> (Matrícula: ARB-F5-091)
+              Árbitro Asignado: <strong className="text-white">{refereeName}</strong> (Matrícula: {refereeMatricula})
             </p>
           </div>
         </div>

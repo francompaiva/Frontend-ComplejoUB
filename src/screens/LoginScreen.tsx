@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { type UserRole } from '../context/ComplejoContext';
+import { authApi } from '../api/endpoints';
+import { apiClient } from '../api/client';
 
 export interface LoginScreenProps {
   onLogin: (role: UserRole) => void;
@@ -11,21 +13,21 @@ const ROLES_INFO: Record<
 > = {
   cliente: {
     title: 'Cliente / Capitán',
-    email: 'juan.perez@ub.edu.ar',
+    email: 'lucas@gmail.com',
     desc: 'Reservar canchas, pagar 30% de seña, cancelar con reintegro, inscribir equipos y ver posiciones.',
     icon: '⚽',
     badge: 'Perfil Cliente'
   },
   admin: {
     title: 'Administrador General',
-    email: 'admin@complejodeportivoub.com',
+    email: 'admin@complejoub.com',
     desc: 'ABM de canchas, tarifas fijas, agenda diaria, control de inasistencias, torneos, reportes y auditoría.',
     icon: '🏟️',
     badge: 'Acceso Total'
   },
   arbitro: {
     title: 'Árbitro Oficial',
-    email: 'arbitro.castrilli@asociacion.org',
+    email: 'arbitro@complejoub.com',
     desc: 'Planilla digital de partidos asignados, carga de marcadores, tarjetas amarillas/rojas e informe disciplinario.',
     icon: '🟨',
     badge: 'Colegiado'
@@ -36,15 +38,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [role, setRole] = useState<UserRole>('cliente');
   const [email, setEmail] = useState(ROLES_INFO.cliente.email);
   const [password, setPassword] = useState('••••••••');
+  const [loading, setLoading] = useState(false);
 
   const handleRoleChange = (newRole: UserRole) => {
     setRole(newRole);
     setEmail(ROLES_INFO[newRole].email);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(role);
+    setLoading(true);
+    try {
+      const realPassword = password === '••••••••' ? 'password123' : password;
+      const res: any = await authApi.login(email, realPassword);
+      if (res && res.token) {
+        apiClient.setToken(res.token);
+      }
+    } catch (err: any) {
+      console.warn('[LoginScreen] Error al autenticar contra backend:', err?.message);
+    } finally {
+      setLoading(false);
+      onLogin(role);
+    }
   };
 
   return (
@@ -132,10 +147,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
           <button
             type="submit"
-            className="w-full py-3.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-black text-sm transition-all shadow-lg shadow-[rgba(101,197,86,0.25)] cursor-pointer mt-2 flex items-center justify-center gap-2"
+            disabled={loading}
+            className="w-full py-3.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-black text-sm transition-all shadow-lg shadow-[rgba(101,197,86,0.25)] cursor-pointer mt-2 flex items-center justify-center gap-2 disabled:opacity-60"
           >
-            <span>Ingresar como {ROLES_INFO[role].title}</span>
-            <span>→</span>
+            {loading ? (
+              <span>Iniciando sesión...</span>
+            ) : (
+              <>
+                <span>Ingresar como {ROLES_INFO[role].title}</span>
+                <span>→</span>
+              </>
+            )}
           </button>
         </form>
 

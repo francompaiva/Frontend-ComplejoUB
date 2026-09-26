@@ -45,7 +45,7 @@ interface AccountConfig {
 const ACCOUNTS: Record<UserRole, AccountConfig> = {
   cliente: {
     role: 'cliente',
-    name: 'Juan Pérez',
+    name: 'Lucas Díaz',
     title: 'Cliente / Capitán',
     badge: 'Cliente',
     icon: '⚽',
@@ -61,7 +61,7 @@ const ACCOUNTS: Record<UserRole, AccountConfig> = {
   },
   arbitro: {
     role: 'arbitro',
-    name: 'Carlos Castrilli',
+    name: 'Sebastian Norjean',
     title: 'Árbitro Oficial AFA/UB',
     badge: 'Árbitro',
     icon: '🟨',
@@ -166,10 +166,10 @@ const AppContent: React.FC = () => {
     setIsPagoOpen(true);
   };
 
-  const handleConfirmPago = () => {
+  const handleConfirmPago = async () => {
     if (selectedSlot) {
-      bookCourt(
-        selectedSlot.courtId || 'c1',
+      await bookCourt(
+        selectedSlot.courtId || '1',
         selectedSlot.court,
         (selectedSlot.sport as any) || 'Fútbol 5',
         selectedSlot.date,

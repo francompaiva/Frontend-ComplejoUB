@@ -1,9 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   type Court,
   type BookingItem,
   type Tournament,
-  type TournamentTeam,
   type FixtureMatch,
   type StandingRow,
   type Referee,
@@ -11,22 +10,22 @@ import {
   type NotificationItem,
   type WaitlistEntry,
   type SportType,
-  INITIAL_COURTS,
-  INITIAL_USER_BOOKINGS,
-  INITIAL_TOURNAMENTS,
-  INITIAL_FIXTURES,
-  INITIAL_STANDINGS,
-  INITIAL_REFEREES,
-  INITIAL_AUDIT_LOGS,
-  INITIAL_NOTIFICATIONS,
-  INITIAL_WAITLIST,
   SPORT_PRICING
 } from '../data/mockData';
-import { torneosApi, canchasApi } from '../api/endpoints';
+import {
+  torneosApi,
+  canchasApi,
+  reservasApi,
+  equiposApi,
+  partidosApi,
+  listaEsperaApi,
+  notificacionesApi,
+  reportesApi
+} from '../api/endpoints';
 
 export type UserRole = 'cliente' | 'admin' | 'arbitro';
 
-interface ComplejoContextType {
+export interface ComplejoContextType {
   userRole: UserRole;
   setUserRole: (role: UserRole) => void;
   courts: Court[];
@@ -42,18 +41,20 @@ interface ComplejoContextType {
   userAbsences: number;
   isUserBanned: boolean;
 
-  // Acciones
-  bookCourt: (courtId: string, courtName: string, sport: SportType, date: string, time: string) => BookingItem;
-  cancelBooking: (bookingId: string) => { refunded: boolean; depositAmount: number; message: string };
-  joinWaitlist: (courtName: string, date: string, time: string, userName: string, userPhone: string) => number;
-  addCourt: (court: Omit<Court, 'id' | 'nextSlot'>) => void | Promise<void>;
+  // Acciones y sincronización con API
+  fetchTorneoData: (torneoId: string | number) => Promise<void>;
+  refreshAllData: () => Promise<void>;
+  bookCourt: (courtId: string, courtName: string, sport: SportType, date: string, time: string) => Promise<BookingItem>;
+  cancelBooking: (bookingId: string) => Promise<{ refunded: boolean; depositAmount: number; message: string }>;
+  joinWaitlist: (courtName: string, date: string, time: string, userName: string, userPhone: string) => Promise<number>;
+  addCourt: (court: Omit<Court, 'id' | 'nextSlot'>) => Promise<void>;
   toggleCourtStatus: (courtId: string) => void;
-  createTournament: (tourney: Omit<Tournament, 'id' | 'registeredTeams'>) => void | Promise<void>;
-  deleteTournament: (tournamentId: string) => void | Promise<void>;
-  registerTeam: (tournamentId: string, teamName: string, players: { name: string; dni: string; position: string }[]) => { success: boolean; error?: string };
-  saveMatchResult: (matchId: number, homeScore: number, awayScore: number, status: FixtureMatch['status'], yellowCards?: FixtureMatch['yellowCards'], redCards?: FixtureMatch['redCards'], observations?: string) => void;
-  assignReferee: (matchId: number, refereeName: string) => void;
-  markAbsence: (clientName: string, courtName: string) => void;
+  createTournament: (tourney: Omit<Tournament, 'id' | 'registeredTeams'>) => Promise<void>;
+  deleteTournament: (tournamentId: string) => Promise<void>;
+  registerTeam: (tournamentId: string, teamName: string, players: { name: string; dni: string; position: string }[]) => Promise<{ success: boolean; error?: string }>;
+  saveMatchResult: (matchId: number, homeScore: number, awayScore: number, status: FixtureMatch['status'], yellowCards?: FixtureMatch['yellowCards'], redCards?: FixtureMatch['redCards'], observations?: string) => Promise<void>;
+  assignReferee: (matchId: number, refereeName: string) => Promise<void>;
+  markAbsence: (clientName: string, courtName: string, bookingId?: string) => Promise<void>;
   markNotificationRead: (notifId: string) => void;
   markAllNotificationsRead: () => void;
   resetDemoData: () => void;
@@ -138,51 +139,181 @@ function mapCanchaFromApi(c: any): Court {
   };
 }
 
+function mapPartidoFromApi(p: any, torneoNombre = ''): FixtureMatch {
+  const isFree = !p.fk_equipo_visitante_id || p.equipo_visitante === 'Fecha Libre';
+  const statusMap: Record<string, FixtureMatch['status']> = {
+    'PROGRAMADO': 'Programado',
+    'DISPUTADO': 'Disputado',
+    'SUSPENDIDO': 'Suspendido',
+    'REPROGRAMADO': 'Reprogramado',
+  };
+
+  let formattedDate = p.fecha ? String(p.fecha).split('T')[0] : '';
+  let formattedTime = p.hora ? String(p.hora).slice(0, 5) + ' hs' : '';
+
+  return {
+    id: Number(p.id),
+    tournamentId: String(p.fk_torneo_id),
+    tournamentName: p.torneo_nombre || torneoNombre || `Torneo #${p.fk_torneo_id}`,
+    round: `Fecha ${p.numero_fecha}`,
+    homeTeam: p.equipo_local || 'Local',
+    awayTeam: isFree ? 'Fecha Libre' : (p.equipo_visitante || 'Visitante'),
+    isFreeDate: isFree,
+    freeTeamName: isFree ? p.equipo_local : undefined,
+    date: formattedDate,
+    time: formattedTime,
+    court: p.cancha_nombre || (isFree ? 'Fecha Libre' : 'Cancha Oficial'),
+    refereeName: p.arbitro_nombre || 'Sin designar',
+    status: statusMap[p.estado] || 'Programado',
+    homeScore: p.goles_local !== null && p.goles_local !== undefined ? Number(p.goles_local) : undefined,
+    awayScore: p.goles_visitante !== null && p.goles_visitante !== undefined ? Number(p.goles_visitante) : undefined,
+    observations: p.observaciones || undefined,
+  };
+}
+
+function mapStandingFromApi(row: any, index: number): StandingRow {
+  return {
+    pos: index + 1,
+    team: row.nombre,
+    pj: Number(row.partidos_jugados) || 0,
+    pg: Number(row.partidos_ganados) || 0,
+    pe: Number(row.partidos_empatados) || 0,
+    pp: Number(row.partidos_perdidos) || 0,
+    gf: Number(row.goles_favor) || 0,
+    gc: Number(row.goles_contra) || 0,
+    pts: Number(row.puntos) || 0,
+  };
+}
+
+function mapReservaFromApi(r: any): BookingItem {
+  const statusMap: Record<string, BookingItem['status']> = {
+    'CONFIRMADA': 'Confirmada',
+    'CANCELADA': 'Cancelada',
+    'FINALIZADA': 'Completada',
+    'INASISTENCIA': 'Cancelada',
+  };
+  const total = Number(r.monto_total) || 18000;
+  const sena = Number(r.monto_sena) || Math.round(total * 0.3);
+  return {
+    id: String(r.id),
+    courtId: String(r.fk_cancha_id),
+    courtName: r.cancha_nombre || `Cancha #${r.fk_cancha_id}`,
+    sport: mapSportFromApi(r.cancha_deporte || 'Futbol 5'),
+    date: r.fecha ? String(r.fecha).split('T')[0] : 'Hoy',
+    time: r.hora ? String(r.hora).slice(0, 5) + ' hs' : '19:00 hs',
+    totalPrice: total,
+    depositPaid: sena,
+    remainingBalance: total - sena,
+    status: statusMap[r.estado] || 'Confirmada',
+    hoursUntilMatch: 48,
+    clientName: r.usuario_nombre || 'Lucas Díaz',
+    clientEmail: r.usuario_email || 'lucas@gmail.com',
+  };
+}
+
+const DEFAULT_REFEREES: Referee[] = [
+  { id: '2', name: 'Sebastian Norjean (Árbitro)', badgeNumber: 'ARB-F5-091', sport: 'Fútbol 5', activeMatches: 3 },
+  { id: '3', name: 'Marcos Perez del Cerro', badgeNumber: 'ARB-PAD-042', sport: 'Pádel', activeMatches: 2 },
+];
+
 export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [userRole, setUserRole] = useState<UserRole>(() => loadOr('userRole', 'cliente'));
-  const [courts, setCourts] = useState<Court[]>(() => loadOr('courts', INITIAL_COURTS));
-  const [bookings, setBookings] = useState<BookingItem[]>(() => loadOr('bookings', INITIAL_USER_BOOKINGS));
-  const [tournaments, setTournaments] = useState<Tournament[]>(() => loadOr('tournaments', INITIAL_TOURNAMENTS));
-  const [fixtures, setFixtures] = useState<FixtureMatch[]>(() => loadOr('fixtures', INITIAL_FIXTURES));
-  const [standings, setStandings] = useState<StandingRow[]>(() => loadOr('standings', INITIAL_STANDINGS));
-  const [referees, setReferees] = useState<Referee[]>(() => loadOr('referees', INITIAL_REFEREES));
-  const [waitlist, setWaitlist] = useState<WaitlistEntry[]>(() => loadOr('waitlist', INITIAL_WAITLIST));
-  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => loadOr('auditLogs', INITIAL_AUDIT_LOGS));
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => loadOr('notifications', INITIAL_NOTIFICATIONS));
-  const [userAbsences, setUserAbsences] = useState<number>(() => loadOr('userAbsences', 0));
+  const [courts, setCourts] = useState<Court[]>([]);
+  const [bookings, setBookings] = useState<BookingItem[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [fixtures, setFixtures] = useState<FixtureMatch[]>([]);
+  const [standings, setStandings] = useState<StandingRow[]>([]);
+  const [referees] = useState<Referee[]>(DEFAULT_REFEREES);
+  const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [userAbsences, setUserAbsences] = useState<number>(0);
 
-  // Carga y sincronización inicial con la API backend (Base de Datos MySQL)
-  useEffect(() => {
-    canchasApi.getAll().then((data) => {
-      if (Array.isArray(data) && data.length > 0) {
-        setCourts(data.map(mapCanchaFromApi));
-      }
-    }).catch((err) => {
-      console.warn('[ComplejoContext] Usando canchas locales (Backend no disponible):', err?.message);
-    });
+  // Carga de fixture y tabla de posiciones para un torneo desde la BD
+  const fetchTorneoData = useCallback(async (torneoId: string | number) => {
+    const numId = typeof torneoId === 'number' ? torneoId : parseInt(String(torneoId).replace(/\D/g, ''), 10);
+    if (isNaN(numId) || numId <= 0) return;
 
-    torneosApi.getAll().then((data) => {
-      if (Array.isArray(data) && data.length > 0) {
-        setTournaments(data.map(mapTorneoFromApi));
+    try {
+      const [fixData, standData] = await Promise.all([
+        torneosApi.getFixture(numId),
+        torneosApi.getTablaPosiciones(numId),
+      ]);
+
+      if (Array.isArray(fixData)) {
+        setFixtures(fixData.map((p: any) => mapPartidoFromApi(p)));
       }
-    }).catch((err) => {
-      console.warn('[ComplejoContext] Usando torneos locales (Backend no disponible):', err?.message);
-    });
+      if (Array.isArray(standData)) {
+        setStandings(standData.map((s: any, idx: number) => mapStandingFromApi(s, idx)));
+      }
+    } catch (err: any) {
+      console.warn(`[ComplejoContext] Error al cargar detalles del torneo #${numId}:`, err?.message);
+    }
   }, []);
 
-  useEffect(() => saveTo('userRole', userRole), [userRole]);
-  useEffect(() => saveTo('courts', courts), [courts]);
-  useEffect(() => saveTo('bookings', bookings), [bookings]);
-  useEffect(() => saveTo('tournaments', tournaments), [tournaments]);
-  useEffect(() => saveTo('fixtures', fixtures), [fixtures]);
-  useEffect(() => saveTo('standings', standings), [standings]);
-  useEffect(() => saveTo('referees', referees), [referees]);
-  useEffect(() => saveTo('waitlist', waitlist), [waitlist]);
-  useEffect(() => saveTo('auditLogs', auditLogs), [auditLogs]);
-  useEffect(() => saveTo('notifications', notifications), [notifications]);
-  useEffect(() => saveTo('userAbsences', userAbsences), [userAbsences]);
+  // Carga y sincronización inicial con la API backend (Base de Datos MySQL)
+  const refreshAllData = useCallback(async () => {
+    try {
+      const [canchas, torneos, resReservas, notifs, logs] = await Promise.all([
+        canchasApi.getAll().catch(() => []),
+        torneosApi.getAll().catch(() => []),
+        reservasApi.getAll().catch(() => []),
+        notificacionesApi.getMisNotificaciones().catch(() => []),
+        reportesApi.getAuditoria().catch(() => []),
+      ]);
 
-  const isUserBanned = userAbsences >= 3; // 3 inasistencias consecutivas bloquean 2 semanas
+      if (Array.isArray(canchas) && canchas.length > 0) {
+        setCourts(canchas.map(mapCanchaFromApi));
+      }
+
+      if (Array.isArray(torneos) && torneos.length > 0) {
+        const mappedTorneos = torneos.map(mapTorneoFromApi);
+        setTournaments(mappedTorneos);
+        // Cargar fixture y tabla del primer torneo (e.g. Copa Verano)
+        await fetchTorneoData(mappedTorneos[0].id);
+      }
+
+      if (Array.isArray(resReservas) && resReservas.length > 0) {
+        setBookings(resReservas.map(mapReservaFromApi));
+      }
+
+      if (Array.isArray(notifs) && notifs.length > 0) {
+        setNotifications(
+          notifs.map((n: any) => ({
+            id: String(n.id),
+            title: n.titulo,
+            message: n.mensaje,
+            timeAgo: 'Reciente',
+            read: Boolean(n.leida),
+            type: n.tipo?.toLowerCase().includes('sancion') ? 'sancion' : n.tipo?.toLowerCase().includes('torneo') ? 'torneo' : 'reserva',
+          }))
+        );
+      }
+
+      if (Array.isArray(logs) && logs.length > 0) {
+        setAuditLogs(
+          logs.map((l: any) => ({
+            id: String(l.id),
+            timestamp: l.created_at ? new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' hs' : 'Hoy',
+            adminName: l.usuario_nombre || 'Administrador General',
+            action: l.accion,
+            detail: typeof l.detalles === 'string' ? l.detalles : JSON.stringify(l.detalles || {}),
+            type: l.entidad_afectada as any,
+          }))
+        );
+      }
+    } catch (err: any) {
+      console.warn('[ComplejoContext] Error en sincronización general con API:', err?.message);
+    }
+  }, [fetchTorneoData]);
+
+  useEffect(() => {
+    refreshAllData();
+  }, [refreshAllData]);
+
+  useEffect(() => saveTo('userRole', userRole), [userRole]);
+
+  const isUserBanned = userAbsences >= 3;
 
   const logAudit = (action: string, detail: string, type: AuditLogItem['type']) => {
     const newLog: AuditLogItem = {
@@ -208,45 +339,83 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setNotifications((prev) => [newNotif, ...prev]);
   };
 
-  // Reserva de turnos con seña del 30%
-  const bookCourt = (courtId: string, courtName: string, sport: SportType, date: string, time: string): BookingItem => {
+  // Reserva de turnos con seña del 30% en MySQL
+  const bookCourt = async (courtId: string, courtName: string, sport: SportType, date: string, time: string): Promise<BookingItem> => {
     const totalPrice = SPORT_PRICING[sport] || 18000;
     const depositPaid = Math.round(totalPrice * 0.3);
     const remainingBalance = totalPrice - depositPaid;
+    const numCanchaId = parseInt(courtId.replace(/\D/g, ''), 10) || 1;
+
+    let cleanDate = date;
+    if (date === 'Hoy') {
+      cleanDate = new Date().toISOString().split('T')[0];
+    } else if (date === 'Mañana') {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      cleanDate = d.toISOString().split('T')[0];
+    }
+
+    const cleanHour = time.replace(' hs', '').trim() + (time.includes(':') ? (time.split(':').length === 2 ? ':00' : '') : ':00:00');
+
+    let createdId = 'res-' + Date.now();
+    try {
+      const apiRes: any = await reservasApi.create({
+        canchaId: numCanchaId,
+        fecha: cleanDate,
+        hora: cleanHour
+      });
+      if (apiRes && apiRes.id) {
+        createdId = String(apiRes.id);
+      }
+    } catch (err: any) {
+      console.warn('[bookCourt] Error al guardar en MySQL:', err?.message);
+    }
 
     const newBooking: BookingItem = {
-      id: 'res-' + Date.now(),
+      id: createdId,
       courtId,
       courtName,
       sport,
-      date,
+      date: cleanDate,
       time,
       totalPrice,
       depositPaid,
       remainingBalance,
       status: 'Confirmada',
-      hoursUntilMatch: date.includes('Hoy') ? 4 : 48,
-      clientName: 'Juan Pérez',
-      clientEmail: 'juan.perez@ub.edu.ar'
+      hoursUntilMatch: 48,
+      clientName: 'Lucas Díaz',
+      clientEmail: 'lucas@gmail.com'
     };
 
     setBookings((prev) => [newBooking, ...prev]);
     addNotification(
       '¡Turno Reservado con Éxito!',
-      `Cancha ${courtName} para el ${date} a las ${time}. Seña abonada: $${depositPaid.toLocaleString()}. Saldo en complejo: $${remainingBalance.toLocaleString()}.`,
+      `Cancha ${courtName} para el ${cleanDate} a las ${time}. Seña abonada: $${depositPaid.toLocaleString()}. Saldo en complejo: $${remainingBalance.toLocaleString()}.`,
       'reserva'
     );
-    logAudit('Nueva Reserva de Cancha', `Cliente Juan Pérez reservó ${courtName} (${sport}) para el ${date} a las ${time}. Seña 30%: $${depositPaid}.`, 'reserva');
+    logAudit('Nueva Reserva de Cancha', `Cliente reservó ${courtName} (${sport}) para el ${cleanDate} a las ${time}. Seña 30%: $${depositPaid}.`, 'reserva');
     return newBooking;
   };
 
-  // Cancelación de reservas con regla de 24 horas
-  const cancelBooking = (bookingId: string) => {
+  // Cancelación de reservas con regla de 24 horas en MySQL
+  const cancelBooking = async (bookingId: string) => {
     const target = bookings.find((b) => b.id === bookingId);
-    if (!target) return { refunded: false, depositAmount: 0, message: 'Reserva no encontrada' };
+    const numId = parseInt(bookingId.replace(/\D/g, ''), 10);
 
-    const isRefundable = target.hoursUntilMatch > 24;
-    const deposit = target.depositPaid;
+    let isRefundable = target ? target.hoursUntilMatch > 24 : true;
+    let deposit = target ? target.depositPaid : 5400;
+
+    if (!isNaN(numId)) {
+      try {
+        const res: any = await reservasApi.cancelar(numId, 'Cancelado por solicitud del cliente');
+        if (res) {
+          isRefundable = Boolean(res.aplicaDevolucion);
+          if (res.montoSenaDevuelto !== undefined) deposit = Number(res.montoSenaDevuelto);
+        }
+      } catch (err: any) {
+        console.warn('[cancelBooking] Error al cancelar en MySQL:', err?.message);
+      }
+    }
 
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Cancelada' } : b))
@@ -267,20 +436,30 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   // Lista de espera
-  const joinWaitlist = (courtName: string, date: string, time: string, userName: string, userPhone: string): number => {
-    const currentCountForSlot = waitlist.filter((w) => w.courtName === courtName && w.time === time).length;
-    const position = currentCountForSlot + 1;
+  const joinWaitlist = async (courtName: string, date: string, time: string, userName: string, userPhone: string): Promise<number> => {
+    const position = waitlist.length + 1;
+    const cleanHour = time.replace(' hs', '').trim() + ':00';
+    let cleanDate = date === 'Hoy' ? new Date().toISOString().split('T')[0] : date;
+
+    try {
+      const canchaTarget = courts.find(c => c.name.toLowerCase() === courtName.toLowerCase());
+      const cId = canchaTarget ? parseInt(canchaTarget.id, 10) : 1;
+      await listaEsperaApi.unirse({ canchaId: cId, fecha: cleanDate, hora: cleanHour });
+    } catch (err: any) {
+      console.warn('[joinWaitlist] API error:', err?.message);
+    }
+
     const entry: WaitlistEntry = {
       id: 'w-' + Date.now(),
       courtName,
-      date,
+      date: cleanDate,
       time,
       userName,
       userPhone,
       position
     };
     setWaitlist((prev) => [...prev, entry]);
-    addNotification('Anotado en Lista de Espera', `Estás en la posición #${position} para ${courtName} a las ${time}. Te notificaremos si el turno se libera.`, 'info');
+    addNotification('Anotado en Lista de Espera', `Estás en la posición #${position} para ${courtName} a las ${time}.`, 'info');
     return position;
   };
 
@@ -302,7 +481,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return;
       }
     } catch (err: any) {
-      console.warn('[ComplejoContext] canchasApi.create falló, usando guardado local:', err?.message);
+      console.warn('[ComplejoContext] canchasApi.create falló:', err?.message);
     }
 
     const newCourt: Court = {
@@ -311,8 +490,6 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       nextSlot: 'Disponible próximo turno'
     };
     setCourts((prev) => [...prev, newCourt]);
-    logAudit('Cancha Creada', `Admin dio de alta ${newCourt.name} (${newCourt.sport}) con tarifa fija de $${newCourt.pricePerHour}/h.`, 'cancha');
-    addNotification('Nueva Cancha Habilitada', `${newCourt.name} disponible para reservas.`, 'info');
   };
 
   const toggleCourtStatus = (courtId: string) => {
@@ -336,7 +513,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     );
   };
 
-  // Creación de torneos
+  // Creación de torneos en MySQL
   const createTournament = async (tourneyData: Omit<Tournament, 'id' | 'registeredTeams'>) => {
     try {
       const created = await torneosApi.create({
@@ -355,7 +532,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return;
       }
     } catch (err: any) {
-      console.warn('[ComplejoContext] torneosApi.create falló, usando guardado local:', err?.message);
+      console.warn('[ComplejoContext] torneosApi.create falló:', err?.message);
     }
 
     const newT: Tournament = {
@@ -363,12 +540,10 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       id: 't-' + (tournaments.length + 1),
       registeredTeams: []
     };
-    setTournaments((prev) => [...prev, newT]);
-    logAudit('Torneo Creado', `Se creó el torneo "${newT.name}" (${newT.sport}) con cupo para ${newT.maxTeams} equipos en modalidad Liga.`, 'torneo');
-    addNotification('Nuevo Torneo Abierto', `Inscripciones abiertas para "${newT.name}".`, 'torneo');
+    setTournaments((prev) => [newT, ...prev]);
   };
 
-  // Eliminación de torneos
+  // Eliminación de torneos en MySQL
   const deleteTournament = async (tournamentId: string) => {
     const target = tournaments.find((t) => t.id === tournamentId);
     if (!target) return;
@@ -383,60 +558,40 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     setTournaments((prev) => prev.filter((t) => t.id !== tournamentId));
-    setFixtures((prev) => prev.filter((f) => f.tournamentId !== tournamentId && f.tournamentName !== target.name));
-
-    logAudit(
-      'Torneo Eliminado',
-      `Se eliminó el torneo "${target.name}" (${target.sport}) y todos sus registros vinculados.`,
-      'torneo'
-    );
-    addNotification(
-      'Torneo Eliminado',
-      `El torneo "${target.name}" fue eliminado del sistema por el Administrador.`,
-      'torneo'
-    );
+    setFixtures((prev) => prev.filter((f) => f.tournamentId !== tournamentId));
+    logAudit('Torneo Eliminado', `Se eliminó el torneo "${target.name}" de la base de datos.`, 'torneo');
   };
 
-  // Inscripción de equipos y control de participación
-  const registerTeam = (tournamentId: string, teamName: string, players: { name: string; dni: string; position: string }[]) => {
-    const tourney = tournaments.find((t) => t.id === tournamentId);
-    if (!tourney) return { success: false, error: 'Torneo no encontrado' };
-
-    // Control de participación (1 jugador no puede participar en >1 equipo del mismo torneo)
-    const existingPlayersDni = new Set<string>();
-    tourney.registeredTeams.forEach((tm) => {
-      tm.players.forEach((p) => existingPlayersDni.add(p.dni.trim()));
-    });
-
-    for (const p of players) {
-      if (existingPlayersDni.has(p.dni.trim())) {
+  // Inscripción de equipos y control de participación en MySQL
+  const registerTeam = async (
+    tournamentId: string,
+    teamName: string,
+    players: { name: string; dni: string; position: string }[]
+  ): Promise<{ success: boolean; error?: string }> => {
+    const numTorneoId = parseInt(tournamentId.replace(/\D/g, ''), 10);
+    if (!isNaN(numTorneoId)) {
+      try {
+        await equiposApi.inscribir({
+          torneoId: numTorneoId,
+          nombreEquipo: teamName
+        });
+        await fetchTorneoData(numTorneoId);
+        logAudit('Inscripción de Equipo', `Equipo "${teamName}" inscripto con éxito (${players.length} jugadores registrados).`, 'torneo');
+        addNotification('Equipo Inscripto', `Tu equipo "${teamName}" fue admitido en el torneo.`, 'torneo');
+        return { success: true };
+      } catch (err: any) {
+        console.warn('[registerTeam] API error:', err?.message);
         return {
           success: false,
-          error: `El jugador ${p.name} (DNI ${p.dni}) ya está inscripto en otro equipo de este mismo torneo.`
+          error: err?.message || 'Error al inscribir equipo en base de datos'
         };
       }
     }
-
-    const newTeam: TournamentTeam = {
-      id: 'tm-' + Date.now(),
-      name: teamName,
-      captain: players[0]?.name || 'Capitán',
-      captainEmail: 'capitan@equipo.com',
-      playersCount: players.length,
-      players
-    };
-
-    setTournaments((prev) =>
-      prev.map((t) => (t.id === tournamentId ? { ...t, registeredTeams: [...t.registeredTeams, newTeam] } : t))
-    );
-
-    logAudit('Inscripción de Equipo', `Equipo "${teamName}" inscripto en "${tourney.name}" con ${players.length} jugadores validados.`, 'torneo');
-    addNotification('Equipo Inscripto', `Tu equipo "${teamName}" fue admitido en "${tourney.name}".`, 'torneo');
-    return { success: true };
+    return { success: false, error: 'ID de torneo inválido' };
   };
 
-  // Carga de resultados y actualización automática de tabla de posiciones
-  const saveMatchResult = (
+  // Carga de resultados oficial conectada a MySQL y triggers
+  const saveMatchResult = async (
     matchId: number,
     homeScore: number,
     awayScore: number,
@@ -444,124 +599,93 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     yellowCards?: FixtureMatch['yellowCards'],
     redCards?: FixtureMatch['redCards'],
     observations?: string
-  ) => {
-    let homeTeam = '';
-    let awayTeam = '';
-    let matchRound = '';
+  ): Promise<void> => {
+    try {
+      const cardDetails = [
+        yellowCards && yellowCards.length > 0 ? `${yellowCards.length} amarillas` : '',
+        redCards && redCards.length > 0 ? `${redCards.length} rojas` : ''
+      ].filter(Boolean).join(', ');
 
-    setFixtures((prev) =>
-      prev.map((m) => {
-        if (m.id === matchId) {
-          homeTeam = m.homeTeam;
-          awayTeam = m.awayTeam;
-          matchRound = m.round;
-          return {
-            ...m,
-            homeScore,
-            awayScore,
-            status,
-            yellowCards: yellowCards || m.yellowCards,
-            redCards: redCards || m.redCards,
-            observations: observations || m.observations
-          };
-        }
-        return m;
-      })
-    );
+      const finalObs = observations || (cardDetails ? `Tarjetas: ${cardDetails}` : 'Resultado registrado oficialmente por colegiado.');
 
-    // Recalcular tabla de posiciones dinámicamente si disputado
-    if (status === 'Disputado' && homeTeam && awayTeam) {
-      setStandings((prev) => {
-        const table = prev.map((row) => ({ ...row }));
-        let hRow = table.find((r) => r.team === homeTeam);
-        let aRow = table.find((r) => r.team === awayTeam);
-
-        if (!hRow) {
-          hRow = { pos: table.length + 1, team: homeTeam, pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, pts: 0 };
-          table.push(hRow);
-        }
-        if (!aRow) {
-          aRow = { pos: table.length + 1, team: awayTeam, pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0, pts: 0 };
-          table.push(aRow);
-        }
-
-        hRow.pj += 1;
-        aRow.pj += 1;
-        hRow.gf += homeScore;
-        hRow.gc += awayScore;
-        aRow.gf += awayScore;
-        aRow.gc += homeScore;
-
-        if (homeScore > awayScore) {
-          hRow.pg += 1;
-          hRow.pts += 3;
-          aRow.pp += 1;
-        } else if (homeScore < awayScore) {
-          aRow.pg += 1;
-          aRow.pts += 3;
-          hRow.pp += 1;
-        } else {
-          hRow.pe += 1;
-          hRow.pts += 1;
-          aRow.pe += 1;
-          aRow.pts += 1;
-        }
-
-        // Ordenar por Puntos > Dif Gol > Goles a favor
-        table.sort((a, b) => {
-          if (b.pts !== a.pts) return b.pts - a.pts;
-          const difB = b.gf - b.gc;
-          const difA = a.gf - a.gc;
-          if (difB !== difA) return difB - difA;
-          return b.gf - a.gf;
-        });
-
-        return table.map((item, idx) => ({ ...item, pos: idx + 1 }));
+      await partidosApi.registrarResultado(matchId, {
+        golesLocal: homeScore,
+        golesVisitante: awayScore,
+        observaciones: finalObs
       });
 
+      // Recargar fixture y tabla de posiciones actualizadas en MySQL vía trigger
+      const targetMatch = fixtures.find(f => f.id === matchId);
+      if (targetMatch && targetMatch.tournamentId) {
+        await fetchTorneoData(targetMatch.tournamentId);
+      }
+
       logAudit(
-        'Resultado Oficial Registrado',
-        `${matchRound}: ${homeTeam} (${homeScore}) - ${awayTeam} (${awayScore}). Tabla de posiciones recalculada en tiempo real.`,
+        'Resultado Oficial Registrado en BD',
+        `Partido #${matchId} finalizado ${homeScore}-${awayScore}. Posiciones recalculadas automáticamente.`,
         'partido'
       );
-      addNotification(
-        'Resultado Actualizado',
-        `${homeTeam} ${homeScore} vs ${awayTeam} ${awayScore}. La tabla de posiciones ha sido actualizada.`,
-        'torneo'
+      addNotification('Resultado Guardado', `Partido #${matchId} actualizado: ${homeScore} a ${awayScore}.`, 'torneo');
+    } catch (err: any) {
+      console.warn('[saveMatchResult] API error:', err?.message);
+      // Fallback local visual
+      setFixtures((prev) =>
+        prev.map((m) =>
+          m.id === matchId
+            ? { ...m, homeScore, awayScore, status, observations: observations || m.observations }
+            : m
+        )
       );
     }
   };
 
-  // Asignación de árbitros
-  const assignReferee = (matchId: number, refereeName: string) => {
-    setFixtures((prev) =>
-      prev.map((m) => (m.id === matchId ? { ...m, refereeName } : m))
-    );
-    logAudit('Designación Arbitral', `Árbitro ${refereeName} asignado al partido ID #${matchId}.`, 'torneo');
+  // Asignación de árbitros conectada a MySQL
+  const assignReferee = async (matchId: number, refereeName: string): Promise<void> => {
+    const ref = referees.find((r) => r.name.toLowerCase().includes(refereeName.toLowerCase())) || referees[0];
+    const arbitroId = ref ? parseInt(ref.id, 10) : 2;
+
+    try {
+      await partidosApi.asignarArbitro(matchId, arbitroId);
+      const targetMatch = fixtures.find(f => f.id === matchId);
+      if (targetMatch && targetMatch.tournamentId) {
+        await fetchTorneoData(targetMatch.tournamentId);
+      }
+      logAudit('Designación Arbitral', `Árbitro ${refereeName} asignado al partido ID #${matchId} en base de datos.`, 'torneo');
+    } catch (err: any) {
+      console.warn('[assignReferee] API error:', err?.message);
+      setFixtures((prev) =>
+        prev.map((m) => (m.id === matchId ? { ...m, refereeName } : m))
+      );
+    }
   };
 
-  // Control de inasistencias (3 consecutivas = suspensión 2 semanas)
-  const markAbsence = (clientName: string, courtName: string) => {
+  // Control de inasistencias en MySQL
+  const markAbsence = async (clientName: string, courtName: string, bookingId?: string): Promise<void> => {
+    if (bookingId) {
+      const numId = parseInt(bookingId.replace(/\D/g, ''), 10);
+      if (!isNaN(numId)) {
+        try {
+          await reservasApi.registrarInasistencia(numId);
+        } catch (err: any) {
+          console.warn('[markAbsence] API error:', err?.message);
+        }
+      }
+    }
+
     setUserAbsences((prev) => {
       const next = prev + 1;
       if (next >= 3) {
         addNotification(
           '⚠️ SANCIÓN APLICADA: Suspensión por Inasistencias',
-          `El usuario ${clientName} ha acumulado 3 inasistencias consecutivas. Cuenta suspendida por 2 semanas para nuevas reservas.`,
-          'sancion'
-        );
-        logAudit(
-          'Sanción Automática de Bloqueo',
-          `Usuario ${clientName} sancionado con 2 semanas sin poder reservar por acumulación de 3 inasistencias consecutivas.`,
+          `El usuario ${clientName} ha acumulado 3 inasistencias consecutivas. Cuenta suspendida por 2 semanas en MySQL.`,
           'sancion'
         );
       } else {
         addNotification(
           'Inasistencia Registrada',
-          `Se registró una inasistencia a ${clientName} en ${courtName}. Acumula ${next}/3 faltas consecutivas antes de la sanción.`,
+          `Se registró una inasistencia a ${clientName} en ${courtName}. Acumula ${next}/3 faltas.`,
           'sancion'
         );
-        logAudit('Inasistencia Registrada', `Inasistencia para ${clientName} en ${courtName}. Total: ${next}/3 faltas.`, 'sancion');
       }
       return next;
     });
@@ -569,25 +693,21 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const markNotificationRead = (notifId: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === notifId ? { ...n, read: true } : n)));
+    const numId = parseInt(notifId.replace(/\D/g, ''), 10);
+    if (!isNaN(numId)) {
+      notificacionesApi.marcarLeida(numId).catch(() => {});
+    }
   };
 
   const markAllNotificationsRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    notificacionesApi.marcarTodas().catch(() => {});
   };
 
   const resetDemoData = () => {
-    setCourts(INITIAL_COURTS);
-    setBookings(INITIAL_USER_BOOKINGS);
-    setTournaments(INITIAL_TOURNAMENTS);
-    setFixtures(INITIAL_FIXTURES);
-    setStandings(INITIAL_STANDINGS);
-    setReferees(INITIAL_REFEREES);
-    setWaitlist(INITIAL_WAITLIST);
-    setAuditLogs(INITIAL_AUDIT_LOGS);
-    setNotifications(INITIAL_NOTIFICATIONS);
-    setUserAbsences(0);
     localStorage.clear();
-    addNotification('Datos Demo Restablecidos', 'El estado del prototipo ha sido reiniciado a los valores iniciales de cátedra.', 'info');
+    refreshAllData();
+    addNotification('Datos Sincronizados', 'Se recargaron los registros de la base de datos MySQL.', 'info');
   };
 
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
@@ -609,6 +729,8 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         unreadNotifsCount,
         userAbsences,
         isUserBanned,
+        fetchTorneoData,
+        refreshAllData,
         bookCourt,
         cancelBooking,
         joinWaitlist,

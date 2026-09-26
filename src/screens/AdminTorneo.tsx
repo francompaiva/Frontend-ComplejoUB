@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import { type SportType, type Tournament, SQUAD_LIMITS } from '../data/mockData';
 import { torneosApi } from '../api/endpoints';
@@ -15,11 +15,42 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
     referees,
     createTournament,
     deleteTournament,
-    assignReferee
+    assignReferee,
+    fetchTorneoData
   } = useComplejo();
 
   const [activeTab, setActiveTab] = useState<'torneos' | 'fixture' | 'tabla'>('torneos');
+  const [selectedTorneoId, setSelectedTorneoId] = useState<string>('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isGeneratingFixture, setIsGeneratingFixture] = useState(false);
+  const [fixtureSuccessMsg, setFixtureSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (tournaments.length > 0) {
+      const exists = tournaments.some(t => t.id === selectedTorneoId);
+      const targetId = exists ? selectedTorneoId : tournaments[0].id;
+      if (targetId !== selectedTorneoId) {
+        setSelectedTorneoId(targetId);
+      }
+      fetchTorneoData(targetId);
+    }
+  }, [tournaments, selectedTorneoId, fetchTorneoData]);
+
+  const handleGenerarFixture = async (torneoId: string) => {
+    const numId = parseInt(torneoId.replace(/\D/g, ''), 10);
+    if (isNaN(numId)) return;
+    setIsGeneratingFixture(true);
+    try {
+      await torneosApi.generarFixture(numId);
+      await fetchTorneoData(numId);
+      setFixtureSuccessMsg('¡Fixture oficial generado y guardado en la base de datos MySQL!');
+      setTimeout(() => setFixtureSuccessMsg(null), 4500);
+    } catch (err: any) {
+      alert(`Error al generar fixture: ${err?.message || 'Verifica que el torneo tenga equipos inscriptos.'}`);
+    } finally {
+      setIsGeneratingFixture(false);
+    }
+  };
 
   // Deletion States (2-step confirmation)
   const [tournamentToDelete, setTournamentToDelete] = useState<Tournament | null>(null);
@@ -292,16 +323,51 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
       {/* TAB 2: FIXTURE OFICIAL */}
       {activeTab === 'fixture' && (
         <div className="bg-[#1e281d] border border-[#5a7056] rounded-2xl p-6 shadow-xl flex flex-col gap-6">
-          <div className="flex items-center justify-between flex-wrap gap-2">
+          {fixtureSuccessMsg && (
+            <div className="p-3.5 rounded-xl bg-emerald-950/70 border border-emerald-500/50 text-emerald-200 text-xs flex items-center justify-between shadow-lg">
+              <span>✅ {fixtureSuccessMsg}</span>
+              <button onClick={() => setFixtureSuccessMsg(null)} className="text-emerald-400 hover:text-white bg-transparent border-none cursor-pointer">✕</button>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between flex-wrap gap-4 border-b border-[#3b4d38] pb-4">
             <div>
               <h3 className="text-lg font-bold text-white">Fixture del Torneo Liga Todos Contra Todos</h3>
               <p className="text-xs text-[#a0a0a0] mt-0.5">
                 Generado automáticamente con asignación de canchas y rotación de fechas libres.
               </p>
             </div>
-            <span className="bg-[#293827] text-[#65c556] border border-[#5a7056] px-3 py-1 rounded-lg text-xs font-mono">
-              Total Partidos: {fixtures.length}
-            </span>
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-[#a0a0a0] font-semibold">Torneo:</label>
+                <select
+                  value={selectedTorneoId}
+                  onChange={(e) => setSelectedTorneoId(e.target.value)}
+                  className="bg-[#293827] border border-[#5a7056] text-white text-xs font-bold px-3 py-1.5 rounded-xl focus:outline-none focus:border-[#65c556]"
+                >
+                  {tournaments.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.sport})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                disabled={isGeneratingFixture || !selectedTorneoId}
+                onClick={() => handleGenerarFixture(selectedTorneoId)}
+                className="px-3.5 py-1.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs shadow transition-all cursor-pointer border-none flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <span>⚡</span>
+                <span>{isGeneratingFixture ? 'Generando...' : 'Generar Fixture Oficial'}</span>
+              </button>
+
+              <span className="bg-[#293827] text-[#65c556] border border-[#5a7056] px-3 py-1 rounded-lg text-xs font-mono">
+                Total: {fixtures.length} partidos
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -391,16 +457,32 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
       {/* TAB 3: TABLA DE POSICIONES */}
       {activeTab === 'tabla' && (
         <div className="bg-[#1e281d] border border-[#5a7056] rounded-2xl overflow-hidden shadow-xl">
-          <div className="px-6 py-4 border-b border-[#5a7056] flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-[#5a7056] flex items-center justify-between flex-wrap gap-4">
             <div>
               <h3 className="text-base font-bold text-white">Tabla Oficial de Posiciones</h3>
               <p className="text-xs text-[#a0a0a0]">
                 Criterio: Puntos &gt; Dif. Goles &gt; Goles a Favor
               </p>
             </div>
-            <span className="bg-[#293827] text-[#65c556] border border-[#5a7056] px-3 py-1 rounded-lg text-xs font-bold">
-              Actualización Automática
-            </span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-[#a0a0a0] font-semibold">Torneo:</label>
+                <select
+                  value={selectedTorneoId}
+                  onChange={(e) => setSelectedTorneoId(e.target.value)}
+                  className="bg-[#293827] border border-[#5a7056] text-white text-xs font-bold px-3 py-1.5 rounded-xl focus:outline-none focus:border-[#65c556]"
+                >
+                  {tournaments.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.sport})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <span className="bg-[#293827] text-[#65c556] border border-[#5a7056] px-3 py-1 rounded-lg text-xs font-bold">
+                Actualización Automática (Triggers BD)
+              </span>
+            </div>
           </div>
 
           <div className="overflow-x-auto">

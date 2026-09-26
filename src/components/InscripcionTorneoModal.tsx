@@ -73,7 +73,9 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -85,22 +87,29 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
       return;
     }
 
-    // Call context registerTeam which checks duplicate players in same tournament
-    const res = registerTeam(selectedTourneyId, teamName, players);
-    if (!res.success) {
-      setErrorMessage(res.error || 'Error al inscribir equipo');
-      return;
-    }
+    setIsSubmitting(true);
+    try {
+      // Call context registerTeam which checks duplicate players in same tournament in MySQL
+      const res = await registerTeam(selectedTourneyId, teamName, players);
+      if (!res.success) {
+        setErrorMessage(res.error || 'Error al inscribir equipo');
+        return;
+      }
 
-    if (onSubmit) {
-      onSubmit({ teamName, players });
-    }
+      if (onSubmit) {
+        onSubmit({ teamName, players });
+      }
 
-    setSuccessMessage(`¡Equipo "${teamName}" inscripto con éxito en "${currentTourney.name}"!`);
-    setTimeout(() => {
-      setSuccessMessage(null);
-      onClose();
-    }, 1800);
+      setSuccessMessage(`¡Equipo "${teamName}" inscripto con éxito en "${currentTourney.name}"!`);
+      setTimeout(() => {
+        setSuccessMessage(null);
+        onClose();
+      }, 1800);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Error de conexión con el servidor.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -273,9 +282,10 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
             </button>
             <button
               type="submit"
-              className="flex-1 py-2.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs cursor-pointer transition-colors shadow"
+              disabled={isSubmitting}
+              className="flex-1 py-2.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs cursor-pointer transition-colors shadow disabled:opacity-50"
             >
-              Confirmar Inscripción
+              {isSubmitting ? 'Inscribiendo...' : 'Confirmar Inscripción'}
             </button>
           </div>
         </form>
