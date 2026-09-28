@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
+import { IconBell } from './Icons';
 
 export const NotificationDropdown: React.FC = () => {
   const { notifications, unreadNotifsCount, markNotificationRead, markAllNotificationsRead } = useComplejo();
@@ -10,17 +11,10 @@ export const NotificationDropdown: React.FC = () => {
       {/* Botón campana con badge */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg bg-[#344732] hover:bg-[#3C503A] text-white border border-[#445941] transition"
+        className="relative p-2 rounded-lg bg-[#344732] hover:bg-[#3C503A] text-white border border-[#445941] transition cursor-pointer flex items-center justify-center"
         title="Notificaciones"
       >
-        <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-          />
-        </svg>
+        <IconBell size={20} className="text-white shrink-0" />
         {unreadNotifsCount > 0 && (
           <span className="absolute -top-1 -right-1 size-5 bg-[#65C556] text-[#293827] text-[11px] font-black rounded-full flex items-center justify-center shadow">
             {unreadNotifsCount}

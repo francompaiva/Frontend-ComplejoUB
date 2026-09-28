@@ -4,6 +4,10 @@ export const authApi = {
   login: (email: string, contrasena: string) => apiClient.post('/auth/login', { email, contrasena }),
   register: (data: { nombre: string; email: string; contrasena: string; rol?: string; telefono?: string }) =>
     apiClient.post('/auth/register', data),
+  verificarCodigo: (email: string, codigo: string) =>
+    apiClient.post('/auth/verificar-codigo', { email, codigo }),
+  reenviarCodigo: (email: string) =>
+    apiClient.post('/auth/reenviar-codigo', { email }),
   getMe: () => apiClient.get('/auth/me'),
 };
 
@@ -22,6 +26,7 @@ export const reservasApi = {
   create: (data: { canchaId: number; fecha: string; hora: string }) => apiClient.post('/reservas', data),
   cancelar: (id: number, motivo?: string) => apiClient.post(`/reservas/${id}/cancelar`, { motivo }),
   registrarInasistencia: (id: number) => apiClient.put(`/reservas/${id}/inasistencia`),
+  confirmarAsistencia: (id: number) => apiClient.put(`/reservas/${id}/asistencia`),
 };
 
 export const torneosApi = {
@@ -76,3 +81,12 @@ export const reportesApi = {
   getDashboard: () => apiClient.get('/reportes/dashboard'),
   getAuditoria: (limite = 50) => apiClient.get(`/reportes/auditoria?limite=${limite}`),
 };
+
+export const adminApi = {
+  getAdministradores: () => apiClient.get('/admin/administradores'),
+  promoverUsuario: (email: string, rol?: string) => apiClient.post('/admin/promover', { email, rol }),
+  crearAdministrador: (data: { nombre: string; email: string; contrasena: string; telefono?: string; rol?: string }) =>
+    apiClient.post('/admin/crear-admin', data),
+  revocarAdministrador: (id: number) => apiClient.delete(`/admin/revocar/${id}`),
+};
+

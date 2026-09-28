@@ -33,12 +33,22 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
   const { tournaments, registerTeam } = useComplejo();
 
   const [selectedTourneyId, setSelectedTourneyId] = useState<string>(
-    tournamentId || tournaments[0]?.id || 't1'
+    tournamentId || tournaments.find(t => t.status === 'Inscripciones abiertas')?.id || tournaments[0]?.id || '1'
   );
   const [teamName, setTeamName] = useState('Los Imparables FC');
   const [players, setPlayers] = useState<TournamentPlayer[]>(DEFAULT_PLAYERS);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (tournamentId) {
+      setSelectedTourneyId(tournamentId);
+    } else if (tournaments.length > 0) {
+      const openT = tournaments.find((t) => t.status === 'Inscripciones abiertas');
+      if (openT) setSelectedTourneyId(openT.id);
+      else setSelectedTourneyId(tournaments[0].id);
+    }
+  }, [tournamentId, isOpen, tournaments]);
 
   if (!isOpen) return null;
 
@@ -169,7 +179,7 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
             >
               {tournaments.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name} ({t.sport}) • Inscripción: ${t.entryFee.toLocaleString('es-AR')}
+                  {t.name} ({t.sport}) • {t.status} • Inscripción: ${t.entryFee.toLocaleString('es-AR')}
                 </option>
               ))}
             </select>

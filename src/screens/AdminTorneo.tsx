@@ -28,7 +28,8 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
   useEffect(() => {
     if (tournaments.length > 0) {
       const exists = tournaments.some(t => t.id === selectedTorneoId);
-      const targetId = exists ? selectedTorneoId : tournaments[0].id;
+      const defaultTorneo = tournaments.find(t => t.status === 'En curso') || tournaments[0];
+      const targetId = exists ? selectedTorneoId : defaultTorneo.id;
       if (targetId !== selectedTorneoId) {
         setSelectedTorneoId(targetId);
       }

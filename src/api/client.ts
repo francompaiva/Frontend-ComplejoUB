@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1';
+const DEFAULT_URL = import.meta.env.DEV ? '/api/v1' : 'http://127.0.0.1:4000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || DEFAULT_URL;
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -42,14 +43,31 @@ class ApiClient {
     }
 
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          ...options,
+          headers,
+        });
+      } catch (networkErr: any) {
+        // Fallback: Si falló la ruta relativa del proxy (/api/v1), intentar directo contra http://127.0.0.1:4000
+        if (API_BASE_URL.startsWith('/')) {
+          const directUrl = `http://127.0.0.1:4000${url}`;
+          response = await fetch(directUrl, {
+            ...options,
+            headers,
+          });
+        } else {
+          throw networkErr;
+        }
+      }
 
       const json: ApiResponse<T> = await response.json();
 
       if (!response.ok || !json.success) {
+        if (response.status === 401) {
+          this.setToken(null);
+        }
         const errorMsg = json.error?.message || `Error en la solicitud HTTP (${response.status})`;
         throw new Error(errorMsg);
       }

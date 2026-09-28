@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
+import { IconAlert, IconCheck, IconTrophy, IconCalendar } from '../components/Icons';
 
 interface AgendaRow {
   hour: string;
-  c1: { text: string; client?: string; occupied: boolean; absent?: boolean; tournament?: boolean };
-  c2: { text: string; client?: string; occupied: boolean; absent?: boolean; tournament?: boolean };
-  c3: { text: string; client?: string; occupied: boolean; absent?: boolean; tournament?: boolean };
-  c4: { text: string; client?: string; occupied: boolean; absent?: boolean; tournament?: boolean };
+  c1: { text: string; client?: string; occupied: boolean; absent?: boolean; attended?: boolean; tournament?: boolean };
+  c2: { text: string; client?: string; occupied: boolean; absent?: boolean; attended?: boolean; tournament?: boolean };
+  c3: { text: string; client?: string; occupied: boolean; absent?: boolean; attended?: boolean; tournament?: boolean };
+  c4: { text: string; client?: string; occupied: boolean; absent?: boolean; attended?: boolean; tournament?: boolean };
 }
 
 const INITIAL_SCHEDULE: AgendaRow[] = [
@@ -48,14 +49,14 @@ const INITIAL_SCHEDULE: AgendaRow[] = [
 ];
 
 export const AdminAgenda: React.FC = () => {
-  const { markAbsence, userAbsences, isUserBanned } = useComplejo();
+  const { markAbsence, confirmarAsistencia, userAbsences, isUserBanned } = useComplejo();
   const [rows, setRows] = useState<AgendaRow[]>(INITIAL_SCHEDULE);
   const [weekendTournamentActive, setWeekendTournamentActive] = useState(true);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'warn' } | null>(null);
 
-  const notify = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3500);
+  const notify = (text: string, type: 'success' | 'warn' = 'warn') => {
+    setToastMsg({ text, type });
+    setTimeout(() => setToastMsg(null), 3800);
   };
 
   const handleMarkAbsent = (hour: string, courtKey: 'c1' | 'c2' | 'c3' | 'c4', clientName: string) => {
@@ -67,7 +68,8 @@ export const AdminAgenda: React.FC = () => {
             [courtKey]: {
               ...r[courtKey],
               absent: true,
-              text: `⚠️ Inasistencia (${clientName})`
+              attended: false,
+              text: `Inasistencia (${clientName})`
             }
           };
         }
@@ -75,22 +77,52 @@ export const AdminAgenda: React.FC = () => {
       })
     );
     markAbsence(clientName, `Cancha ${courtKey.toUpperCase()}`);
-    notify(`Inasistencia registrada para ${clientName}. Total de faltas acumuladas: ${userAbsences + 1}/3`);
+    notify(`Inasistencia registrada para ${clientName}. Faltas consecutivas: ${Math.min(userAbsences + 1, 3)}/3`, 'warn');
+  };
+
+  const handleConfirmAttendance = async (hour: string, courtKey: 'c1' | 'c2' | 'c3' | 'c4', clientName: string) => {
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.hour === hour) {
+          return {
+            ...r,
+            [courtKey]: {
+              ...r[courtKey],
+              attended: true,
+              absent: false,
+              text: `Asistió (${clientName})`
+            }
+          };
+        }
+        return r;
+      })
+    );
+    await confirmarAsistencia('1');
+    notify(`Asistencia confirmada para ${clientName}. Contador de inasistencias consecutivas reiniciado a 0.`, 'success');
   };
 
   return (
     <div className="flex flex-col gap-6 p-6 lg:p-8 bg-[#293827] min-h-full text-white font-['Inter',sans-serif]">
       {toastMsg && (
-        <div className="fixed top-14 right-6 z-50 bg-[#1e281d] border-2 border-[#f59e0b] text-[#f59e0b] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2">
-          <span>⚠️</span>
-          <span className="text-xs font-bold">{toastMsg}</span>
+        <div
+          className={`fixed top-14 right-6 z-50 bg-[#1e281d] border-2 ${
+            toastMsg.type === 'success' ? 'border-[#65c556] text-[#65c556]' : 'border-[#f59e0b] text-[#f59e0b]'
+          } px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 backdrop-blur-md`}
+        >
+          {toastMsg.type === 'success' ? (
+            <IconCheck size={18} className="shrink-0 text-white" />
+          ) : (
+            <IconAlert size={18} className="shrink-0 text-white" />
+          )}
+          <span className="text-xs font-bold">{toastMsg.text}</span>
         </div>
       )}
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            <IconCalendar size={24} className="text-[#65c556] shrink-0" />
             <h1 className="font-bold text-2xl text-white">Agenda Diaria de Turnos</h1>
           </div>
           <p className="font-normal text-sm text-[#a0a0a0] mt-1">
@@ -98,29 +130,48 @@ export const AdminAgenda: React.FC = () => {
           </p>
         </div>
 
-        {/* Weekend Tournament Switcher */}
-        <div className="flex items-center gap-3 bg-[#1e281d] border border-[#5a7056] px-4 py-2.5 rounded-xl">
-          <span className="text-xs font-semibold text-[#c0c0c0]">
-            Torneo de Fin de Semana:
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              setWeekendTournamentActive(!weekendTournamentActive);
-              notify(
-                !weekendTournamentActive
-                  ? 'Fin de semana con torneo: Canchas 1 y 2 bloqueadas para reservas comunes.'
-                  : 'Sin torneos: Horarios de fin de semana liberados para reservas normales.'
-              );
-            }}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer border ${
-              weekendTournamentActive
-                ? 'bg-[#65c556] text-[#293827] border-[#65c556]'
-                : 'bg-[#293827] text-[#a0a0a0] border-[#5a7056]'
-            }`}
-          >
-            {weekendTournamentActive ? '✓ Torneo Activo (Bloqueo)' : '✕ Sin Torneo (Libre)'}
-          </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Absences Counter Live Badge */}
+          <div className="flex items-center gap-2 bg-[#1e281d] border border-[#5a7056] px-3.5 py-2 rounded-xl text-xs">
+            <span className="text-neutral-400">Faltas Juan Pérez:</span>
+            <span
+              className={`font-black px-2 py-0.5 rounded-full ${
+                userAbsences >= 3
+                  ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                  : userAbsences > 0
+                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                  : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+              }`}
+            >
+              {userAbsences} / 3 consecutivas
+            </span>
+          </div>
+
+          {/* Weekend Tournament Switcher */}
+          <div className="flex items-center gap-3 bg-[#1e281d] border border-[#5a7056] px-4 py-2 rounded-xl">
+            <span className="text-xs font-semibold text-[#c0c0c0]">
+              Torneo Fin de Semana:
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setWeekendTournamentActive(!weekendTournamentActive);
+                notify(
+                  !weekendTournamentActive
+                    ? 'Fin de semana con torneo: Canchas 1 y 2 bloqueadas para reservas comunes.'
+                    : 'Sin torneos: Horarios de fin de semana liberados para reservas normales.',
+                  'warn'
+                );
+              }}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer border ${
+                weekendTournamentActive
+                  ? 'bg-[#65c556] text-[#293827] border-[#65c556]'
+                  : 'bg-[#293827] text-[#a0a0a0] border-[#5a7056]'
+              }`}
+            >
+              {weekendTournamentActive ? '✓ Torneo Activo (Bloqueo)' : '✕ Sin Torneo (Libre)'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -128,17 +179,17 @@ export const AdminAgenda: React.FC = () => {
       {isUserBanned && (
         <div className="bg-[rgba(229,62,62,0.15)] border-2 border-[#e53e3e] rounded-2xl p-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">🚫</span>
+            <IconAlert size={24} className="text-[#e53e3e] shrink-0" />
             <div>
               <p className="font-bold text-sm text-[#e53e3e]">
-                Sanción Activa por Inasistencias
+                Sanción Activa por Inasistencias Consecutivas
               </p>
               <p className="text-xs text-[#c0c0c0]">
-                El usuario demo Juan Pérez ha acumulado <strong>3 inasistencias consecutivas</strong>. Suspensión de reservas vigente por 2 semanas.
+                El usuario demo Juan Pérez ha alcanzado <strong>3 inasistencias consecutivas</strong>. Cuenta suspendida por 14 días. Tras la aplicación de la sanción, el contador se restableció a 0.
               </p>
             </div>
           </div>
-          <span className="bg-[#e53e3e] text-white text-[11px] font-black px-3 py-1 rounded-full uppercase">
+          <span className="bg-[#e53e3e] text-white text-[11px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
             Suspendido
           </span>
         </div>
@@ -146,10 +197,10 @@ export const AdminAgenda: React.FC = () => {
 
       {/* Weekend tournament notice badge */}
       {weekendTournamentActive && (
-        <div className="bg-[rgba(245,158,11,0.15)] border border-[#f59e0b] rounded-xl p-3 flex items-center gap-3 text-xs text-[#f59e0b]">
-          <span>🏆</span>
-          <span>
-            <strong>Torneo Activo:</strong> El sistema detectó torneos programados para este fin de semana. Las reservas comunes quedan deshabilitadas en horarios asignados al fixture.
+        <div className="bg-[rgba(245,158,11,0.15)] border border-[#f59e0b] rounded-xl p-3 flex items-start sm:items-center gap-3 text-xs text-[#f59e0b] shadow-md">
+          <IconTrophy size={18} className="shrink-0 mt-0.5 sm:mt-0 text-[#f59e0b]" />
+          <span className="leading-relaxed">
+            <strong className="font-bold">Torneo Activo:</strong> El sistema detectó torneos programados para este fin de semana. Las reservas comunes quedan deshabilitadas en horarios asignados al fixture.
           </span>
         </div>
       )}
@@ -177,13 +228,15 @@ export const AdminAgenda: React.FC = () => {
                   {(['c1', 'c2', 'c3', 'c4'] as const).map((colKey) => {
                     const slot = row[colKey];
                     return (
-                      <td key={colKey} className="py-4 px-4 min-w-[200px]">
+                      <td key={colKey} className="py-4 px-4 min-w-[220px]">
                         <div
-                          className={`p-2.5 rounded-xl border flex flex-col gap-1.5 ${
+                          className={`p-3 rounded-xl border flex flex-col gap-2 ${
                             slot.tournament
                               ? 'bg-[rgba(245,158,11,0.12)] border-[#f59e0b]/40 text-[#f59e0b]'
                               : slot.absent
                               ? 'bg-[rgba(229,62,62,0.15)] border-[#e53e3e] text-[#e53e3e]'
+                              : slot.attended
+                              ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
                               : slot.occupied
                               ? 'bg-[rgba(101,197,86,0.12)] border-[#65c556]/40 text-white'
                               : slot.text.includes('Mantenimiento')
@@ -198,16 +251,28 @@ export const AdminAgenda: React.FC = () => {
                             )}
                           </div>
 
-                          {/* Action button: mark absence */}
-                          {slot.occupied && !slot.tournament && !slot.absent && slot.client && (
-                            <button
-                              type="button"
-                              onClick={() => handleMarkAbsent(row.hour, colKey, slot.client!)}
-                              className="text-[10px] self-start mt-1 text-[#e53e3e] hover:underline cursor-pointer bg-transparent border-none p-0 font-medium"
-                              title="Si el cliente acumula 3 faltas consecutivas queda suspendido por 2 semanas"
-                            >
-                              ✕ Marcar Inasistencia
-                            </button>
+                          {/* Action buttons: confirm attendance or mark absence */}
+                          {slot.occupied && !slot.tournament && !slot.absent && !slot.attended && slot.client && (
+                            <div className="flex items-center gap-2 mt-1 pt-1.5 border-t border-[#5a7056]/30">
+                              <button
+                                type="button"
+                                onClick={() => handleConfirmAttendance(row.hour, colKey, slot.client!)}
+                                className="inline-flex items-center gap-1 text-[11px] text-[#65c556] hover:bg-[#65c556]/20 px-2 py-0.5 rounded cursor-pointer transition-colors bg-transparent border border-[#65c556]/30 font-semibold"
+                                title="Registra asistencia y resetea a 0 las faltas consecutivas"
+                              >
+                                <IconCheck size={12} className="text-[#65c556] shrink-0" />
+                                Asistió
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMarkAbsent(row.hour, colKey, slot.client!)}
+                                className="inline-flex items-center gap-1 text-[11px] text-[#e53e3e] hover:bg-[#e53e3e]/20 px-2 py-0.5 rounded cursor-pointer transition-colors bg-transparent border border-[#e53e3e]/30 font-semibold"
+                                title="Si acumula 3 faltas consecutivas se suspende por 14 días"
+                              >
+                                <IconAlert size={12} className="text-[#e53e3e] shrink-0" />
+                                Inasistencia
+                              </button>
+                            </div>
                           )}
                         </div>
                       </td>
@@ -222,5 +287,6 @@ export const AdminAgenda: React.FC = () => {
     </div>
   );
 };
+
 
 export default AdminAgenda;

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import type { StandingRow, FixtureMatch } from '../data/mockData';
+import { IconPlus } from '../components/Icons';
 
 interface MisTorneosProps {
   onNavigate: (screen: any) => void;
-  onOpenInscripcion: () => void;
+  onOpenInscripcion: (tournamentId?: string) => void;
 }
 
 export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscripcion }) => {
@@ -15,7 +16,8 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
   useEffect(() => {
     if (tournaments.length > 0) {
       const exists = tournaments.some(t => t.id === selectedTorneoId);
-      const targetId = exists ? selectedTorneoId : tournaments[0].id;
+      const defaultTorneo = tournaments.find(t => t.status === 'En curso') || tournaments[0];
+      const targetId = exists ? selectedTorneoId : defaultTorneo.id;
       if (targetId !== selectedTorneoId) {
         setSelectedTorneoId(targetId);
       }
@@ -41,83 +43,8 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
     f => String(f.tournamentId) === String(selectedTorneo.id) || f.tournamentName.includes(selectedTorneo.name)
   );
 
-  const handleBrandClick = () => {
-    if (userRole === 'arbitro') onNavigate('arbitro');
-    else if (userRole === 'admin') onNavigate('admin-agenda');
-    else onNavigate('landing');
-  };
-
   return (
     <div className="flex flex-col min-h-screen bg-[#293827] text-white font-['Inter',sans-serif]">
-      {/* Navbar principal */}
-      <header className="sticky top-0 z-40 bg-[#293827]/95 backdrop-blur border-b border-[#445941] px-6 lg:px-12 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={handleBrandClick}>
-          <div className="size-9 bg-[#65C556] rounded-lg flex items-center justify-center font-black text-[#293827]">
-            UB
-          </div>
-          <span className="font-extrabold text-lg tracking-tight">Complejo Deportivo UB</span>
-        </div>
-
-        {userRole === 'arbitro' ? (
-          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-[#A3B89E]">
-            <button onClick={() => onNavigate('arbitro')} className="hover:text-white transition flex items-center gap-1.5 cursor-pointer">
-              <span>←</span> Volver al Panel Arbitral
-            </button>
-            <span className="text-[#65C556] font-bold">
-              Fixture y Posiciones Oficiales
-            </span>
-          </nav>
-        ) : userRole === 'admin' ? (
-          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-[#A3B89E]">
-            <button onClick={() => onNavigate('admin-agenda')} className="hover:text-white transition flex items-center gap-1.5 cursor-pointer">
-              <span>←</span> Volver al Panel Admin
-            </button>
-            <span className="text-[#65C556] font-bold">
-              Torneos y Posiciones
-            </span>
-          </nav>
-        ) : (
-          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-[#A3B89E]">
-            <button onClick={() => onNavigate('landing')} className="hover:text-white transition cursor-pointer">
-              Canchas
-            </button>
-            <button onClick={() => onNavigate('mis-reservas')} className="hover:text-white transition cursor-pointer">
-              Mis Reservas
-            </button>
-            <span className="text-[#65C556] font-bold">
-              Torneos
-            </span>
-            <button onClick={() => onNavigate('mis-reservas')} className="hover:text-white transition cursor-pointer">
-              Mi Perfil
-            </button>
-          </nav>
-        )}
-
-        <div className="flex items-center gap-4">
-          {userRole === 'arbitro' ? (
-            <button
-              onClick={() => onNavigate('arbitro')}
-              className="bg-[#65C556] hover:bg-[#52ad44] text-[#293827] font-bold text-sm px-5 py-2.5 rounded-lg transition shadow-md shadow-[#65C556]/10 flex items-center gap-1.5 cursor-pointer"
-            >
-              <span>⏱️</span> Panel Arbitral
-            </button>
-          ) : userRole === 'admin' ? (
-            <button
-              onClick={() => onNavigate('admin-torneo')}
-              className="bg-[#65C556] hover:bg-[#52ad44] text-[#293827] font-bold text-sm px-5 py-2.5 rounded-lg transition shadow-md shadow-[#65C556]/10 flex items-center gap-1.5 cursor-pointer"
-            >
-              <span>🏆</span> Gestionar Torneos
-            </button>
-          ) : (
-            <button
-              onClick={() => onNavigate('landing')}
-              className="bg-[#65C556] hover:bg-[#52ad44] text-[#293827] font-bold text-sm px-5 py-2.5 rounded-lg transition shadow-md shadow-[#65C556]/10 cursor-pointer"
-            >
-              Reservar Cancha
-            </button>
-          )}
-        </div>
-      </header>
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 lg:px-12 py-10">
@@ -128,17 +55,23 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
               Competencias oficiales modalidad liga. Consulta tablas de posiciones, fixtures e inscribe a tu equipo.
             </p>
           </div>
-          {userRole !== 'arbitro' && (
+          <div className="flex items-center gap-3">
             <button
-              onClick={onOpenInscripcion}
-              className="inline-flex items-center justify-center gap-2 bg-[#65C556] hover:bg-[#54b045] text-[#293827] font-extrabold px-6 py-3 rounded-lg shadow-lg shadow-[#65C556]/20 transition cursor-pointer"
+              onClick={() => onNavigate('landing')}
+              className="inline-flex items-center justify-center gap-2 bg-[#1e281d] hover:bg-[#3b4d38] border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold px-4 py-3 rounded-lg transition cursor-pointer text-xs"
             >
-              <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Inscribir Mi Equipo
+              ← Volver a Canchas
             </button>
-          )}
+            {userRole !== 'arbitro' && (
+              <button
+                onClick={() => onOpenInscripcion(selectedTorneo.id)}
+                className="inline-flex items-center justify-center gap-2 bg-[#65C556] hover:bg-[#54b045] text-[#293827] font-extrabold px-6 py-3 rounded-lg shadow-lg shadow-[#65C556]/20 transition cursor-pointer text-sm"
+              >
+                <IconPlus size={18} className="shrink-0" />
+                Inscribir Mi Equipo
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Torneos Grid Cards (Figma 242:1726) */}

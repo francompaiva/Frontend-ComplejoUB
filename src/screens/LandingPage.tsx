@@ -3,23 +3,63 @@ import { useComplejo } from '../context/ComplejoContext';
 import { type BookingSlotInfo } from '../components/ConfirmacionPagoModal';
 import { type SportType, SPORT_PRICING } from '../data/mockData';
 import ListaEsperaModal from '../components/ListaEsperaModal';
+import { IconCalendar, IconClock } from '../components/Icons';
 
 export interface LandingPageProps {
   onNavigate: (screen: string) => void;
-  onOpenInscripcion: () => void;
+  onOpenInscripcion: (tournamentId?: string) => void;
   onOpenPago: (slotData: BookingSlotInfo) => void;
 }
 
-const HOURS = ['17:00 hs', '18:00 hs', '19:00 hs', '20:00 hs', '21:00 hs', '22:00 hs'];
+const ALL_HOURS = [
+  '09:00 hs',
+  '10:00 hs',
+  '11:00 hs',
+  '12:00 hs',
+  '13:00 hs',
+  '14:00 hs',
+  '15:00 hs',
+  '16:00 hs',
+  '17:00 hs',
+  '18:00 hs',
+  '19:00 hs',
+  '20:00 hs',
+  '21:00 hs',
+  '22:00 hs',
+  '23:00 hs'
+];
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   onNavigate,
   onOpenInscripcion,
   onOpenPago
 }) => {
-  const { tournaments, standings, courts, bookings, fixtures, unreadNotifsCount, joinWaitlist } = useComplejo();
+  const { tournaments, standings, courts, bookings, fixtures, joinWaitlist } = useComplejo();
   const [selectedSport, setSelectedSport] = useState<SportType>('Fútbol 5');
-  const [selectedDay, setSelectedDay] = useState<'Hoy' | 'Mañana' | 'Sábado' | 'Domingo'>('Hoy');
+
+  // Fechas de conveniencia
+  const todayStr = new Date().toISOString().split('T')[0];
+  const tomorrowStr = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  })();
+  const saturdayStr = (() => {
+    const d = new Date();
+    const diff = (6 - d.getDay() + 7) % 7 || 7;
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().split('T')[0];
+  })();
+  const sundayStr = (() => {
+    const d = new Date();
+    const diff = (7 - d.getDay()) % 7 || 7;
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().split('T')[0];
+  })();
+
+  // Selección de fecha interactiva (por defecto Hoy)
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [shiftFilter, setShiftFilter] = useState<'all' | 'evening' | 'morning'>('all');
 
   // Modal lista de espera
   const [waitlistModal, setWaitlistModal] = useState<{
@@ -34,37 +74,32 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     time: ''
   });
 
-  const isWeekend = selectedDay === 'Sábado' || selectedDay === 'Domingo';
+  const dateObj = new Date(selectedDate + 'T00:00:00');
+  const dayOfWeek = dateObj.getDay(); // 0 = Domingo, 6 = Sábado
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
   // Canchas filtradas por deporte
   const filteredCourts = courts.filter((c) => c.sport === selectedSport);
 
-  const getTargetDate = (day: 'Hoy' | 'Mañana' | 'Sábado' | 'Domingo'): string => {
-    const d = new Date();
-    if (day === 'Mañana') {
-      d.setDate(d.getDate() + 1);
-    } else if (day === 'Sábado') {
-      const diff = (6 - d.getDay() + 7) % 7 || 7;
-      d.setDate(d.getDate() + diff);
-    } else if (day === 'Domingo') {
-      const diff = (7 - d.getDay()) % 7 || 7;
-      d.setDate(d.getDate() + diff);
-    }
-    return d.toISOString().split('T')[0];
-  };
+  // Filtrado de franjas horarias por turno
+  const displayedHours = ALL_HOURS.filter((h) => {
+    const hourNum = parseInt(h.split(':')[0], 10);
+    if (shiftFilter === 'morning') return hourNum >= 9 && hourNum < 17;
+    if (shiftFilter === 'evening') return hourNum >= 17;
+    return true;
+  });
 
-  const targetDateStr = getTargetDate(selectedDay);
-
+  // Verificación de disponibilidad slot por slot (Cancha y Hora específica)
   const getSlotStatus = (courtName: string, hour: string) => {
     const cleanHour = hour.replace(' hs', '').trim();
 
-    // 1. Partido de torneo en esa cancha y horario
+    // 1. Partido de torneo en ESA cancha específica y en ESE horario exacto
     const matchOnCourt = fixtures.find(
       (m) =>
         !m.isFreeDate &&
         (m.court === courtName || courtName.includes(m.court) || m.court.includes(courtName)) &&
         m.time?.slice(0, 5) === cleanHour &&
-        (m.date === targetDateStr || isWeekend)
+        m.date === selectedDate
     );
 
     if (matchOnCourt) {
@@ -74,12 +109,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       };
     }
 
-    // 2. Reserva activa en esa cancha y horario en la base de datos
+    // 2. Reserva activa en ESA cancha específica y en ESE horario en la base de datos
     const bookingOnCourt = bookings.find(
       (b) =>
         (b.courtName === courtName || courtName.includes(b.courtName) || b.courtName.includes(courtName)) &&
         b.time?.slice(0, 5) === cleanHour &&
-        (b.date === targetDateStr || b.date === selectedDay) &&
+        b.date === selectedDate &&
         b.status !== 'Cancelada'
     );
 
@@ -94,72 +129,24 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     setWaitlistModal({
       isOpen: true,
       courtName,
-      date: selectedDay,
+      date: selectedDate,
       time: hour
     });
   };
 
+  // Formato legible para la fecha seleccionada
+  const formattedSelectedDate = (() => {
+    try {
+      const parts = selectedDate.split('-');
+      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      return d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    } catch {
+      return selectedDate;
+    }
+  })();
+
   return (
     <div className="bg-[#293827] min-h-full w-full font-['Inter',sans-serif] text-white flex flex-col">
-      {/* Top Navbar */}
-      <nav className="bg-[#1e281d] border-b border-[#5a7056] px-6 lg:px-12 py-3 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-3">
-          <div className="bg-[rgba(101,197,86,0.15)] flex items-center justify-center rounded-xl size-9 border border-[#65c556] text-xl">
-            ⚽
-          </div>
-          <div>
-            <span className="font-extrabold text-base tracking-tight text-white">
-              Complejo Deportivo <strong className="text-[#65c556]">UB</strong>
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-6">
-          <button
-            type="button"
-            onClick={() => onNavigate('landing')}
-            className="text-xs font-bold text-[#65c556] cursor-pointer bg-transparent border-none"
-          >
-            Canchas
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('mis-reservas')}
-            className="text-xs font-semibold text-[#c0c0c0] hover:text-white transition-colors cursor-pointer bg-transparent border-none"
-          >
-            Mis Reservas
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('mis-torneos')}
-            className="text-xs font-semibold text-[#c0c0c0] hover:text-white transition-colors cursor-pointer bg-transparent border-none"
-          >
-            Torneos
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('mis-reservas')}
-            className="text-xs font-semibold text-[#c0c0c0] hover:text-white transition-colors cursor-pointer bg-transparent border-none"
-          >
-            Mi Perfil
-          </button>
-
-          {/* Notification Indicator */}
-          <div
-            onClick={() => onNavigate('mis-reservas')}
-            className="relative cursor-pointer flex items-center justify-center size-8 rounded-full bg-[#293827] border border-[#5a7056] hover:border-[#65c556]"
-            title="Centro de Notificaciones"
-          >
-            <span>🔔</span>
-            {unreadNotifsCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-[#e53e3e] text-white text-[9px] font-black size-4 rounded-full flex items-center justify-center">
-                {unreadNotifsCount}
-              </span>
-            )}
-          </div>
-        </div>
-      </nav>
-
       {/* Hero Banner */}
       <div className="relative overflow-hidden bg-gradient-to-b from-[#1a2e18] via-[#233821] to-[#293827] py-14 px-6 lg:px-12 text-center border-b border-[#5a7056]/50">
         <span className="inline-block bg-[rgba(101,197,86,0.15)] text-[#65c556] border border-[#65c556]/40 text-xs font-extrabold uppercase px-3 py-1 rounded-full mb-3 tracking-wider">
@@ -192,30 +179,124 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
       {/* Schedule Table Section */}
       <div className="px-6 lg:px-12 py-10 flex flex-col gap-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-white">Disponibilidad de Turnos</h2>
-            <p className="text-xs text-[#a0a0a0] mt-0.5">
+            <div className="flex items-center gap-2">
+              <h2 className="text-2xl font-bold text-white">Disponibilidad de Turnos</h2>
+              <span className="text-xs bg-[#1e281d] text-[#65c556] border border-[#5a7056] px-2.5 py-0.5 rounded-full capitalize font-semibold">
+                {formattedSelectedDate}
+              </span>
+            </div>
+            <p className="text-xs text-[#a0a0a0] mt-1">
               Tarifa fija para {selectedSport}: <strong className="text-[#65c556]">${(SPORT_PRICING[selectedSport] || 18000).toLocaleString('es-AR')}</strong> (Seña 30%: ${Math.round((SPORT_PRICING[selectedSport] || 18000) * 0.3).toLocaleString('es-AR')})
             </p>
           </div>
 
-          {/* Day filter */}
-          <div className="flex items-center gap-1.5 bg-[#1e281d] p-1.5 rounded-xl border border-[#5a7056]">
-            {(['Hoy', 'Mañana', 'Sábado', 'Domingo'] as const).map((day) => (
+          {/* Interactive Date & Filter Controls */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Quick date shortcuts */}
+            <div className="flex items-center gap-1 bg-[#1e281d] p-1.5 rounded-xl border border-[#5a7056]">
               <button
-                key={day}
                 type="button"
-                onClick={() => setSelectedDay(day)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                  selectedDay === day
-                    ? 'bg-[#65c556] text-[#293827] font-bold'
+                onClick={() => setSelectedDate(todayStr)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  selectedDate === todayStr
+                    ? 'bg-[#65c556] text-[#293827] font-bold shadow'
                     : 'text-[#a0a0a0] hover:text-white'
                 }`}
               >
-                {day}
+                Hoy
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => setSelectedDate(tomorrowStr)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  selectedDate === tomorrowStr
+                    ? 'bg-[#65c556] text-[#293827] font-bold shadow'
+                    : 'text-[#a0a0a0] hover:text-white'
+                }`}
+              >
+                Mañana
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedDate(saturdayStr)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  selectedDate === saturdayStr
+                    ? 'bg-[#65c556] text-[#293827] font-bold shadow'
+                    : 'text-[#a0a0a0] hover:text-white'
+                }`}
+              >
+                Sábado
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedDate(sundayStr)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  selectedDate === sundayStr
+                    ? 'bg-[#65c556] text-[#293827] font-bold shadow'
+                    : 'text-[#a0a0a0] hover:text-white'
+                }`}
+              >
+                Domingo
+              </button>
+            </div>
+
+            {/* Interactive Calendar Date Picker */}
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border"
+              style={{ backgroundColor: '#1e281d', borderColor: '#5a7056' }}
+            >
+              <IconCalendar size={16} className="text-[#65c556]" />
+              <input
+                type="date"
+                min={todayStr}
+                value={selectedDate}
+                onChange={(e) => {
+                  if (e.target.value) setSelectedDate(e.target.value);
+                }}
+                className="bg-transparent text-xs text-white focus:outline-none cursor-pointer font-bold"
+                style={{ colorScheme: 'dark' }}
+                title="Elegir cualquier fecha en el calendario"
+              />
+            </div>
+
+            {/* Shift Filter (Turno) */}
+            <div className="flex items-center gap-1 bg-[#1e281d] p-1.5 rounded-xl border border-[#5a7056]">
+              <button
+                type="button"
+                onClick={() => setShiftFilter('all')}
+                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
+                  shiftFilter === 'all'
+                    ? 'bg-[#65c556] text-[#293827] font-bold shadow'
+                    : 'text-[#a0a0a0] hover:text-white'
+                }`}
+              >
+                Todos los Horarios
+              </button>
+              <button
+                type="button"
+                onClick={() => setShiftFilter('morning')}
+                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
+                  shiftFilter === 'morning'
+                    ? 'bg-[#65c556] text-[#293827] font-bold shadow'
+                    : 'text-[#a0a0a0] hover:text-white'
+                }`}
+              >
+                Mañana (9-16h)
+              </button>
+              <button
+                type="button"
+                onClick={() => setShiftFilter('evening')}
+                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
+                  shiftFilter === 'evening'
+                    ? 'bg-[#65c556] text-[#293827] font-bold shadow'
+                    : 'text-[#a0a0a0] hover:text-white'
+                }`}
+              >
+                Tarde/Noche (17-23h)
+              </button>
+            </div>
           </div>
         </div>
 
@@ -224,7 +305,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="bg-[rgba(245,158,11,0.15)] border border-[#f59e0b] rounded-xl p-3 flex items-center gap-3 text-xs text-[#f59e0b]">
             <span className="text-base">🏆</span>
             <span>
-              <strong>Aviso de Fin de Semana:</strong> Durante el fin de semana se disputan las fechas del torneo oficial en las canchas principales. Los horarios afectados están reservados exclusivamente para los partidos de liga.
+              <strong>Aviso de Torneo Oficial (RF-06):</strong> Durante el fin de semana se disputan las fechas del torneo oficial en las canchas programadas. Cada partido ocupa únicamente su cancha y horario asignado; todas las demás canchas u horarios libres están 100% habilitados para reservas comunes con el 30% de seña.
             </span>
           </div>
         )}
@@ -235,7 +316,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <table className="w-full text-center text-xs">
               <thead>
                 <tr className="border-b border-[#5a7056] bg-[#293827] text-[#a0a0a0]">
-                  <th className="py-3 px-4 text-left font-bold w-24">HORARIO</th>
+                  <th className="py-3 px-4 text-left font-bold w-28">HORARIO</th>
                   {filteredCourts.map((c) => (
                     <th key={c.id} className="py-3 px-4 font-bold text-white">
                       {c.name}
@@ -249,10 +330,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#293827]">
-                {HOURS.map((hour) => (
+                {displayedHours.map((hour) => (
                   <tr key={hour} className="hover:bg-[#293827]/30 transition-colors">
-                    <td className="py-4 px-4 text-left font-mono font-bold text-[#65c556]">
-                      {hour}
+                    <td className="py-4 px-4 text-left font-mono font-bold text-[#65c556] flex items-center gap-1.5">
+                      <IconClock size={13} className="text-[#5a7056]" />
+                      <span>{hour}</span>
                     </td>
 
                     {filteredCourts.map((c) => {
@@ -267,7 +349,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                                   court: c.name,
                                   courtId: c.id,
                                   sport: selectedSport,
-                                  date: targetDateStr,
+                                  date: selectedDate,
                                   time: hour,
                                   price: c.pricePerHour
                                 })
@@ -277,7 +359,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                               Reservar (${Math.round(c.pricePerHour * 0.3).toLocaleString('es-AR')})
                             </button>
                           ) : status === 'Torneo' ? (
-                            <div className="py-2.5 px-2 rounded-xl bg-[rgba(245,158,11,0.15)] border border-[#f59e0b]/40 text-[#f59e0b] font-bold text-xs">
+                            <div
+                              className="py-2.5 px-2 rounded-xl border text-xs font-bold shadow-sm"
+                              style={{
+                                backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                                borderColor: 'rgba(245, 158, 11, 0.5)',
+                                color: '#f59e0b'
+                              }}
+                              title="Cancha reservada para encuentro oficial de torneo"
+                            >
                               {label}
                             </div>
                           ) : (
@@ -326,7 +416,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           <button
             type="button"
-            onClick={onOpenInscripcion}
+            onClick={() => onOpenInscripcion()}
             className="px-5 py-2.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs shadow-lg transition-all cursor-pointer self-start md:self-auto"
           >
             + Inscribir mi Equipo
@@ -369,7 +459,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
               <button
                 type="button"
-                onClick={onOpenInscripcion}
+                onClick={() => onOpenInscripcion(t.id)}
                 className="w-full py-2.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs transition-colors cursor-pointer"
               >
                 Inscribir Equipo a este Torneo

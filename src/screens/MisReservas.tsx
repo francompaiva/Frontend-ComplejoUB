@@ -47,61 +47,52 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
 
   return (
     <div className="bg-[#293827] min-h-full w-full font-['Inter',sans-serif] text-white flex flex-col">
-      {/* Top Navbar */}
-      <nav className="bg-[#1e281d] border-b border-[#5a7056] px-6 lg:px-12 py-3 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-3">
-          <div className="bg-[rgba(101,197,86,0.15)] flex items-center justify-center rounded-xl size-9 border border-[#65c556] text-xl">
-            ⚽
-          </div>
-          <span className="font-extrabold text-base tracking-tight text-white">
-            Complejo Deportivo <strong className="text-[#65c556]">UB</strong>
-          </span>
-        </div>
-
-        <div className="flex items-center gap-6">
-          <button
-            type="button"
-            onClick={() => onNavigate('landing')}
-            className="text-xs font-semibold text-[#c0c0c0] hover:text-white transition-colors cursor-pointer bg-transparent border-none"
-          >
-            ← Volver a Canchas
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('mis-torneos')}
-            className="text-xs font-semibold text-[#c0c0c0] hover:text-white transition-colors cursor-pointer bg-transparent border-none"
-          >
-            🏆 Torneos
-          </button>
+      {/* Subheader / Tabs de Mis Reservas */}
+      <div className="px-6 lg:px-12 pt-6 max-w-6xl mx-auto w-full flex items-center justify-between gap-4 flex-wrap border-b border-[#5a7056]/40 pb-4">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={() => setActiveTab('activos')}
-            className={`text-xs font-bold transition-colors cursor-pointer bg-transparent border-none ${
-              activeTab === 'activos' ? 'text-[#65c556]' : 'text-[#c0c0c0]'
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer border ${
+              activeTab === 'activos'
+                ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
+                : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
             }`}
           >
-            Mis Reservas
+            📋 Mis Turnos y Reservas
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('perfil')}
-            className={`text-xs font-bold transition-colors cursor-pointer bg-transparent border-none ${
-              activeTab === 'perfil' ? 'text-[#65c556]' : 'text-[#c0c0c0]'
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer border ${
+              activeTab === 'perfil'
+                ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
+                : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
             }`}
           >
-            Mi Perfil
+            👤 Mi Perfil
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('notificaciones')}
-            className={`text-xs font-bold transition-colors cursor-pointer bg-transparent border-none flex items-center gap-1 ${
-              activeTab === 'notificaciones' ? 'text-[#65c556]' : 'text-[#c0c0c0]'
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer border flex items-center gap-1.5 ${
+              activeTab === 'notificaciones'
+                ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
+                : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
             }`}
           >
             <span>🔔</span> Notificaciones
           </button>
         </div>
-      </nav>
+
+        <button
+          type="button"
+          onClick={() => onNavigate('landing')}
+          className="text-xs font-semibold text-[#a3b89e] hover:text-white transition cursor-pointer flex items-center gap-1.5"
+        >
+          <span>←</span> Volver a Canchas
+        </button>
+      </div>
 
       {/* Main Container */}
       <div className="px-6 lg:px-12 py-8 flex flex-col gap-6 max-w-6xl mx-auto w-full">

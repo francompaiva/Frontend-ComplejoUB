@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ComplejoProvider, useComplejo, type UserRole } from './context/ComplejoContext';
+import { apiClient } from './api/client';
 import LoginScreen from './screens/LoginScreen';
 import LandingPage from './screens/LandingPage';
 import MisReservas from './screens/MisReservas';
@@ -11,10 +12,23 @@ import AdminTorneo from './screens/AdminTorneo';
 import AdminResultados from './screens/AdminResultados';
 import AdminReportes from './screens/AdminReportes';
 import AdminAuditoria from './screens/AdminAuditoria';
+import { AdminGestionUsuarios } from './screens/AdminGestionUsuarios';
 import AdminLayout from './screens/AdminLayout';
 import ConfirmacionPagoModal, { type BookingSlotInfo } from './components/ConfirmacionPagoModal';
 import InscripcionTorneoModal from './components/InscripcionTorneoModal';
 import MisTorneos from './screens/MisTorneos';
+import {
+  IconStadium,
+  IconBall,
+  IconTrophy,
+  IconCalendar,
+  IconClipboard,
+  IconChartBar,
+  IconShield,
+  IconCrown,
+  IconWhistle,
+  IconLogout
+} from './components/Icons';
 
 export type ScreenId =
   | 'login'
@@ -28,14 +42,15 @@ export type ScreenId =
   | 'admin-torneo'
   | 'admin-resultados'
   | 'admin-reportes'
-  | 'admin-auditoria';
+  | 'admin-auditoria'
+  | 'admin-usuarios';
 
 interface AccountConfig {
   role: UserRole;
   name: string;
   title: string;
   badge: string;
-  icon: string;
+  iconNode: React.ReactNode;
   primaryScreen: ScreenId;
   allowedScreens: ScreenId[];
   description: string;
@@ -48,7 +63,7 @@ const ACCOUNTS: Record<UserRole, AccountConfig> = {
     name: 'Lucas Díaz',
     title: 'Cliente / Capitán',
     badge: 'Cliente',
-    icon: '⚽',
+    iconNode: <IconBall size={18} className="text-[#65c556]" />,
     primaryScreen: 'landing',
     allowedScreens: ['landing', 'mis-reservas', 'mis-torneos'],
     description: 'Gestión personal de reservas, pago de señas, cancelaciones y nómina de torneos.',
@@ -64,7 +79,7 @@ const ACCOUNTS: Record<UserRole, AccountConfig> = {
     name: 'Sebastian Norjean',
     title: 'Árbitro Oficial AFA/UB',
     badge: 'Árbitro',
-    icon: '🟨',
+    iconNode: <IconWhistle size={18} className="text-yellow-400" />,
     primaryScreen: 'arbitro',
     allowedScreens: ['arbitro', 'mis-torneos'],
     description: 'Planilla digital oficial de partidos asignados, tarjetas y actas de disciplina.',
@@ -80,7 +95,7 @@ const ACCOUNTS: Record<UserRole, AccountConfig> = {
     name: 'Administración General',
     title: 'Administrador Complejo UB',
     badge: 'Admin',
-    icon: '🛡️',
+    iconNode: <IconShield size={18} className="text-[#65c556]" />,
     primaryScreen: 'admin-agenda',
     allowedScreens: [
       'admin-agenda',
@@ -101,17 +116,45 @@ const ACCOUNTS: Record<UserRole, AccountConfig> = {
       'Creación de torneos y fixture Round-Robin',
       'Métricas de facturación y logs de auditoría'
     ]
+  },
+  superadmin: {
+    role: 'superadmin',
+    name: 'Superadministrador',
+    title: 'Superadmin Cátedra UB',
+    badge: 'Superadmin',
+    iconNode: <IconCrown size={18} className="text-yellow-400" />,
+    primaryScreen: 'admin-agenda',
+    allowedScreens: [
+      'admin-agenda',
+      'admin-overview',
+      'admin-canchas',
+      'admin-torneo',
+      'admin-resultados',
+      'admin-reportes',
+      'admin-auditoria',
+      'admin-usuarios',
+      'landing',
+      'mis-torneos',
+      'arbitro'
+    ],
+    description: 'Control absoluto del complejo y gestión jerárquica de administradores por email.',
+    permissions: [
+      'Alta y creación de cuentas administrativas',
+      'Promoción de usuarios registrados a Administrador',
+      'Revocación de privilegios administrativos',
+      'Acceso total a agenda, torneos, canchas y auditoría'
+    ]
   }
 };
 
 const AppContent: React.FC = () => {
-  const { userRole, setUserRole, bookCourt, resetDemoData, unreadNotifsCount } = useComplejo();
+  const { userRole, setUserRole, currentUser, setCurrentUser, bookCourt, unreadNotifsCount } = useComplejo();
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('login');
   const [adminSection, setAdminSection] = useState<string>('agenda');
   const [isInscripcionOpen, setIsInscripcionOpen] = useState(false);
+  const [selectedTourneyIdForModal, setSelectedTourneyIdForModal] = useState<string | undefined>(undefined);
   const [isPagoOpen, setIsPagoOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<BookingSlotInfo | null>(null);
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
   // Control de accesos por cuenta: Si la pantalla actual no está permitida para el rol activo, redirigir
   useEffect(() => {
@@ -122,10 +165,15 @@ const AppContent: React.FC = () => {
     }
   }, [userRole, currentScreen]);
 
+  const handleOpenInscripcion = (tourneyId?: string) => {
+    setSelectedTourneyIdForModal(tourneyId);
+    setIsInscripcionOpen(true);
+  };
+
   // Login handler
-  const handleLogin = (role: UserRole) => {
-    setUserRole(role);
-    if (role === 'admin') {
+  const handleLogin = async (role: UserRole) => {
+    await setUserRole(role);
+    if (role === 'admin' || role === 'superadmin') {
       setCurrentScreen('admin-agenda');
       setAdminSection('agenda');
     } else if (role === 'arbitro') {
@@ -135,18 +183,12 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // Cambio directo de cuenta desde el selector
-  const handleSwitchAccount = (newRole: UserRole) => {
-    setUserRole(newRole);
-    if (newRole === 'admin') {
-      setCurrentScreen('admin-agenda');
-      setAdminSection('agenda');
-    } else if (newRole === 'arbitro') {
-      setCurrentScreen('arbitro');
-    } else {
-      setCurrentScreen('landing');
-    }
-    setIsAccountModalOpen(false);
+  // Cierre de sesión y retorno a pantalla de login
+  const handleLogout = () => {
+    apiClient.setToken(null);
+    setCurrentUser(null);
+    localStorage.removeItem('complejo_user');
+    setCurrentScreen('login');
   };
 
   // Admin section switcher
@@ -159,6 +201,7 @@ const AppContent: React.FC = () => {
     else if (section === 'resultados') setCurrentScreen('admin-resultados');
     else if (section === 'reportes') setCurrentScreen('admin-reportes');
     else if (section === 'auditoria') setCurrentScreen('admin-auditoria');
+    else if (section === 'usuarios') setCurrentScreen('admin-usuarios');
   };
 
   const handleOpenPago = (slotData: BookingSlotInfo) => {
@@ -181,89 +224,91 @@ const AppContent: React.FC = () => {
     setCurrentScreen('mis-reservas');
   };
 
-  const currentAccount = ACCOUNTS[userRole];
+  const currentAccount = ACCOUNTS[userRole] || ACCOUNTS.cliente;
+  const isAdminOrSuper = userRole === 'admin' || userRole === 'superadmin';
 
   return (
     <div className="size-full min-h-screen bg-[#293827] flex flex-col font-['Inter',sans-serif]">
-      {/* Top Header Bar: Deliberate Action Buttons, Zero Sliders / Zero Horizontal Scrollbars */}
-      <header className="bg-[#141b13] border-b border-[#3b4d38] px-4 py-2.5 flex items-center justify-between gap-4 text-xs z-50 sticky top-0">
+      {/* Top Header Bar: Solid opaque background, high z-index */}
+      <header
+        className="border-b border-[#3b4d38] px-5 py-3 flex items-center justify-between gap-4 text-xs shadow-2xl"
+        style={{
+          position: 'sticky',
+          top: 0,
+          backgroundColor: '#141b13',
+          zIndex: 999,
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6)'
+        }}
+      >
         {/* Left: Brand & Active Account Badge */}
         <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="font-extrabold text-[#65C556] tracking-tight text-sm">COMPLEJO UB</span>
+          <div
+            onClick={() => {
+              if (isAdminOrSuper) setCurrentScreen('admin-agenda');
+              else if (userRole === 'arbitro') setCurrentScreen('arbitro');
+              else setCurrentScreen('landing');
+            }}
+            className="flex items-center gap-2.5 cursor-pointer select-none group"
+            title="Complejo Deportivo UB - Ir al inicio"
+          >
+            <div className="size-9 rounded-xl bg-[rgba(101,197,86,0.15)] border border-[#65c556] flex items-center justify-center text-[#65c556] shadow-sm group-hover:scale-105 transition-transform">
+              <IconStadium size={20} />
+            </div>
+            <span className="font-extrabold text-sm sm:text-base text-white tracking-tight">
+              Complejo Deportivo <strong className="text-[#65c556]">UB</strong>
+            </span>
           </div>
 
           {currentScreen !== 'login' && (
-            <button
-              type="button"
-              onClick={() => setIsAccountModalOpen(true)}
-              className="bg-[#1e281d] hover:bg-[#293827] text-white px-2.5 py-1 rounded-lg border border-[#5a7056] flex items-center gap-1.5 transition cursor-pointer"
-              title="Haz clic para cambiar de cuenta o rol"
-            >
-              <span>{currentAccount.icon}</span>
-              <span className="font-semibold">{currentAccount.name}</span>
-              <span className="bg-[#293827] text-[#65c556] px-1.5 py-0.2 rounded text-[10px] font-bold border border-[#65c556]/40 uppercase">
+            <div className="bg-[#1e281d] text-white px-3 py-1.5 rounded-xl border border-[#5a7056] flex items-center gap-2 shadow-sm">
+              <span>{currentAccount.iconNode}</span>
+              <span className="font-semibold">{currentUser?.nombre || currentAccount.name}</span>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase ${
+                  userRole === 'superadmin'
+                    ? 'bg-amber-400/20 text-yellow-300 border-amber-400/40'
+                    : 'bg-[#293827] text-[#65c556] border-[#65c556]/40'
+                }`}
+              >
                 {currentAccount.badge}
               </span>
-              <span className="text-[#a0a0a0] text-[10px]">▾</span>
-            </button>
+            </div>
           )}
         </div>
 
-        {/* Center: Action Navigation Buttons based on Role (No Slider, No Overflow) */}
+        {/* Center: Action Navigation Buttons based on Role (Spacious gap-3, vector icons) */}
         {currentScreen === 'login' ? (
-          <div className="hidden sm:flex items-center gap-2">
-            <span className="text-[#a0a0a0] text-[11px]">Acceso rápido demo:</span>
-            <button
-              type="button"
-              onClick={() => handleLogin('cliente')}
-              className="bg-[#1e281d] hover:bg-[#65c556] hover:text-[#293827] text-[#c0c0c0] px-2 py-1 rounded text-[11px] font-semibold transition border border-[#3b4d38] cursor-pointer"
-            >
-              ⚽ Cliente
-            </button>
-            <button
-              type="button"
-              onClick={() => handleLogin('arbitro')}
-              className="bg-[#1e281d] hover:bg-[#65c556] hover:text-[#293827] text-[#c0c0c0] px-2 py-1 rounded text-[11px] font-semibold transition border border-[#3b4d38] cursor-pointer"
-            >
-              🟨 Árbitro
-            </button>
-            <button
-              type="button"
-              onClick={() => handleLogin('admin')}
-              className="bg-[#1e281d] hover:bg-[#65c556] hover:text-[#293827] text-[#c0c0c0] px-2 py-1 rounded text-[11px] font-semibold transition border border-[#3b4d38] cursor-pointer"
-            >
-              🛡️ Admin
-            </button>
+          <div className="text-[#a0a0a0] text-xs font-medium">
+            Acceso seguro con verificación de cuenta por correo electrónico
           </div>
         ) : (
-          <nav className="flex items-center gap-1.5 flex-wrap">
+          <nav className="flex items-center gap-3 flex-wrap">
             {/* Nav Buttons for CLIENTE */}
             {userRole === 'cliente' && (
               <>
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('landing')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
                     currentScreen === 'landing'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
+                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <span>🏟️</span>
+                  <IconStadium size={16} />
                   <span>Canchas & Turnos</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('mis-reservas')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
                     currentScreen === 'mis-reservas'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
+                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <span>📋</span>
+                  <IconClipboard size={16} />
                   <span>Mis Reservas</span>
                   {unreadNotifsCount > 0 && (
                     <span className="bg-[#e53e3e] text-white px-1.5 py-0.2 rounded-full text-[10px] font-black">
@@ -275,13 +320,13 @@ const AppContent: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('mis-torneos')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
                     currentScreen === 'mis-torneos'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
+                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <span>🏆</span>
+                  <IconTrophy size={16} />
                   <span>Torneos & Fixture</span>
                 </button>
               </>
@@ -293,132 +338,148 @@ const AppContent: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('arbitro')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
                     currentScreen === 'arbitro'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
+                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <span>⏱️</span>
+                  <IconWhistle size={16} />
                   <span>Planilla Arbitral</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('mis-torneos')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
                     currentScreen === 'mis-torneos'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
+                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <span>🏆</span>
+                  <IconTrophy size={16} />
                   <span>Fixture & Posiciones</span>
                 </button>
               </>
             )}
 
-            {/* Nav Buttons for ADMIN */}
-            {userRole === 'admin' && (
-              <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Nav Buttons for ADMIN / SUPERADMIN with generous spacing (gap-3) */}
+            {isAdminOrSuper && (
+              <div className="flex items-center gap-3 flex-wrap">
                 <button
                   type="button"
                   onClick={() => handleAdminNavigate('agenda')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1 border ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                     currentScreen === 'admin-agenda'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold'
+                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <span>📅</span>
+                  <IconCalendar size={15} />
                   <span>Agenda</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleAdminNavigate('overview')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1 border ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                     currentScreen === 'admin-overview'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold'
+                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <span>📊</span>
+                  <IconChartBar size={15} />
                   <span>Dashboard</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleAdminNavigate('canchas')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1 border ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                     currentScreen === 'admin-canchas'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold'
+                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <span>⚽</span>
+                  <IconBall size={15} />
                   <span>Canchas</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleAdminNavigate('torneo')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1 border ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                     currentScreen === 'admin-torneo'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold'
+                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <span>🏆</span>
+                  <IconTrophy size={15} />
                   <span>Torneos</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleAdminNavigate('resultados')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1 border ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                     currentScreen === 'admin-resultados'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold'
+                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <span>📝</span>
+                  <IconClipboard size={15} />
                   <span>Resultados</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleAdminNavigate('reportes')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1 border ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                     currentScreen === 'admin-reportes'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold'
+                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <span>📈</span>
+                  <IconChartBar size={15} />
                   <span>Reportes</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleAdminNavigate('auditoria')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1 border ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                     currentScreen === 'admin-auditoria'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold'
+                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <span>🛡️</span>
+                  <IconShield size={15} />
                   <span>Auditoría</span>
                 </button>
+
+                {/* Exclusive Button for Superadmin: Gestión de Administradores */}
+                {userRole === 'superadmin' && (
+                  <button
+                    type="button"
+                    onClick={() => handleAdminNavigate('usuarios')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border ${
+                      currentScreen === 'admin-usuarios'
+                        ? 'bg-amber-400 text-[#141b13] border-amber-400 font-extrabold shadow-md shadow-amber-400/25'
+                        : 'bg-amber-500/15 text-amber-300 border-amber-500/40 hover:bg-amber-500/25 hover:text-white'
+                    }`}
+                  >
+                    <IconCrown size={15} />
+                    <span>Gestión Admins</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('landing')}
-                  className="px-2 py-1 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1 border border-[#5a7056] bg-[#293827] text-[#65c556] hover:bg-[#3b4d38] hover:text-white"
-                  title="Inspeccionar la experiencia de usuario del portal"
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer flex items-center gap-1.5 border border-[#5a7056] bg-[#293827] text-[#65c556] hover:bg-[#3b4d38] hover:text-white"
+                  title="Ver portal como cliente"
                 >
-                  <span>👁️</span>
+                  <IconStadium size={15} />
                   <span>Vista Portal</span>
                 </button>
               </div>
@@ -427,33 +488,17 @@ const AppContent: React.FC = () => {
         )}
 
         {/* Right: Global Actions */}
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => setIsAccountModalOpen(true)}
-            className="bg-[#293827] hover:bg-[#3b4d38] text-white px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#5a7056] hover:border-[#65c556] cursor-pointer flex items-center gap-1.5 transition"
-            title="Cambiar de cuenta o rol de usuario"
-          >
-            <span>👥</span>
-            <span>Cambiar Cuenta</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={resetDemoData}
-            title="Restablece las reservas y fixtures a los valores iniciales"
-            className="bg-[#293827] hover:bg-[#3b4d38] text-[#c0c0c0] hover:text-white px-2 py-1.5 rounded-lg text-xs border border-[#5a7056] cursor-pointer transition hidden md:inline"
-          >
-            🔄 Reiniciar Demo
-          </button>
-
+        {/* Right: Global Actions */}
+        <div className="flex items-center gap-2.5 shrink-0">
           {currentScreen !== 'login' && (
             <button
               type="button"
-              onClick={() => setCurrentScreen('login')}
-              className="bg-[#3d2424] hover:bg-[#c53030] text-[#ff8080] hover:text-white px-2.5 py-1.5 rounded-lg font-semibold transition border border-[rgba(229,62,62,0.3)] cursor-pointer text-xs"
+              onClick={handleLogout}
+              className="bg-[#3d2424] hover:bg-[#c53030] text-[#ff8080] hover:text-white px-3.5 py-1.5 rounded-xl font-semibold transition border border-[rgba(229,62,62,0.3)] cursor-pointer text-xs flex items-center gap-1.5 shadow-sm"
+              title="Cerrar sesión"
             >
-              Salir
+              <IconLogout size={14} />
+              <span className="hidden sm:inline">Cerrar Sesión</span>
             </button>
           )}
         </div>
@@ -466,7 +511,7 @@ const AppContent: React.FC = () => {
         {currentScreen === 'landing' && (
           <LandingPage
             onNavigate={(screen) => setCurrentScreen(screen as ScreenId)}
-            onOpenInscripcion={() => setIsInscripcionOpen(true)}
+            onOpenInscripcion={handleOpenInscripcion}
             onOpenPago={handleOpenPago}
           />
         )}
@@ -478,7 +523,7 @@ const AppContent: React.FC = () => {
         {currentScreen === 'mis-torneos' && (
           <MisTorneos
             onNavigate={(screen) => setCurrentScreen(screen as ScreenId)}
-            onOpenInscripcion={() => setIsInscripcionOpen(true)}
+            onOpenInscripcion={handleOpenInscripcion}
           />
         )}
 
@@ -496,7 +541,7 @@ const AppContent: React.FC = () => {
           <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
             <AdminOverview
               onNavigate={handleAdminNavigate}
-              onOpenInscripcion={() => setIsInscripcionOpen(true)}
+              onOpenInscripcion={handleOpenInscripcion}
             />
           </AdminLayout>
         )}
@@ -509,7 +554,7 @@ const AppContent: React.FC = () => {
 
         {currentScreen === 'admin-torneo' && (
           <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
-            <AdminTorneo onOpenInscripcion={() => setIsInscripcionOpen(true)} />
+            <AdminTorneo onOpenInscripcion={handleOpenInscripcion} />
           </AdminLayout>
         )}
 
@@ -530,133 +575,25 @@ const AppContent: React.FC = () => {
             <AdminAuditoria />
           </AdminLayout>
         )}
+
+        {currentScreen === 'admin-usuarios' && (
+          <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
+            <AdminGestionUsuarios />
+          </AdminLayout>
+        )}
       </main>
-
-      {/* Account Switcher Modal: Distinct accesses per account */}
-      {isAccountModalOpen && (
-        <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
-          onClick={() => setIsAccountModalOpen(false)}
-        >
-          <div
-            className="bg-[#1e281d] border border-[#5a7056] rounded-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-7 shadow-2xl flex flex-col gap-5 text-white my-auto relative"
-            style={{ maxWidth: '640px', width: '100%' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="size-10 rounded-xl bg-[rgba(101,197,86,0.15)] border border-[#65c556] flex items-center justify-center text-xl shrink-0">
-                  👥
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-white leading-tight">Cuentas y Accesos por Rol</h2>
-                  <p className="text-xs text-[#a0a0a0] mt-0.5">
-                    Cada cuenta posee permisos y pantallas restringidas según su rol en el complejo.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsAccountModalOpen(false)}
-                className="text-[#a0a0a0] hover:text-white size-8 flex items-center justify-center rounded-lg bg-[#293827] border border-[#5a7056] cursor-pointer text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Account List */}
-            <div className="flex flex-col gap-3">
-              {(['cliente', 'arbitro', 'admin'] as UserRole[]).map((r) => {
-                const acc = ACCOUNTS[r];
-                const isActive = userRole === r && currentScreen !== 'login';
-                return (
-                  <div
-                    key={r}
-                    className={`p-4 rounded-xl border transition-all ${
-                      isActive
-                        ? 'bg-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.15)]'
-                        : 'bg-[#141b13] border-[#3b4d38] hover:border-[#5a7056]'
-                    }`}
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl shrink-0">{acc.icon}</span>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-white text-sm">{acc.name}</span>
-                            <span className="bg-[#1e281d] text-[#65c556] px-2 py-0.5 rounded text-[10px] font-bold border border-[#5a7056]">
-                              {acc.badge}
-                            </span>
-                            {isActive && (
-                              <span className="bg-[#65c556] text-[#293827] px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide">
-                                Sesión Actual
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-xs text-[#a0a0a0]">{acc.title}</span>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleSwitchAccount(r)}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                          isActive
-                            ? 'bg-[#65c556] text-[#293827] shadow'
-                            : 'bg-[#293827] hover:bg-[#65c556] text-white hover:text-[#293827] border border-[#5a7056]'
-                        }`}
-                      >
-                        {isActive ? '✓ Cuenta Activa' : 'Ingresar con esta Cuenta →'}
-                      </button>
-                    </div>
-
-                    <p className="text-xs text-[#c0c0c0] mb-2">{acc.description}</p>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      {acc.permissions.map((p, idx) => (
-                        <span
-                          key={idx}
-                          className="bg-[#1e281d] text-[#a0a0a0] text-[10px] px-2 py-0.5 rounded border border-[#3b4d38]"
-                        >
-                          • {p}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Bottom Actions */}
-            <div className="flex items-center justify-between pt-2 border-t border-[#3b4d38]">
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentScreen('login');
-                  setIsAccountModalOpen(false);
-                }}
-                className="text-xs text-[#ff8080] hover:underline cursor-pointer bg-transparent border-none font-semibold flex items-center gap-1"
-              >
-                <span>←</span> Ir a Pantalla de Autenticación / Login
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsAccountModalOpen(false)}
-                className="bg-[#293827] hover:bg-[#3b4d38] text-white px-4 py-2 rounded-xl text-xs font-bold border border-[#5a7056] cursor-pointer"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Global Modals */}
       <InscripcionTorneoModal
         isOpen={isInscripcionOpen}
-        onClose={() => setIsInscripcionOpen(false)}
+        tournamentId={selectedTourneyIdForModal}
+        onClose={() => {
+          setIsInscripcionOpen(false);
+          setSelectedTourneyIdForModal(undefined);
+        }}
         onSubmit={() => {
-          // Success handled in modal
+          setIsInscripcionOpen(false);
+          setSelectedTourneyIdForModal(undefined);
         }}
       />
 

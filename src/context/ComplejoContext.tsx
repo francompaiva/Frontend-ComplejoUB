@@ -10,9 +10,12 @@ import {
   type NotificationItem,
   type WaitlistEntry,
   type SportType,
-  SPORT_PRICING
+  SPORT_PRICING,
+  INITIAL_COURTS,
+  INITIAL_TOURNAMENTS
 } from '../data/mockData';
 import {
+  authApi,
   torneosApi,
   canchasApi,
   reservasApi,
@@ -22,12 +25,30 @@ import {
   notificacionesApi,
   reportesApi
 } from '../api/endpoints';
+import { apiClient } from '../api/client';
 
-export type UserRole = 'cliente' | 'admin' | 'arbitro';
+export type UserRole = 'cliente' | 'admin' | 'arbitro' | 'superadmin';
+
+export interface CurrentUser {
+  id: number;
+  nombre: string;
+  email: string;
+  rol: string;
+  token?: string;
+}
+
+export const DEMO_EMAILS: Record<UserRole, string> = {
+  cliente: 'lucas@gmail.com',
+  admin: 'operador@complejoub.com',
+  arbitro: 'arbitro@complejoub.com',
+  superadmin: 'admin@complejoub.com',
+};
 
 export interface ComplejoContextType {
   userRole: UserRole;
   setUserRole: (role: UserRole) => void;
+  currentUser: CurrentUser | null;
+  setCurrentUser: (user: CurrentUser | null) => void;
   courts: Court[];
   bookings: BookingItem[];
   tournaments: Tournament[];
@@ -55,6 +76,7 @@ export interface ComplejoContextType {
   saveMatchResult: (matchId: number, homeScore: number, awayScore: number, status: FixtureMatch['status'], yellowCards?: FixtureMatch['yellowCards'], redCards?: FixtureMatch['redCards'], observations?: string) => Promise<void>;
   assignReferee: (matchId: number, refereeName: string) => Promise<void>;
   markAbsence: (clientName: string, courtName: string, bookingId?: string) => Promise<void>;
+  confirmarAsistencia: (bookingId: string) => Promise<void>;
   markNotificationRead: (notifId: string) => void;
   markAllNotificationsRead: () => void;
   resetDemoData: () => void;
@@ -217,10 +239,18 @@ const DEFAULT_REFEREES: Referee[] = [
 ];
 
 export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [userRole, setUserRole] = useState<UserRole>(() => loadOr('userRole', 'cliente'));
-  const [courts, setCourts] = useState<Court[]>([]);
+  const [userRole, setUserRoleState] = useState<UserRole>(() => loadOr('userRole', 'cliente'));
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() => {
+    try {
+      const stored = localStorage.getItem('complejo_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [courts, setCourts] = useState<Court[]>(INITIAL_COURTS);
   const [bookings, setBookings] = useState<BookingItem[]>([]);
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>(INITIAL_TOURNAMENTS);
   const [fixtures, setFixtures] = useState<FixtureMatch[]>([]);
   const [standings, setStandings] = useState<StandingRow[]>([]);
   const [referees] = useState<Referee[]>(DEFAULT_REFEREES);
@@ -228,6 +258,21 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [userAbsences, setUserAbsences] = useState<number>(0);
+
+  // Helper para autenticar automáticamente según el rol activo
+  const authenticateRole = useCallback(async (role: UserRole) => {
+    try {
+      const email = DEMO_EMAILS[role];
+      const res: any = await authApi.login(email, 'password123');
+      if (res && res.token) {
+        apiClient.setToken(res.token);
+        localStorage.setItem('complejo_user', JSON.stringify(res.user));
+        setCurrentUser(res.user);
+      }
+    } catch (err: any) {
+      console.warn(`[ComplejoContext] Error al autenticar como ${role}:`, err?.message);
+    }
+  }, []);
 
   // Carga de fixture y tabla de posiciones para un torneo desde la BD
   const fetchTorneoData = useCallback(async (torneoId: string | number) => {
@@ -251,15 +296,16 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, []);
 
-  // Carga y sincronización inicial con la API backend (Base de Datos MySQL)
-  const refreshAllData = useCallback(async () => {
+  // Carga y sincronización con la API backend (Base de Datos MySQL)
+  const refreshAllData = useCallback(async (currentRole = userRole) => {
     try {
+      const isRoleAdmin = currentRole === 'admin';
       const [canchas, torneos, resReservas, notifs, logs] = await Promise.all([
         canchasApi.getAll().catch(() => []),
         torneosApi.getAll().catch(() => []),
-        reservasApi.getAll().catch(() => []),
+        (isRoleAdmin ? reservasApi.getAll() : reservasApi.getMisReservas()).catch(() => []),
         notificacionesApi.getMisNotificaciones().catch(() => []),
-        reportesApi.getAuditoria().catch(() => []),
+        (isRoleAdmin ? reportesApi.getAuditoria() : Promise.resolve([])).catch(() => []),
       ]);
 
       if (Array.isArray(canchas) && canchas.length > 0) {
@@ -267,10 +313,36 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
 
       if (Array.isArray(torneos) && torneos.length > 0) {
-        const mappedTorneos = torneos.map(mapTorneoFromApi);
+        // Enriquecer torneos con sus equipos inscriptos reales desde MySQL
+        const mappedTorneos = await Promise.all(
+          torneos.map(async (t: any) => {
+            const base = mapTorneoFromApi(t);
+            try {
+              const equipos = await equiposApi.getAll(t.id);
+              if (Array.isArray(equipos)) {
+                base.registeredTeams = equipos.map((eq: any) => ({
+                  id: String(eq.id),
+                  name: eq.nombre,
+                  captain: eq.capitan_nombre || 'Capitán',
+                  captainEmail: eq.capitan_email || 'capitan@gmail.com',
+                  playersCount: eq.jugadores?.length || 5,
+                  players: eq.jugadores || []
+                }));
+              }
+            } catch {
+              // fallback
+            }
+            return base;
+          })
+        );
+
         setTournaments(mappedTorneos);
-        // Cargar fixture y tabla del primer torneo (e.g. Copa Verano)
-        await fetchTorneoData(mappedTorneos[0].id);
+
+        // Seleccionar por defecto el torneo en curso (ej. Copa Verano) para mostrar fixtures y posiciones reales
+        const defaultActive = mappedTorneos.find((t) => t.status === 'En curso') || mappedTorneos[0];
+        if (defaultActive) {
+          await fetchTorneoData(defaultActive.id);
+        }
       }
 
       if (Array.isArray(resReservas) && resReservas.length > 0) {
@@ -305,13 +377,30 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (err: any) {
       console.warn('[ComplejoContext] Error en sincronización general con API:', err?.message);
     }
-  }, [fetchTorneoData]);
+  }, [fetchTorneoData, userRole]);
 
+  // Cambio de rol con autenticación instantánea en backend
+  const setUserRole = useCallback(async (newRole: UserRole) => {
+    setUserRoleState(newRole);
+    saveTo('userRole', newRole);
+    await authenticateRole(newRole);
+    await refreshAllData(newRole);
+  }, [authenticateRole, refreshAllData]);
+
+  // Inicialización en montaje: autenticar según rol y cargar datos de MySQL
   useEffect(() => {
-    refreshAllData();
-  }, [refreshAllData]);
-
-  useEffect(() => saveTo('userRole', userRole), [userRole]);
+    let isMounted = true;
+    const init = async () => {
+      await authenticateRole(userRole);
+      if (isMounted) {
+        await refreshAllData(userRole);
+      }
+    };
+    init();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const isUserBanned = userAbsences >= 3;
 
@@ -347,12 +436,35 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const numCanchaId = parseInt(courtId.replace(/\D/g, ''), 10) || 1;
 
     let cleanDate = date;
+    const now = new Date();
     if (date === 'Hoy') {
-      cleanDate = new Date().toISOString().split('T')[0];
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      cleanDate = `${year}-${month}-${day}`;
     } else if (date === 'Mañana') {
       const d = new Date();
       d.setDate(d.getDate() + 1);
-      cleanDate = d.toISOString().split('T')[0];
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      cleanDate = `${year}-${month}-${day}`;
+    } else if (date === 'Sábado') {
+      const diff = (6 - now.getDay() + 7) % 7 || 7;
+      const d = new Date();
+      d.setDate(d.getDate() + diff);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      cleanDate = `${year}-${month}-${day}`;
+    } else if (date === 'Domingo') {
+      const diff = (7 - now.getDay()) % 7 || 7;
+      const d = new Date();
+      d.setDate(d.getDate() + diff);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      cleanDate = `${year}-${month}-${day}`;
     }
 
     const cleanHour = time.replace(' hs', '').trim() + (time.includes(':') ? (time.split(':').length === 2 ? ':00' : '') : ':00:00');
@@ -366,9 +478,12 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
       if (apiRes && apiRes.id) {
         createdId = String(apiRes.id);
+        await refreshAllData();
       }
     } catch (err: any) {
       console.warn('[bookCourt] Error al guardar en MySQL:', err?.message);
+      alert(`No se pudo completar la reserva en la base de datos: ${err?.message || 'Error al persistir turno'}`);
+      throw err;
     }
 
     const newBooking: BookingItem = {
@@ -387,7 +502,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       clientEmail: 'lucas@gmail.com'
     };
 
-    setBookings((prev) => [newBooking, ...prev]);
+    setBookings((prev) => [newBooking, ...prev.filter(b => b.id !== createdId)]);
     addNotification(
       '¡Turno Reservado con Éxito!',
       `Cancha ${courtName} para el ${cleanDate} a las ${time}. Seña abonada: $${depositPaid.toLocaleString()}. Saldo en complejo: $${remainingBalance.toLocaleString()}.`,
@@ -411,6 +526,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (res) {
           isRefundable = Boolean(res.aplicaDevolucion);
           if (res.montoSenaDevuelto !== undefined) deposit = Number(res.montoSenaDevuelto);
+          await refreshAllData();
         }
       } catch (err: any) {
         console.warn('[cancelBooking] Error al cancelar en MySQL:', err?.message);
@@ -425,11 +541,11 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (isRefundable) {
       msg = `Reserva cancelada con más de 24 hs de anticipación. Se reintegra el 100% de la seña ($${deposit.toLocaleString()}) al medio de pago original.`;
       addNotification('Cancelación con Reembolso', msg, 'reserva');
-      logAudit('Cancelación con Reintegro', `Reserva ${bookingId} cancelada con anticipación > 24hs. Devolución de seña de $${deposit}.`, 'reserva');
+      logAudit('Cancelación con Reintegro', `Reserva #${bookingId} cancelada con anticipación > 24hs. Devolución de seña de $${deposit}.`, 'reserva');
     } else {
       msg = `Reserva cancelada con menos de 24 hs de anticipación. De acuerdo a la política del complejo, no corresponde reintegro de la seña ($${deposit.toLocaleString()}).`;
       addNotification('Cancelación sin Reintegro', msg, 'sancion');
-      logAudit('Cancelación Fuera de Término', `Reserva ${bookingId} cancelada con menos de 24hs. Seña de $${deposit} retenida como penalización.`, 'sancion');
+      logAudit('Cancelación Fuera de Término', `Reserva #${bookingId} cancelada con menos de 24hs. Seña de $${deposit} retenida como penalización.`, 'sancion');
     }
 
     return { refunded: isRefundable, depositAmount: deposit, message: msg };
@@ -463,7 +579,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return position;
   };
 
-  // Gestión de canchas
+  // Gestión de canchas en MySQL
   const addCourt = async (courtData: Omit<Court, 'id' | 'nextSlot'>) => {
     try {
       const created = await canchasApi.create({
@@ -474,42 +590,50 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         precio_hora: courtData.pricePerHour
       });
       if (created) {
-        const mapped = mapCanchaFromApi(created);
-        setCourts((prev) => [...prev, mapped]);
-        logAudit('Cancha Creada', `Admin dio de alta ${mapped.name} (${mapped.sport}) en base de datos.`, 'cancha');
-        addNotification('Nueva Cancha Habilitada', `${mapped.name} disponible para reservas.`, 'info');
+        await refreshAllData();
+        logAudit('Cancha Creada', `Admin dio de alta ${courtData.name} (${courtData.sport}) en base de datos.`, 'cancha');
+        addNotification('Nueva Cancha Habilitada', `${courtData.name} disponible para reservas.`, 'info');
         return;
       }
     } catch (err: any) {
       console.warn('[ComplejoContext] canchasApi.create falló:', err?.message);
+      alert(`Error al crear cancha en MySQL: ${err?.message || 'Permiso denegado'}`);
+      throw err;
     }
-
-    const newCourt: Court = {
-      ...courtData,
-      id: 'c-' + (courts.length + 1),
-      nextSlot: 'Disponible próximo turno'
-    };
-    setCourts((prev) => [...prev, newCourt]);
   };
 
-  const toggleCourtStatus = (courtId: string) => {
+  const toggleCourtStatus = async (courtId: string) => {
+    const numId = parseInt(courtId.replace(/\D/g, ''), 10);
+    const target = courts.find((c) => c.id === courtId);
+    if (!target) return;
+    const nextStatus = target.status === 'activa' ? 'mantenimiento' : 'activa';
+    const nextActiva = nextStatus === 'activa';
+
+    if (!isNaN(numId)) {
+      try {
+        await canchasApi.update(numId, { activa: nextActiva });
+        await refreshAllData();
+      } catch (err: any) {
+        console.warn('[toggleCourtStatus] Error al actualizar en MySQL:', err?.message);
+      }
+    }
+
     setCourts((prev) =>
       prev.map((c) => {
         if (c.id === courtId) {
-          const next = c.status === 'activa' ? 'mantenimiento' : 'activa';
-          logAudit(
-            'Cambio Estado de Cancha',
-            `${c.name} pasó a estado: ${next === 'activa' ? 'Operativa' : 'En Mantenimiento'}.`,
-            'cancha'
-          );
           return {
             ...c,
-            status: next,
-            nextSlot: next === 'activa' ? 'Libre próximo turno' : 'Bloqueada por mantenimiento'
+            status: nextStatus,
+            nextSlot: nextActiva ? 'Libre próximo turno' : 'Bloqueada por mantenimiento'
           };
         }
         return c;
       })
+    );
+    logAudit(
+      'Cambio Estado de Cancha',
+      `${target.name} pasó a estado: ${nextActiva ? 'Operativa' : 'En Mantenimiento'}.`,
+      'cancha'
     );
   };
 
@@ -525,22 +649,16 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         reglamento: tourneyData.prize
       });
       if (created) {
-        const mapped = mapTorneoFromApi(created);
-        setTournaments((prev) => [mapped, ...prev]);
-        logAudit('Torneo Creado', `Se creó el torneo "${mapped.name}" (${mapped.sport}) en base de datos.`, 'torneo');
-        addNotification('Nuevo Torneo Abierto', `Inscripciones abiertas para "${mapped.name}".`, 'torneo');
+        await refreshAllData();
+        logAudit('Torneo Creado', `Se creó el torneo "${created.nombre || tourneyData.name}" (${tourneyData.sport}) en base de datos.`, 'torneo');
+        addNotification('Nuevo Torneo Abierto', `Inscripciones abiertas para "${created.nombre || tourneyData.name}".`, 'torneo');
         return;
       }
     } catch (err: any) {
       console.warn('[ComplejoContext] torneosApi.create falló:', err?.message);
+      alert(`Error al crear torneo en MySQL: ${err?.message || 'Error inesperado'}`);
+      throw err;
     }
-
-    const newT: Tournament = {
-      ...tourneyData,
-      id: 't-' + (tournaments.length + 1),
-      registeredTeams: []
-    };
-    setTournaments((prev) => [newT, ...prev]);
   };
 
   // Eliminación de torneos en MySQL
@@ -552,14 +670,14 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!isNaN(numericId)) {
       try {
         await torneosApi.delete(numericId);
+        await refreshAllData();
+        logAudit('Torneo Eliminado', `Se eliminó el torneo "${target.name}" de la base de datos.`, 'torneo');
+        addNotification('Torneo Eliminado', `Se eliminó "${target.name}".`, 'info');
       } catch (err: any) {
         console.warn('[ComplejoContext] torneosApi.delete falló:', err?.message);
+        alert(`Error al eliminar torneo de MySQL: ${err?.message}`);
       }
     }
-
-    setTournaments((prev) => prev.filter((t) => t.id !== tournamentId));
-    setFixtures((prev) => prev.filter((f) => f.tournamentId !== tournamentId));
-    logAudit('Torneo Eliminado', `Se eliminó el torneo "${target.name}" de la base de datos.`, 'torneo');
   };
 
   // Inscripción de equipos y control de participación en MySQL
@@ -575,6 +693,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           torneoId: numTorneoId,
           nombreEquipo: teamName
         });
+        await refreshAllData();
         await fetchTorneoData(numTorneoId);
         logAudit('Inscripción de Equipo', `Equipo "${teamName}" inscripto con éxito (${players.length} jugadores registrados).`, 'torneo');
         addNotification('Equipo Inscripto', `Tu equipo "${teamName}" fue admitido en el torneo.`, 'torneo');
@@ -619,6 +738,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (targetMatch && targetMatch.tournamentId) {
         await fetchTorneoData(targetMatch.tournamentId);
       }
+      await refreshAllData();
 
       logAudit(
         'Resultado Oficial Registrado en BD',
@@ -628,6 +748,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       addNotification('Resultado Guardado', `Partido #${matchId} actualizado: ${homeScore} a ${awayScore}.`, 'torneo');
     } catch (err: any) {
       console.warn('[saveMatchResult] API error:', err?.message);
+      alert(`Error al registrar resultado en MySQL: ${err?.message || 'Permiso denegado'}`);
       // Fallback local visual
       setFixtures((prev) =>
         prev.map((m) =>
@@ -650,6 +771,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (targetMatch && targetMatch.tournamentId) {
         await fetchTorneoData(targetMatch.tournamentId);
       }
+      await refreshAllData();
       logAudit('Designación Arbitral', `Árbitro ${refereeName} asignado al partido ID #${matchId} en base de datos.`, 'torneo');
     } catch (err: any) {
       console.warn('[assignReferee] API error:', err?.message);
@@ -661,11 +783,27 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Control de inasistencias en MySQL
   const markAbsence = async (clientName: string, courtName: string, bookingId?: string): Promise<void> => {
-    if (bookingId) {
-      const numId = parseInt(bookingId.replace(/\D/g, ''), 10);
+    let targetBookingId = bookingId;
+    if (!targetBookingId) {
+      const b = bookings.find(
+        (item) =>
+          item.status !== 'Cancelada' &&
+          (item.clientName?.toLowerCase().includes(clientName.toLowerCase()) ||
+           clientName.toLowerCase().includes(item.clientName?.toLowerCase()))
+      );
+      if (b) targetBookingId = b.id;
+    }
+    if (!targetBookingId && bookings.length > 0) {
+      const b = bookings.find((item) => item.status !== 'Cancelada') || bookings[0];
+      targetBookingId = b.id;
+    }
+
+    if (targetBookingId) {
+      const numId = parseInt(targetBookingId.replace(/\D/g, ''), 10);
       if (!isNaN(numId)) {
         try {
           await reservasApi.registrarInasistencia(numId);
+          await refreshAllData();
         } catch (err: any) {
           console.warn('[markAbsence] API error:', err?.message);
         }
@@ -680,15 +818,33 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           `El usuario ${clientName} ha acumulado 3 inasistencias consecutivas. Cuenta suspendida por 2 semanas en MySQL.`,
           'sancion'
         );
+        return 0; // Se resetea el contador tras aplicar la suspensión (corrección docente)
       } else {
         addNotification(
           'Inasistencia Registrada',
-          `Se registró una inasistencia a ${clientName} en ${courtName}. Acumula ${next}/3 faltas.`,
+          `Se registró una inasistencia a ${clientName} en ${courtName}. Acumula ${next}/3 faltas consecutivas.`,
           'sancion'
         );
+        return next;
       }
-      return next;
     });
+  };
+
+  const confirmarAsistencia = async (bookingId: string): Promise<void> => {
+    const numId = parseInt(bookingId.replace(/\D/g, ''), 10);
+    if (!isNaN(numId)) {
+      try {
+        await reservasApi.confirmarAsistencia(numId);
+        await refreshAllData();
+      } catch (err: any) {
+        console.warn('[confirmarAsistencia] API error:', err?.message);
+      }
+    }
+    setUserAbsences(0); // Resetea contador consecutivo de inasistencias al asistir
+    setBookings((prev) =>
+      prev.map((b) => (b.id === bookingId ? { ...b, status: 'Completada' } : b))
+    );
+    addNotification('Asistencia Confirmada', 'Se confirmó la asistencia y se restableció a 0 el contador de inasistencias consecutivas.', 'reserva');
   };
 
   const markNotificationRead = (notifId: string) => {
@@ -717,6 +873,8 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       value={{
         userRole,
         setUserRole,
+        currentUser,
+        setCurrentUser,
         courts,
         bookings,
         tournaments,
@@ -742,6 +900,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         saveMatchResult,
         assignReferee,
         markAbsence,
+        confirmarAsistencia,
         markNotificationRead,
         markAllNotificationsRead,
         resetDemoData
