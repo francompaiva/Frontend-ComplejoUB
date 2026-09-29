@@ -55,16 +55,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const handleOfflineLogin = (emailToUse?: string) => {
     const emailTarget = (emailToUse || loginEmail || 'lucas@gmail.com').trim().toLowerCase();
     let targetRole: UserRole = 'cliente';
-    const clientProfiles: Record<string, { id: number; nombre: string }> = {
-      'lucas@gmail.com': { id: 4, nombre: 'Lucas Díaz (Cliente / Capitán)' },
-      'mateo@gmail.com': { id: 5, nombre: 'Mateo Fernández' },
-      'juan@gmail.com': { id: 6, nombre: 'Juan Paiva' },
-      'diego@gmail.com': { id: 7, nombre: 'Diego López' },
-      'gonzalo@gmail.com': { id: 8, nombre: 'Gonzalo Higuaín' },
-      'julian@gmail.com': { id: 9, nombre: 'Julián Álvarez' },
-      'enzo@gmail.com': { id: 10, nombre: 'Enzo Fernández' },
-      'rodrigo@gmail.com': { id: 11, nombre: 'Rodrigo De Paul' },
-      'sancionado@gmail.com': { id: 12, nombre: 'Usuario Sancionado Test' },
+    const clientProfiles: Record<string, { id: number; nombre: string; inasistencias?: number; estado_cuenta?: string; suspension_hasta?: string | null }> = {
+      'lucas@gmail.com': { id: 4, nombre: 'Lucas Díaz (Cliente / Capitán)', inasistencias: 0, estado_cuenta: 'Activa' },
+      'mateo@gmail.com': { id: 5, nombre: 'Mateo Fernández', inasistencias: 1, estado_cuenta: 'Activa' },
+      'juan@gmail.com': { id: 6, nombre: 'Juan Paiva', inasistencias: 0, estado_cuenta: 'Activa' },
+      'diego@gmail.com': { id: 7, nombre: 'Diego López', inasistencias: 0, estado_cuenta: 'Activa' },
+      'gonzalo@gmail.com': { id: 8, nombre: 'Gonzalo Higuaín', inasistencias: 0, estado_cuenta: 'Activa' },
+      'julian@gmail.com': { id: 9, nombre: 'Julián Álvarez', inasistencias: 0, estado_cuenta: 'Activa' },
+      'enzo@gmail.com': { id: 10, nombre: 'Enzo Fernández', inasistencias: 0, estado_cuenta: 'Activa' },
+      'rodrigo@gmail.com': { id: 11, nombre: 'Rodrigo De Paul', inasistencias: 0, estado_cuenta: 'Activa' },
+      'sancionado@gmail.com': {
+        id: 12,
+        nombre: 'Usuario Sancionado Test',
+        inasistencias: 3,
+        estado_cuenta: 'Suspendida',
+        suspension_hasta: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+      },
     };
 
     const clientMatch = clientProfiles[emailTarget];
@@ -73,8 +79,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       nombre: clientMatch?.nombre || emailTarget.split('@')[0],
       email: emailTarget,
       rol: 'Cliente',
-      inasistencias: 0,
-      estado_cuenta: 'Activa',
+      inasistencias: clientMatch?.inasistencias ?? 0,
+      estado_cuenta: clientMatch?.estado_cuenta || 'Activa',
+      suspension_hasta: clientMatch?.suspension_hasta || null,
     };
 
     if (emailTarget === 'admin@complejoub.com' || emailTarget === 'complejoub.soporte@gmail.com') {
@@ -572,7 +579,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     <IconCheck size={14} />
                     Accesos de Demostración para Evaluación
                   </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     <button
                       type="button"
                       onClick={() => handleQuickFill('lucas@gmail.com', 'password123')}
@@ -604,6 +611,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                       title="Sebastián Norjean (Árbitro)"
                     >
                       🟨 Árbitro
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickFill('sancionado@gmail.com', 'password123')}
+                      className="px-2.5 py-1.5 rounded-lg bg-[#2b1818] hover:bg-[#3f2121] border border-[#ef4444]/60 text-[11px] font-semibold text-red-300 transition text-center cursor-pointer truncate"
+                      title="Usuario Sancionado Test (3 inasistencias - RF-05)"
+                    >
+                      🚫 Sancionado
                     </button>
                   </div>
                 </div>

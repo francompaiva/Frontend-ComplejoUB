@@ -148,7 +148,7 @@ const ACCOUNTS: Record<UserRole, AccountConfig> = {
 };
 
 const AppContent: React.FC = () => {
-  const { userRole, setUserRole, currentUser, setCurrentUser, bookCourt, unreadNotifsCount } = useComplejo();
+  const { userRole, setUserRole, currentUser, setCurrentUser, bookCourt, unreadNotifsCount, isUserBanned } = useComplejo();
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('login');
   const [adminSection, setAdminSection] = useState<string>('agenda');
   const [isInscripcionOpen, setIsInscripcionOpen] = useState(false);
@@ -194,11 +194,12 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // Cierre de sesión y retorno a pantalla de login
+  // Cierre de sesión y retorno a pantalla de login con purga atómica de tokens
   const handleLogout = () => {
     apiClient.setToken(null);
     setCurrentUser(null);
     localStorage.removeItem('complejo_user');
+    localStorage.removeItem('complejo_ub_token');
     setCurrentScreen('login');
   };
 
@@ -216,23 +217,32 @@ const AppContent: React.FC = () => {
   };
 
   const handleOpenPago = (slotData: BookingSlotInfo) => {
+    if (isUserBanned) {
+      alert('Tu cuenta se encuentra suspendida temporalmente por acumulación de inasistencias (RF-05). No puedes realizar reservas.');
+      return;
+    }
     setSelectedSlot(slotData);
     setIsPagoOpen(true);
   };
 
   const handleConfirmPago = async () => {
     if (selectedSlot) {
-      await bookCourt(
-        selectedSlot.courtId || '1',
-        selectedSlot.court,
-        (selectedSlot.sport as any) || 'Fútbol 5',
-        selectedSlot.date,
-        selectedSlot.time
-      );
+      try {
+        await bookCourt(
+          selectedSlot.courtId || '1',
+          selectedSlot.court,
+          (selectedSlot.sport as any) || 'Fútbol 5',
+          selectedSlot.date,
+          selectedSlot.time
+        );
+        setIsPagoOpen(false);
+        setSelectedSlot(null);
+        setCurrentScreen('mis-reservas');
+      } catch (err: any) {
+        setIsPagoOpen(false);
+        setSelectedSlot(null);
+      }
     }
-    setIsPagoOpen(false);
-    setSelectedSlot(null);
-    setCurrentScreen('mis-reservas');
   };
 
   const currentAccount = ACCOUNTS[userRole] || ACCOUNTS.cliente;

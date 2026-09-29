@@ -34,7 +34,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onOpenInscripcion,
   onOpenPago
 }) => {
-  const { tournaments, standings, courts, bookings, fixtures, joinWaitlist } = useComplejo();
+  const { tournaments, standings, courts, bookings, fixtures, joinWaitlist, isUserBanned, currentUser } = useComplejo();
   const [selectedSport, setSelectedSport] = useState<SportType>('Fútbol 5');
 
   // Fechas de conveniencia
@@ -92,6 +92,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   // Verificación de disponibilidad slot por slot (Cancha y Hora específica)
   const getSlotStatus = (courtName: string, hour: string) => {
     const cleanHour = hour.replace(' hs', '').trim();
+
+    // 0. Horario concluido en el pasado
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const hourNum = parseInt(cleanHour.split(':')[0], 10);
+    const minuteNum = parseInt(cleanHour.split(':')[1] || '0', 10);
+    const slotDateTime = new Date(y, m - 1, d, hourNum, minuteNum, 0);
+
+    if (slotDateTime.getTime() <= Date.now()) {
+      return {
+        status: 'Pasado' as const,
+        label: 'Horario concluido'
+      };
+    }
 
     // 1. Partido de torneo en ESA cancha específica y en ESE horario exacto
     const matchOnCourt = fixtures.find(
@@ -300,6 +313,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </div>
 
+        {/* Banner de Sanción Vigente (RF-05) */}
+        {isUserBanned && (
+          <div className="bg-[rgba(229,62,62,0.15)] border-2 border-[#e53e3e] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <span className="text-3xl shrink-0">🚫</span>
+              <div>
+                <h3 className="font-bold text-base text-[#e53e3e]">
+                  Cuenta Suspendida para Nuevas Reservas (RF-05)
+                </h3>
+                <p className="text-xs text-[#d1d5db] mt-1 leading-relaxed">
+                  Has acumulado <strong>3 inasistencias consecutivas</strong> a turnos reservados. De acuerdo a la normativa del complejo deportivo, tu cuenta está bloqueada {currentUser?.suspension_hasta ? `hasta el ${new Date(currentUser.suspension_hasta).toLocaleDateString('es-AR')}` : 'durante 14 días'}. Los botones de reserva permanecerán inhabilitados.
+                </p>
+              </div>
+            </div>
+            <span className="bg-[#e53e3e] text-white text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider self-start sm:self-center shrink-0">
+              Sanción Activa
+            </span>
+          </div>
+        )}
+
         {/* Weekend notice if applicable */}
         {isWeekend && (
           <div className="bg-[rgba(245,158,11,0.15)] border border-[#f59e0b] rounded-xl p-3 flex items-center gap-3 text-xs text-[#f59e0b]">
@@ -341,23 +374,41 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       const { status, label } = getSlotStatus(c.name, hour);
                       return (
                         <td key={c.id} className="py-3 px-3 min-w-[180px]">
-                          {status === 'Libre' ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                onOpenPago({
-                                  court: c.name,
-                                  courtId: c.id,
-                                  sport: selectedSport,
-                                  date: selectedDate,
-                                  time: hour,
-                                  price: c.pricePerHour
-                                })
-                              }
-                              className="w-full py-2.5 rounded-xl bg-[rgba(101,197,86,0.15)] text-[#65c556] border border-[#65c556]/40 hover:bg-[#65c556] hover:text-[#293827] font-bold text-xs transition-all cursor-pointer shadow-sm"
+                          {status === 'Pasado' ? (
+                            <div
+                              className="w-full py-2.5 px-2 rounded-xl bg-[#1e281d]/70 text-[#71856d] border border-[#3b4d38] font-bold text-xs select-none shadow-sm"
+                              title="Este horario ya ha concluido"
                             >
-                              Reservar (${Math.round(c.pricePerHour * 0.3).toLocaleString('es-AR')})
-                            </button>
+                              Concluido
+                            </div>
+                          ) : status === 'Libre' ? (
+                            isUserBanned ? (
+                              <button
+                                type="button"
+                                disabled
+                                title="No puedes reservar: tu cuenta está suspendida por acumulación de inasistencias (RF-05)"
+                                className="w-full py-2.5 rounded-xl bg-red-950/20 text-red-400 border border-red-500/30 font-bold text-xs opacity-60 cursor-not-allowed shadow-sm flex items-center justify-center gap-1"
+                              >
+                                <span>🚫 Suspendido</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onOpenPago({
+                                    court: c.name,
+                                    courtId: c.id,
+                                    sport: selectedSport,
+                                    date: selectedDate,
+                                    time: hour,
+                                    price: c.pricePerHour
+                                  })
+                                }
+                                className="w-full py-2.5 rounded-xl bg-[rgba(101,197,86,0.15)] text-[#65c556] border border-[#65c556]/40 hover:bg-[#65c556] hover:text-[#293827] font-bold text-xs transition-all cursor-pointer shadow-sm"
+                              >
+                                Reservar (${Math.round(c.pricePerHour * 0.3).toLocaleString('es-AR')})
+                              </button>
+                            )
                           ) : status === 'Torneo' ? (
                             <div
                               className="py-2.5 px-2 rounded-xl border text-xs font-bold shadow-sm"

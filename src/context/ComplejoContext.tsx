@@ -48,6 +48,9 @@ export interface CurrentUser {
   email: string;
   rol: string;
   token?: string;
+  inasistencias?: number;
+  estado_cuenta?: string;
+  suspension_hasta?: string | null;
 }
 
 export const DEMO_EMAILS: Record<UserRole, string> = {
@@ -220,6 +223,22 @@ function mapStandingFromApi(row: any, index: number): StandingRow {
   };
 }
 
+function computeHoursUntil(dateStr?: string, timeStr?: string): number {
+  if (!dateStr || !timeStr) return 48;
+  try {
+    const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+    const cleanTime = timeStr.replace(' hs', '').trim();
+    const [hh, mm] = cleanTime.split(':').map(Number);
+    const [year, month, day] = cleanDate.split('-').map(Number);
+    if (isNaN(year) || isNaN(month) || isNaN(day)) return 48;
+    const target = new Date(year, month - 1, day, hh || 0, mm || 0, 0);
+    const diffMs = target.getTime() - Date.now();
+    return diffMs / (1000 * 60 * 60);
+  } catch {
+    return 48;
+  }
+}
+
 function mapReservaFromApi(r: any): BookingItem {
   const statusMap: Record<string, BookingItem['status']> = {
     'CONFIRMADA': 'Confirmada',
@@ -240,7 +259,7 @@ function mapReservaFromApi(r: any): BookingItem {
     depositPaid: sena,
     remainingBalance: total - sena,
     status: statusMap[r.estado] || 'Confirmada',
-    hoursUntilMatch: 48,
+    hoursUntilMatch: computeHoursUntil(r.fecha, r.hora),
     clientName: r.usuario_nombre || 'Cliente',
     clientEmail: r.usuario_email || '',
     rawStatus: r.estado,
@@ -456,7 +475,18 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, []);
 
-  const isUserBanned = userAbsences >= 3;
+  // Sincronizar faltas acumuladas con el usuario en sesión
+  useEffect(() => {
+    if (currentUser && currentUser.inasistencias !== undefined) {
+      setUserAbsences(Number(currentUser.inasistencias));
+    }
+  }, [currentUser]);
+
+  const isUserBanned = Boolean(
+    currentUser?.estado_cuenta === 'Suspendida' ||
+    (currentUser?.inasistencias !== undefined && Number(currentUser.inasistencias) >= 3) ||
+    userAbsences >= 3
+  );
 
   const logAudit = (action: string, detail: string, type: AuditLogItem['type']) => {
     const newLog: AuditLogItem = {
@@ -484,6 +514,13 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Reserva de turnos con seña del 30% en MySQL
   const bookCourt = async (courtId: string, courtName: string, sport: SportType, date: string, time: string): Promise<BookingItem> => {
+    // RF-05: Validación inmediata de sanción
+    if (isUserBanned) {
+      const msg = 'Tu cuenta se encuentra suspendida temporalmente por acumulación de inasistencias (RF-05). No puedes realizar nuevas reservas.';
+      alert(msg);
+      throw new Error(msg);
+    }
+
     const totalPrice = SPORT_PRICING[sport] || 18000;
     const depositPaid = Math.round(totalPrice * 0.3);
     const remainingBalance = totalPrice - depositPaid;
@@ -523,6 +560,16 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const cleanHour = time.replace(' hs', '').trim() + (time.includes(':') ? (time.split(':').length === 2 ? ':00' : '') : ':00:00');
 
+    // Validación Docente: No permitir turnos en fechas u horarios concluidos
+    const [year, month, day] = cleanDate.split('-').map(Number);
+    const [hours, minutes] = cleanHour.split(':').map(Number);
+    const targetTurnoDate = new Date(year, month - 1, day, hours || 0, minutes || 0, 0);
+    if (targetTurnoDate.getTime() <= Date.now()) {
+      const msg = 'No es posible reservar un turno para una fecha u horario que ya ha transcurrido.';
+      alert(msg);
+      throw new Error(msg);
+    }
+
     let createdId = 'res-' + Date.now();
     try {
       const apiRes: any = await reservasApi.create({
@@ -551,7 +598,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       depositPaid,
       remainingBalance,
       status: 'Confirmada',
-      hoursUntilMatch: 48,
+      hoursUntilMatch: computeHoursUntil(cleanDate, time),
       clientName: currentUser?.nombre || 'Cliente',
       clientEmail: currentUser?.email || ''
     };
@@ -571,7 +618,8 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const target = bookings.find((b) => b.id === bookingId);
     const numId = parseInt(bookingId.replace(/\D/g, ''), 10);
 
-    let isRefundable = target ? target.hoursUntilMatch > 24 : true;
+    const dynamicHoursUntil = target ? computeHoursUntil(target.date, target.time) : 48;
+    let isRefundable = dynamicHoursUntil > 24;
     let deposit = target ? target.depositPaid : 5400;
 
     if (!isNaN(numId)) {
@@ -592,6 +640,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     );
 
     let msg = '';
+    const depositToReturn = isRefundable ? deposit : 0;
     if (isRefundable) {
       msg = `Reserva cancelada con más de 24 hs de anticipación. Se reintegra el 100% de la seña ($${deposit.toLocaleString()}) al medio de pago original.`;
       addNotification('Cancelación con Reembolso', msg, 'reserva');
@@ -599,10 +648,10 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } else {
       msg = `Reserva cancelada con menos de 24 hs de anticipación. De acuerdo a la política del complejo, no corresponde reintegro de la seña ($${deposit.toLocaleString()}).`;
       addNotification('Cancelación sin Reintegro', msg, 'sancion');
-      logAudit('Cancelación Fuera de Término', `Reserva #${bookingId} cancelada con menos de 24hs. Seña de $${deposit} retenida como penalización.`, 'sancion');
+      logAudit('Cancelación Fuera de Término', `Reserva #${bookingId} cancelada con menos de 24hs. Seña de $${deposit} retenida como compensación.`, 'sancion');
     }
 
-    return { refunded: isRefundable, depositAmount: deposit, message: msg };
+    return { refunded: isRefundable, depositAmount: depositToReturn, message: msg };
   };
 
   // Lista de espera
