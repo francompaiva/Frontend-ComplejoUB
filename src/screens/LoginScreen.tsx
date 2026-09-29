@@ -157,9 +157,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           'No se pudo conectar con el servidor backend en http://localhost:4000. ' +
           'Asegúrate de ejecutar "npm run dev" en la carpeta Backend-ComplejoUB o ingresa en Modo Demo a continuación.'
         );
-      } else if (errMsg.toLowerCase().includes('verificada') || errMsg.toLowerCase().includes('código')) {
+      } else if (
+        errMsg.toLowerCase().includes('verific') ||
+        errMsg.toLowerCase().includes('código') ||
+        errMsg.toLowerCase().includes('codigo')
+      ) {
         setOtpEmail(emailTrimmed);
-        setOtpError(errMsg);
+        setOtpCode('');
+        setOtpError(null);
+        setOtpSuccess(errMsg);
         setIsOtpModalOpen(true);
       } else {
         setLoginError(errMsg);
