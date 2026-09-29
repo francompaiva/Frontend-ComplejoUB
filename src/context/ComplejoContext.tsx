@@ -46,7 +46,7 @@ export const DEMO_EMAILS: Record<UserRole, string> = {
 
 export interface ComplejoContextType {
   userRole: UserRole;
-  setUserRole: (role: UserRole) => void;
+  setUserRole: (role: UserRole, userToSet?: CurrentUser | null) => void;
   currentUser: CurrentUser | null;
   setCurrentUser: (user: CurrentUser | null) => void;
   courts: Court[];
@@ -228,8 +228,8 @@ function mapReservaFromApi(r: any): BookingItem {
     remainingBalance: total - sena,
     status: statusMap[r.estado] || 'Confirmada',
     hoursUntilMatch: 48,
-    clientName: r.usuario_nombre || 'Lucas Díaz',
-    clientEmail: r.usuario_email || 'lucas@gmail.com',
+    clientName: r.usuario_nombre || 'Cliente',
+    clientEmail: r.usuario_email || '',
   };
 }
 
@@ -259,12 +259,33 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [userAbsences, setUserAbsences] = useState<number>(0);
 
-  // Helper para autenticar automáticamente según el rol activo
+  // Helper para autenticar automáticamente según el rol activo SOLO si no hay usuario en sesión
   const authenticateRole = useCallback(async (role: UserRole) => {
+    const storedUserRaw = localStorage.getItem('complejo_user');
+    const token = apiClient.getToken();
+    if (storedUserRaw && token) {
+      try {
+        const parsed = JSON.parse(storedUserRaw);
+        const parsedRole = (parsed.rol || '').toLowerCase();
+        const roleMatches =
+          (role === 'cliente' && parsedRole === 'cliente') ||
+          (role === 'arbitro' && parsedRole === 'arbitro') ||
+          (role === 'admin' && (parsedRole === 'administrador' || parsedRole === 'admin')) ||
+          (role === 'superadmin' && (parsedRole === 'superadministrador' || parsedRole === 'superadmin'));
+
+        if (roleMatches) {
+          setCurrentUser(parsed);
+          return;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     try {
       const email = DEMO_EMAILS[role];
       const res: any = await authApi.login(email, 'password123');
-      if (res && res.token) {
+      if (res && res.token && res.user) {
         apiClient.setToken(res.token);
         localStorage.setItem('complejo_user', JSON.stringify(res.user));
         setCurrentUser(res.user);
@@ -380,18 +401,36 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [fetchTorneoData, userRole]);
 
   // Cambio de rol con autenticación instantánea en backend
-  const setUserRole = useCallback(async (newRole: UserRole) => {
+  const setUserRole = useCallback(async (newRole: UserRole, userToSet?: CurrentUser | null) => {
     setUserRoleState(newRole);
     saveTo('userRole', newRole);
-    await authenticateRole(newRole);
+    if (userToSet) {
+      setCurrentUser(userToSet);
+      localStorage.setItem('complejo_user', JSON.stringify(userToSet));
+    } else {
+      await authenticateRole(newRole);
+    }
     await refreshAllData(newRole);
   }, [authenticateRole, refreshAllData]);
 
-  // Inicialización en montaje: autenticar según rol y cargar datos de MySQL
+  // Inicialización en montaje: si hay usuario previo en localStorage, restaurarlo; si no, esperar login
   useEffect(() => {
     let isMounted = true;
     const init = async () => {
-      await authenticateRole(userRole);
+      const storedUserRaw = localStorage.getItem('complejo_user');
+      const token = apiClient.getToken();
+      if (storedUserRaw && token) {
+        try {
+          const parsed = JSON.parse(storedUserRaw);
+          setCurrentUser(parsed);
+          if (isMounted) {
+            await refreshAllData(userRole);
+          }
+          return;
+        } catch {
+          // ignore
+        }
+      }
       if (isMounted) {
         await refreshAllData(userRole);
       }
@@ -498,8 +537,8 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       remainingBalance,
       status: 'Confirmada',
       hoursUntilMatch: 48,
-      clientName: 'Lucas Díaz',
-      clientEmail: 'lucas@gmail.com'
+      clientName: currentUser?.nombre || 'Cliente',
+      clientEmail: currentUser?.email || ''
     };
 
     setBookings((prev) => [newBooking, ...prev.filter(b => b.id !== createdId)]);

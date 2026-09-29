@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ComplejoProvider, useComplejo, type UserRole } from './context/ComplejoContext';
+import { ComplejoProvider, useComplejo, type UserRole, type CurrentUser } from './context/ComplejoContext';
 import { apiClient } from './api/client';
 import LoginScreen from './screens/LoginScreen';
 import LandingPage from './screens/LandingPage';
@@ -60,7 +60,7 @@ interface AccountConfig {
 const ACCOUNTS: Record<UserRole, AccountConfig> = {
   cliente: {
     role: 'cliente',
-    name: 'Lucas Díaz',
+    name: 'Cliente',
     title: 'Cliente / Capitán',
     badge: 'Cliente',
     iconNode: <IconBall size={18} className="text-[#65c556]" />,
@@ -76,7 +76,7 @@ const ACCOUNTS: Record<UserRole, AccountConfig> = {
   },
   arbitro: {
     role: 'arbitro',
-    name: 'Sebastian Norjean',
+    name: 'Árbitro',
     title: 'Árbitro Oficial AFA/UB',
     badge: 'Árbitro',
     iconNode: <IconWhistle size={18} className="text-yellow-400" />,
@@ -172,7 +172,18 @@ const AppContent: React.FC = () => {
 
   // Login handler
   const handleLogin = async (role: UserRole) => {
-    await setUserRole(role);
+    let userObj: CurrentUser | null = currentUser;
+    if (!userObj) {
+      const stored = localStorage.getItem('complejo_user');
+      if (stored) {
+        try {
+          userObj = JSON.parse(stored);
+        } catch {
+          userObj = null;
+        }
+      }
+    }
+    await setUserRole(role, userObj);
     if (role === 'admin' || role === 'superadmin') {
       setCurrentScreen('admin-agenda');
       setAdminSection('agenda');
