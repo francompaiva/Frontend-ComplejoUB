@@ -218,7 +218,7 @@ const AppContent: React.FC = () => {
 
   const handleOpenPago = (slotData: BookingSlotInfo) => {
     if (isUserBanned) {
-      alert('Tu cuenta se encuentra suspendida temporalmente por acumulación de inasistencias (RF-05). No puedes realizar reservas.');
+      alert('Tu cuenta se encuentra suspendida temporalmente por acumulación de inasistencias. No puedes realizar reservas.');
       return;
     }
     setSelectedSlot(slotData);

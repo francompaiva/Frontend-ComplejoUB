@@ -147,7 +147,7 @@ export const AdminGestionUsuarios: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-[#a0a0a0] mt-1 max-w-2xl leading-relaxed">
-              De acuerdo a las reglas de negocio (RF-17), los árbitros y administradores no se registran en el portal público. Son dados de alta y asignados exclusivamente por la dirección del complejo deportivo.
+              Los árbitros y administradores no se registran en el portal público. Son dados de alta y asignados exclusivamente por la dirección del complejo deportivo.
             </p>
           </div>
         </div>

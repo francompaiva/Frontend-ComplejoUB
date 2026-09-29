@@ -162,7 +162,7 @@ export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
 
           {/* Scope notice */}
           <p className="text-[11px] text-[#a0a0a0] italic text-center">
-            * Conforme al alcance del proyecto (TP1 3.2), los pagos son simulados y se aprueban automáticamente.
+            * La seña se procesa de manera inmediata y segura para confirmar tu reserva en el sistema.
           </p>
 
           {/* Actions */}

@@ -26,6 +26,7 @@ import {
   reportesApi
 } from '../api/endpoints';
 import { apiClient } from '../api/client';
+import { formatTimeAgo } from '../utils/dateUtils';
 
 export type {
   Court,
@@ -406,14 +407,18 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       if (Array.isArray(notifs) && notifs.length > 0) {
         setNotifications(
-          notifs.map((n: any) => ({
-            id: String(n.id),
-            title: n.titulo,
-            message: n.mensaje,
-            timeAgo: 'Reciente',
-            read: Boolean(n.leida),
-            type: n.tipo?.toLowerCase().includes('sancion') ? 'sancion' : n.tipo?.toLowerCase().includes('torneo') ? 'torneo' : 'reserva',
-          }))
+          notifs.map((n: any) => {
+            const rawDate = n.created_at || n.createdAt;
+            return {
+              id: String(n.id),
+              title: n.titulo,
+              message: n.mensaje,
+              createdAt: rawDate ? new Date(rawDate).toISOString() : new Date().toISOString(),
+              timeAgo: formatTimeAgo(rawDate),
+              read: Boolean(n.leida),
+              type: n.tipo?.toLowerCase().includes('sancion') ? 'sancion' : n.tipo?.toLowerCase().includes('torneo') ? 'torneo' : 'reserva',
+            };
+          })
         );
       }
 
@@ -501,10 +506,12 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const addNotification = (title: string, message: string, type: NotificationItem['type']) => {
+    const nowIso = new Date().toISOString();
     const newNotif: NotificationItem = {
       id: 'notif-' + Date.now(),
       title,
       message,
+      createdAt: nowIso,
       timeAgo: 'Recién',
       read: false,
       type
@@ -514,9 +521,8 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Reserva de turnos con seña del 30% en MySQL
   const bookCourt = async (courtId: string, courtName: string, sport: SportType, date: string, time: string): Promise<BookingItem> => {
-    // RF-05: Validación inmediata de sanción
     if (isUserBanned) {
-      const msg = 'Tu cuenta se encuentra suspendida temporalmente por acumulación de inasistencias (RF-05). No puedes realizar nuevas reservas.';
+      const msg = 'Tu cuenta se encuentra suspendida temporalmente por acumulación de inasistencias. No puedes realizar nuevas reservas.';
       alert(msg);
       throw new Error(msg);
     }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import CancelacionConfirmModal from '../components/CancelacionConfirmModal';
 import { type BookingItem } from '../data/mockData';
+import { formatTimeAgo } from '../utils/dateUtils';
 
 export interface MisReservasProps {
   onNavigate: (screen: string) => void;
@@ -436,7 +437,7 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <h4 className="font-bold text-sm text-white">{n.title}</h4>
-                      <span className="text-[10px] text-[#a0a0a0] font-mono">{n.timeAgo}</span>
+                      <span className="text-[10px] text-[#a0a0a0] font-mono">{formatTimeAgo(n.createdAt || n.timeAgo)}</span>
                     </div>
                     <p className="text-xs text-[#c0c0c0] mt-1 leading-relaxed">{n.message}</p>
                   </div>

@@ -80,7 +80,7 @@ export const CancelacionConfirmModal: React.FC<CancelacionConfirmModalProps> = (
                 <span>⚠️ Anticipación menor a 24 horas ({Math.max(0, Math.round(hoursUntilMatch))} hs restantes)</span>
               </div>
               <p className="text-[12px] text-[#c0c0c0] leading-relaxed">
-                Por cancelarse con menos de 24 horas de antelación, <strong>la seña de ${depositAmount.toLocaleString('es-AR')} no será devuelta (devolución: $0)</strong> y queda retenida como compensación por el turno no ocupado (RF-04).
+                Por cancelarse con menos de 24 horas de antelación, <strong>la seña de ${depositAmount.toLocaleString('es-AR')} no será devuelta (devolución: $0)</strong> y queda retenida como compensación por el turno no ocupado.
               </p>
             </div>
           )}

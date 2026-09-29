@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import { type BookingSlotInfo } from '../components/ConfirmacionPagoModal';
-import { type SportType, SPORT_PRICING } from '../data/mockData';
+import { type SportType, type Tournament, SPORT_PRICING } from '../data/mockData';
 import ListaEsperaModal from '../components/ListaEsperaModal';
+import TorneoDetalleModal from '../components/TorneoDetalleModal';
 import { IconCalendar, IconClock } from '../components/Icons';
 
 export interface LandingPageProps {
@@ -36,6 +37,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 }) => {
   const { tournaments, standings, courts, bookings, fixtures, joinWaitlist, isUserBanned, currentUser } = useComplejo();
   const [selectedSport, setSelectedSport] = useState<SportType>('Fútbol 5');
+  const [detailModalTorneo, setDetailModalTorneo] = useState<Tournament | null>(null);
 
   // Fechas de conveniencia
   const todayStr = new Date().toISOString().split('T')[0];
@@ -320,7 +322,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <span className="text-3xl shrink-0">🚫</span>
               <div>
                 <h3 className="font-bold text-base text-[#e53e3e]">
-                  Cuenta Suspendida para Nuevas Reservas (RF-05)
+                  Cuenta Suspendida para Nuevas Reservas
                 </h3>
                 <p className="text-xs text-[#d1d5db] mt-1 leading-relaxed">
                   Has acumulado <strong>3 inasistencias consecutivas</strong> a turnos reservados. De acuerdo a la normativa del complejo deportivo, tu cuenta está bloqueada {currentUser?.suspension_hasta ? `hasta el ${new Date(currentUser.suspension_hasta).toLocaleDateString('es-AR')}` : 'durante 14 días'}. Los botones de reserva permanecerán inhabilitados.
@@ -338,7 +340,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="bg-[rgba(245,158,11,0.15)] border border-[#f59e0b] rounded-xl p-3 flex items-center gap-3 text-xs text-[#f59e0b]">
             <span className="text-base">🏆</span>
             <span>
-              <strong>Aviso de Torneo Oficial (RF-06):</strong> Durante el fin de semana se disputan las fechas del torneo oficial en las canchas programadas. Cada partido ocupa únicamente su cancha y horario asignado; todas las demás canchas u horarios libres están 100% habilitados para reservas comunes con el 30% de seña.
+              <strong>Aviso de Torneo Oficial:</strong> Durante el fin de semana se disputan las fechas del torneo oficial en las canchas programadas. Cada partido ocupa únicamente su cancha y horario asignado; todas las demás canchas u horarios libres están 100% habilitados para reservas comunes con el 30% de seña.
             </span>
           </div>
         )}
@@ -386,7 +388,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                               <button
                                 type="button"
                                 disabled
-                                title="No puedes reservar: tu cuenta está suspendida por acumulación de inasistencias (RF-05)"
+                                title="No puedes reservar: tu cuenta está suspendida por acumulación de inasistencias"
                                 className="w-full py-2.5 rounded-xl bg-red-950/20 text-red-400 border border-red-500/30 font-bold text-xs opacity-60 cursor-not-allowed shadow-sm flex items-center justify-center gap-1"
                               >
                                 <span>🚫 Suspendido</span>
@@ -508,13 +510,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => onOpenInscripcion(t.id)}
-                className="w-full py-2.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs transition-colors cursor-pointer"
-              >
-                Inscribir Equipo a este Torneo
-              </button>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setDetailModalTorneo(t)}
+                  className="flex-1 py-2.5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white hover:border-[#65c556] font-bold text-xs transition-colors cursor-pointer text-center"
+                >
+                  Ver Detalles
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenInscripcion(t.id)}
+                  className="flex-1 py-2.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs transition-colors cursor-pointer text-center"
+                >
+                  Inscribir Equipo
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -582,7 +593,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <footer className="bg-[#141b13] border-t border-[#5a7056] px-6 lg:px-12 py-8 text-xs text-[#a0a0a0] flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <p className="font-bold text-white">Complejo Deportivo UB</p>
-          <p className="text-[11px] mt-0.5">Proyecto de Construcción de Software • Docente: Prof. Lic. María Julia Monasterio</p>
+          <p className="text-[11px] mt-0.5">Sistema Integral de Gestión Deportiva • Complejo Deportivo UB</p>
         </div>
         <div className="flex gap-4">
           <button onClick={() => onNavigate('landing')} className="hover:text-white bg-transparent border-none cursor-pointer">
@@ -609,6 +620,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         onClose={() => setWaitlistModal({ ...waitlistModal, isOpen: false })}
         onConfirm={(name, phone) => {
           joinWaitlist(waitlistModal.courtName, waitlistModal.date, waitlistModal.time, name, phone);
+        }}
+      />
+
+      {/* Modal Detalle de Torneo */}
+      <TorneoDetalleModal
+        isOpen={!!detailModalTorneo}
+        torneo={detailModalTorneo}
+        onClose={() => setDetailModalTorneo(null)}
+        onInscribir={(id) => {
+          setDetailModalTorneo(null);
+          onOpenInscripcion(id);
         }}
       />
     </div>

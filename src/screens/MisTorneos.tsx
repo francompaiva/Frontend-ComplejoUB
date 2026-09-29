@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
-import type { StandingRow, FixtureMatch } from '../data/mockData';
+import type { StandingRow, FixtureMatch, Tournament } from '../data/mockData';
 import { IconPlus } from '../components/Icons';
+import TorneoDetalleModal from '../components/TorneoDetalleModal';
 
 interface MisTorneosProps {
   onNavigate: (screen: any) => void;
@@ -12,6 +13,7 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
   const { tournaments, standings, fixtures, userRole, fetchTorneoData } = useComplejo();
   const [selectedTorneoId, setSelectedTorneoId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'posiciones' | 'fixture'>('posiciones');
+  const [detailModalTorneo, setDetailModalTorneo] = useState<Tournament | null>(null);
 
   useEffect(() => {
     if (tournaments.length > 0) {
@@ -81,7 +83,10 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
             return (
               <div
                 key={torneo.id}
-                onClick={() => setSelectedTorneoId(torneo.id)}
+                onClick={() => {
+                  setSelectedTorneoId(torneo.id);
+                  document.getElementById('torneo-activo-detalle')?.scrollIntoView({ behavior: 'smooth' });
+                }}
                 className={`bg-[#344732] rounded-xl border p-5 flex flex-col justify-between transition cursor-pointer hover:border-[#65C556] ${
                   isSelected ? 'border-[#65C556] ring-1 ring-[#65C556] shadow-lg' : 'border-[#445941]'
                 }`}
@@ -113,13 +118,16 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
                 <div className="pt-4 border-t border-[#445941] flex items-center justify-between">
                   <span className="text-xs font-bold text-[#A3B89E]">Modalidad Liga</span>
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedTorneoId(torneo.id);
+                      setDetailModalTorneo(torneo);
                     }}
-                    className="text-xs font-bold text-[#65C556] hover:underline"
+                    className="text-xs font-bold text-[#65C556] hover:text-[#54b045] underline flex items-center gap-1 cursor-pointer"
                   >
-                    Ver Detalles →
+                    <span>Ver Detalles</span>
+                    <span>→</span>
                   </button>
                 </div>
               </div>
@@ -128,7 +136,7 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
         </div>
 
         {/* Torneo Activo: Pestañas de Posiciones y Fixture */}
-        <div className="bg-[#344732] rounded-xl border border-[#445941] overflow-hidden shadow-xl">
+        <div id="torneo-activo-detalle" className="bg-[#344732] rounded-xl border border-[#445941] overflow-hidden shadow-xl">
           <div className="p-6 border-b border-[#445941] flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
@@ -344,6 +352,24 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
           </div>
         </div>
       </footer>
+
+      {/* Modal de Detalle de Torneo */}
+      <TorneoDetalleModal
+        isOpen={!!detailModalTorneo}
+        torneo={detailModalTorneo}
+        onClose={() => setDetailModalTorneo(null)}
+        onInscribir={(id) => {
+          setDetailModalTorneo(null);
+          onOpenInscripcion(id);
+        }}
+        onVerFixture={(id) => {
+          setSelectedTorneoId(id);
+          setDetailModalTorneo(null);
+          setTimeout(() => {
+            document.getElementById('torneo-activo-detalle')?.scrollIntoView({ behavior: 'smooth' });
+          }, 150);
+        }}
+      />
     </div>
   );
 };

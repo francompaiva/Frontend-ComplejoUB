@@ -316,7 +316,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             Complejo Deportivo <strong className="text-[#65c556]">UB</strong>
           </h1>
           <p className="text-xs text-[#a0a0a0]">
-            Sistema Integral de Reservas, Torneos y Arbitraje (TP1 Universidad de Belgrano)
+            Sistema Integral de Gestión de Reservas, Torneos y Arbitraje
           </p>
         </div>
 
@@ -368,9 +368,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                 <span className="text-[11px] text-[#a0a0a0]">Válido durante 15 minutos</span>
               </div>
 
-              {/* Tips for Evaluators */}
+              {/* Tips de demo */}
               <div className="bg-[#293827] p-3 rounded-xl border border-[#5a7056]/60 text-[11px] text-[#a0a0a0] leading-relaxed">
-                💡 <strong className="text-[#65c556]">Tip de evaluación:</strong> El código fue enviado mediante Nodemailer y también se imprime en la terminal del backend. También puedes utilizar el código maestro universal <strong>123456</strong>.
+                💡 <strong className="text-[#65c556]">Verificación de prueba:</strong> Para entornos de prueba o demostración, también puedes ingresar el código universal <strong>123456</strong>.
               </div>
 
               <div className="flex items-center justify-between text-xs pt-2">
@@ -573,11 +573,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   </div>
                 )}
 
-                {/* Accesos de Demostración para Evaluación (autocompleta campos para validar en BD) */}
+                {/* Cuentas de Acceso Rápido / Demo */}
                 <div className="bg-[#293827] border border-[#5a7056]/60 rounded-2xl p-3.5 flex flex-col gap-2 mt-1">
                   <span className="text-[11px] font-bold text-[#65c556] uppercase tracking-wider flex items-center gap-1.5">
                     <IconCheck size={14} />
-                    Accesos de Demostración para Evaluación
+                    Cuentas de Acceso Rápido
                   </span>
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     <button
@@ -616,7 +616,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                       type="button"
                       onClick={() => handleQuickFill('sancionado@gmail.com', 'password123')}
                       className="px-2.5 py-1.5 rounded-lg bg-[#2b1818] hover:bg-[#3f2121] border border-[#ef4444]/60 text-[11px] font-semibold text-red-300 transition text-center cursor-pointer truncate"
-                      title="Usuario Sancionado Test (3 inasistencias - RF-05)"
+                      title="Usuario Sancionado Test (3 inasistencias consecutivas)"
                     >
                       🚫 Sancionado
                     </button>

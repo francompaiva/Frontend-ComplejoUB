@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import { IconBell } from './Icons';
+import { formatTimeAgo } from '../utils/dateUtils';
 
 export const NotificationDropdown: React.FC = () => {
   const { notifications, unreadNotifsCount, markNotificationRead, markAllNotificationsRead } = useComplejo();
@@ -62,7 +63,7 @@ export const NotificationDropdown: React.FC = () => {
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-bold text-xs text-white">{notif.title}</span>
-                      <span className="text-[10px] text-[#A3B89E]">{notif.timeAgo}</span>
+                      <span className="text-[10px] text-[#A3B89E] font-medium">{formatTimeAgo(notif.createdAt || notif.timeAgo)}</span>
                     </div>
                     <p className="text-xs text-[#A3B89E] leading-relaxed">{notif.message}</p>
                   </div>

@@ -660,7 +660,7 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
               </div>
 
               <div className="bg-[#293827] p-2.5 rounded-lg border border-[#5a7056] text-[11px] text-[#a0a0a0]">
-                * Modalidad fija: <strong>Liga (todos contra todos)</strong> con generación automática de cruces y fecha libre si la cantidad de equipos es impar (Alcance 3.1).
+                * Modalidad fija: <strong>Liga (todos contra todos)</strong> con generación automática de cruces y fecha libre si la cantidad de equipos es impar.
               </div>
 
               <div className="flex gap-2.5 mt-2">

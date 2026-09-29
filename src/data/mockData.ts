@@ -106,6 +106,7 @@ export interface NotificationItem {
   id: string;
   title: string;
   message: string;
+  createdAt?: string;
   timeAgo: string;
   read: boolean;
   type: 'reserva' | 'torneo' | 'sancion' | 'info';
@@ -479,7 +480,8 @@ export const INITIAL_NOTIFICATIONS: NotificationItem[] = [
     id: 'notif-1',
     title: '¡Reserva Confirmada!',
     message: 'Tu turno para Cancha 1 (Fútbol 5) fue confirmado. Seña del 30% ($5.400) acreditada.',
-    timeAgo: 'Hace 10 minutos',
+    createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    timeAgo: 'Hace 10 mins',
     read: false,
     type: 'reserva'
   },
@@ -487,7 +489,8 @@ export const INITIAL_NOTIFICATIONS: NotificationItem[] = [
     id: 'notif-2',
     title: 'Fecha 2 de Copa Apertura',
     message: 'Tu equipo "Los Galácticos FC" juega hoy a las 20:30 hs en Cancha 1 frente a Real Bañil.',
-    timeAgo: 'Hace 1 hora',
+    createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
+    timeAgo: 'Hace 2 horas',
     read: false,
     type: 'torneo'
   },
@@ -495,7 +498,17 @@ export const INITIAL_NOTIFICATIONS: NotificationItem[] = [
     id: 'notif-3',
     title: 'Política de Cancelación',
     message: 'Recordá que para recuperar el 100% de la seña debés cancelar con más de 24 horas de anticipación.',
+    createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
     timeAgo: 'Hace 1 día',
+    read: true,
+    type: 'info'
+  },
+  {
+    id: 'notif-4',
+    title: 'Inauguración Nuevas Instalaciones',
+    message: 'Se encuentran habilitadas las nuevas canchas con césped sintético profesional.',
+    createdAt: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString(),
+    timeAgo: 'Hace 1 semana',
     read: true,
     type: 'info'
   }
