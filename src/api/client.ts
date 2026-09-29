@@ -69,7 +69,10 @@ class ApiClient {
           this.setToken(null);
         }
         const errorMsg = json.error?.message || `Error en la solicitud HTTP (${response.status})`;
-        throw new Error(errorMsg);
+        const errorObj: any = new Error(errorMsg);
+        errorObj.statusCode = response.status;
+        errorObj.details = json.error?.details || null;
+        throw errorObj;
       }
 
       return json.data as T;

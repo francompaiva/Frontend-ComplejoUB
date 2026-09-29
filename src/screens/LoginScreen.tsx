@@ -151,17 +151,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         errMsg.toLowerCase().includes('networkerror') ||
         errMsg.toLowerCase().includes('fetch');
 
+      const isAccountUnverified =
+        err?.statusCode === 403 ||
+        err?.details?.requiresVerification === true ||
+        errMsg.toLowerCase().includes('debes activar tu cuenta') ||
+        errMsg.toLowerCase().includes('activación a tu casilla');
+
       if (isConnectionError) {
         setBackendOffline(true);
         setLoginError(
           'No se pudo conectar con el servidor backend en http://localhost:4000. ' +
           'Asegúrate de ejecutar "npm run dev" en la carpeta Backend-ComplejoUB o ingresa en Modo Demo a continuación.'
         );
-      } else if (
-        errMsg.toLowerCase().includes('verific') ||
-        errMsg.toLowerCase().includes('código') ||
-        errMsg.toLowerCase().includes('codigo')
-      ) {
+      } else if (isAccountUnverified) {
         setOtpEmail(emailTrimmed);
         setOtpCode('');
         setOtpError(null);
@@ -432,13 +434,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             {/* TAB 1: Iniciar Sesión */}
             {activeTab === 'login' && (
               <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
-                {loginError && (
-                  <div className="bg-[#7f1d1d]/80 border border-[#ef4444] p-3.5 rounded-xl flex items-start gap-2.5 text-xs text-[#fecaca] animate-fadeIn">
-                    <IconAlert size={16} className="shrink-0 text-[#ef4444] mt-0.5" />
-                    <span className="leading-relaxed">{loginError}</span>
-                  </div>
-                )}
-
                 {backendOffline && (
                   <div className="bg-[#241717] border border-[#ef4444] rounded-2xl p-4 flex flex-col gap-3 text-xs text-white shadow-xl animate-fadeIn">
                     <div className="flex items-start gap-3">
@@ -549,6 +544,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     </button>
                   </div>
                 </div>
+
+                {/* Mensaje de Error en Rojo abajo de los campos */}
+                {loginError && (
+                  <div className="bg-[#7f1d1d]/90 border border-[#ef4444] p-3 rounded-xl flex items-start gap-2.5 text-xs text-[#fecaca] animate-fadeIn shadow-lg">
+                    <IconAlert size={16} className="shrink-0 text-[#ef4444] mt-0.5" />
+                    <span className="leading-relaxed font-semibold">{loginError}</span>
+                  </div>
+                )}
 
                 {/* Accesos de Demostración para Evaluación (autocompleta campos para validar en BD) */}
                 <div className="bg-[#293827] border border-[#5a7056]/60 rounded-2xl p-3.5 flex flex-col gap-2 mt-1">
