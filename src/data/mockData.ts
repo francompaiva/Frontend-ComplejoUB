@@ -25,6 +25,8 @@ export interface BookingItem {
   hoursUntilMatch: number; // para verificar regla de 24 horas
   clientName: string;
   clientEmail: string;
+  rawStatus?: string;
+  asistencia_confirmada?: boolean | null;
 }
 
 export interface TournamentTeam {

@@ -27,6 +27,19 @@ import {
 } from '../api/endpoints';
 import { apiClient } from '../api/client';
 
+export type {
+  Court,
+  BookingItem,
+  Tournament,
+  FixtureMatch,
+  StandingRow,
+  Referee,
+  AuditLogItem,
+  NotificationItem,
+  WaitlistEntry,
+  SportType
+} from '../data/mockData';
+
 export type UserRole = 'cliente' | 'admin' | 'arbitro' | 'superadmin';
 
 export interface CurrentUser {
@@ -64,7 +77,7 @@ export interface ComplejoContextType {
 
   // Acciones y sincronización con API
   fetchTorneoData: (torneoId: string | number) => Promise<void>;
-  refreshAllData: () => Promise<void>;
+  refreshAllData: (currentRole?: UserRole) => Promise<void>;
   bookCourt: (courtId: string, courtName: string, sport: SportType, date: string, time: string) => Promise<BookingItem>;
   cancelBooking: (bookingId: string) => Promise<{ refunded: boolean; depositAmount: number; message: string }>;
   joinWaitlist: (courtName: string, date: string, time: string, userName: string, userPhone: string) => Promise<number>;
@@ -230,6 +243,8 @@ function mapReservaFromApi(r: any): BookingItem {
     hoursUntilMatch: 48,
     clientName: r.usuario_nombre || 'Cliente',
     clientEmail: r.usuario_email || '',
+    rawStatus: r.estado,
+    asistencia_confirmada: r.asistencia_confirmada !== undefined && r.asistencia_confirmada !== null ? Boolean(r.asistencia_confirmada) : null,
   };
 }
 
@@ -320,7 +335,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Carga y sincronización con la API backend (Base de Datos MySQL)
   const refreshAllData = useCallback(async (currentRole = userRole) => {
     try {
-      const isRoleAdmin = currentRole === 'admin';
+      const isRoleAdmin = currentRole === 'admin' || currentRole === 'superadmin';
       const [canchas, torneos, resReservas, notifs, logs] = await Promise.all([
         canchasApi.getAll().catch(() => []),
         torneosApi.getAll().catch(() => []),
