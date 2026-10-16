@@ -227,22 +227,6 @@ function mapStandingFromApi(row: any, index: number): StandingRow {
   };
 }
 
-function computeHoursUntil(dateStr?: string, timeStr?: string): number {
-  if (!dateStr || !timeStr) return 48;
-  try {
-    const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
-    const cleanTime = timeStr.replace(' hs', '').trim();
-    const [hh, mm] = cleanTime.split(':').map(Number);
-    const [year, month, day] = cleanDate.split('-').map(Number);
-    if (isNaN(year) || isNaN(month) || isNaN(day)) return 48;
-    const target = new Date(year, month - 1, day, hh || 0, mm || 0, 0);
-    const diffMs = target.getTime() - Date.now();
-    return diffMs / (1000 * 60 * 60);
-  } catch {
-    return 48;
-  }
-}
-
 function mapReservaFromApi(r: any): BookingItem {
   const statusMap: Record<string, BookingItem['status']> = {
     'CONFIRMADA': 'Confirmada',
@@ -263,7 +247,8 @@ function mapReservaFromApi(r: any): BookingItem {
     depositPaid: sena,
     remainingBalance: total - sena,
     status: statusMap[r.estado] || 'Confirmada',
-    hoursUntilMatch: computeHoursUntil(r.fecha, r.hora),
+    hoursUntilMatch: r.horas_anticipacion ?? r.horasAnticipacion ?? 0,
+    aplicaDevolucion: r.aplica_devolucion !== undefined ? Boolean(r.aplica_devolucion) : Boolean(r.aplicaDevolucion),
     clientName: r.usuario_nombre || 'Cliente',
     clientEmail: r.usuario_email || '',
     rawStatus: r.estado,
@@ -607,7 +592,8 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       depositPaid,
       remainingBalance,
       status: 'Confirmada',
-      hoursUntilMatch: computeHoursUntil(cleanDate, time),
+      hoursUntilMatch: 48,
+      aplicaDevolucion: true,
       clientName: currentUser?.nombre || 'Cliente',
       clientEmail: currentUser?.email || ''
     };
@@ -622,42 +608,45 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return newBooking;
   };
 
-  // Cancelación de reservas con regla de 24 horas en MySQL
+  // Cancelación de reservas centralizada en la API del backend
   const cancelBooking = async (bookingId: string) => {
     const target = bookings.find((b) => b.id === bookingId);
     const numId = parseInt(bookingId.replace(/\D/g, ''), 10);
 
-    const dynamicHoursUntil = target ? computeHoursUntil(target.date, target.time) : 48;
-    let isRefundable = dynamicHoursUntil > 24;
+    // Estado inicial de reembolso determinado por el backend en la reserva
+    let isRefundable = target?.aplicaDevolucion ?? false;
     let deposit = target ? target.depositPaid : 5400;
+    let serverMessage = '';
 
     if (!isNaN(numId)) {
       try {
         const res: any = await reservasApi.cancelar(numId, 'Cancelado por solicitud del cliente');
         if (res) {
+          // El backend es la única fuente de verdad para el estado y los términos de cancelación
           isRefundable = Boolean(res.aplicaDevolucion);
           if (res.montoSenaDevuelto !== undefined) deposit = Number(res.montoSenaDevuelto);
+          if (res.mensaje) serverMessage = res.mensaje;
           await refreshAllData();
         }
       } catch (err: any) {
-        console.warn('[cancelBooking] Error al cancelar en MySQL:', err?.message);
+        console.warn('[cancelBooking] Error al cancelar en backend:', err?.message);
       }
     }
 
     setBookings((prev) =>
-      prev.map((b) => (b.id === bookingId ? { ...b, status: 'Cancelada' } : b))
+      prev.map((b) => (b.id === bookingId ? { ...b, status: 'Cancelada', aplicaDevolucion: isRefundable } : b))
     );
 
     let msg = '';
     const depositToReturn = isRefundable ? deposit : 0;
     if (isRefundable) {
-      msg = `Reserva cancelada con más de 24 hs de anticipación. Se reintegra el 100% de la seña ($${deposit.toLocaleString()}) al medio de pago original.`;
+      msg = serverMessage || `Reserva cancelada con más de 24 hs de anticipación. Se reintegra el 100% de la seña ($${deposit.toLocaleString()}) al medio de pago original.`;
       addNotification('Cancelación con Reembolso', msg, 'reserva');
-      logAudit('Cancelación con Reintegro', `Reserva #${bookingId} cancelada con anticipación > 24hs. Devolución de seña de $${deposit}.`, 'reserva');
+      logAudit('Cancelación con Reintegro', `Reserva #${bookingId} cancelada con reintegro de seña de $${deposit}.`, 'reserva');
     } else {
-      msg = `Reserva cancelada con menos de 24 hs de anticipación. De acuerdo a la política del complejo, no corresponde reintegro de la seña ($${deposit.toLocaleString()}).`;
+      msg = serverMessage || `Reserva cancelada con menos de 24 hs de anticipación. De acuerdo a la política del complejo, no corresponde reintegro de la seña ($${deposit.toLocaleString()}).`;
       addNotification('Cancelación sin Reintegro', msg, 'sancion');
-      logAudit('Cancelación Fuera de Término', `Reserva #${bookingId} cancelada con menos de 24hs. Seña de $${deposit} retenida como compensación.`, 'sancion');
+      logAudit('Cancelación Fuera de Término', `Reserva #${bookingId} cancelada sin reintegro. Seña de $${deposit} retenida como compensación.`, 'sancion');
     }
 
     return { refunded: isRefundable, depositAmount: depositToReturn, message: msg };

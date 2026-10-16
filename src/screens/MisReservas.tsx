@@ -200,7 +200,7 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
               </div>
             ) : (
               activeBookings.map((b) => {
-                const canRefund = b.hoursUntilMatch > 24;
+                const canRefund = Boolean(b.aplicaDevolucion);
                 return (
                   <div
                     key={b.id}
@@ -448,11 +448,12 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
         )}
       </div>
 
-      {/* Modal de Cancelación con regla de 24hs */}
+      {/* Modal de Cancelación con regla de 24hs centralizada en el backend */}
       <CancelacionConfirmModal
         isOpen={!!bookingToCancel}
         bookingName={bookingToCancel ? `${bookingToCancel.courtName} (${bookingToCancel.date} • ${bookingToCancel.time})` : ''}
-        hoursUntilMatch={bookingToCancel?.hoursUntilMatch ?? 48}
+        isRefundable={bookingToCancel?.aplicaDevolucion ?? false}
+        hoursUntilMatch={bookingToCancel?.hoursUntilMatch}
         depositAmount={bookingToCancel?.depositPaid ?? 5400}
         onClose={() => setBookingToCancel(null)}
         onConfirm={handleConfirmCancel}
