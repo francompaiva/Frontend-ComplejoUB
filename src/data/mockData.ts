@@ -22,7 +22,8 @@ export interface BookingItem {
   depositPaid: number; // 30%
   remainingBalance: number; // 70%
   status: 'Confirmada' | 'Pendiente' | 'Completada' | 'Cancelada';
-  hoursUntilMatch: number; // para verificar regla de 24 horas
+  hoursUntilMatch: number; // determinado por backend
+  aplicaDevolucion?: boolean; // determinado por la API del backend
   clientName: string;
   clientEmail: string;
   rawStatus?: string;
@@ -158,7 +159,8 @@ export const INITIAL_USER_BOOKINGS: BookingItem[] = [
     depositPaid: 5400, // 30%
     remainingBalance: 12600, // 70%
     status: 'Confirmada',
-    hoursUntilMatch: 36, // Más de 24h -> devuelve seña
+    hoursUntilMatch: 36,
+    aplicaDevolucion: true, // Determinado por backend (>24h)
     clientName: 'Juan Pérez',
     clientEmail: 'juan.perez@ub.edu.ar'
   },
@@ -173,7 +175,8 @@ export const INITIAL_USER_BOOKINGS: BookingItem[] = [
     depositPaid: 3600,
     remainingBalance: 8400,
     status: 'Confirmada',
-    hoursUntilMatch: 3, // Menos de 24h -> no devuelve seña
+    hoursUntilMatch: 3,
+    aplicaDevolucion: false, // Determinado por backend (<24h)
     clientName: 'Juan Pérez',
     clientEmail: 'juan.perez@ub.edu.ar'
   },
@@ -189,6 +192,7 @@ export const INITIAL_USER_BOOKINGS: BookingItem[] = [
     remainingBalance: 9800,
     status: 'Completada',
     hoursUntilMatch: -100,
+    aplicaDevolucion: false,
     clientName: 'Juan Pérez',
     clientEmail: 'juan.perez@ub.edu.ar'
   }

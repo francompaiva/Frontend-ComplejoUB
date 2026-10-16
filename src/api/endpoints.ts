@@ -24,6 +24,7 @@ export const reservasApi = {
   getMisReservas: () => apiClient.get('/reservas/mis-reservas'),
   getAll: (fecha?: string) => apiClient.get('/reservas' + (fecha ? `?fecha=${fecha}` : '')),
   create: (data: { canchaId: number; fecha: string; hora: string }) => apiClient.post('/reservas', data),
+  getCancelacionInfo: (id: number) => apiClient.get(`/reservas/${id}/cancelacion-info`),
   cancelar: (id: number, motivo?: string) => apiClient.post(`/reservas/${id}/cancelar`, { motivo }),
   registrarInasistencia: (id: number) => apiClient.put(`/reservas/${id}/inasistencia`),
   confirmarAsistencia: (id: number) => apiClient.put(`/reservas/${id}/asistencia`),
