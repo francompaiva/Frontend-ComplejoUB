@@ -3,6 +3,7 @@ import React from 'react';
 export interface CancelacionConfirmModalProps {
   isOpen: boolean;
   bookingName?: string;
+  isRefundable?: boolean;
   hoursUntilMatch?: number;
   depositAmount?: number;
   onClose: () => void;
@@ -12,14 +13,13 @@ export interface CancelacionConfirmModalProps {
 export const CancelacionConfirmModal: React.FC<CancelacionConfirmModalProps> = ({
   isOpen,
   bookingName,
-  hoursUntilMatch = 48,
+  isRefundable = false,
+  hoursUntilMatch,
   depositAmount = 5400,
   onClose,
   onConfirm
 }) => {
   if (!isOpen) return null;
-
-  const isRefundable = hoursUntilMatch > 24;
 
   return (
     <div
@@ -58,14 +58,14 @@ export const CancelacionConfirmModal: React.FC<CancelacionConfirmModalProps> = (
             </div>
           )}
 
-          {/* 24-hour verification block */}
+          {/* Bloque de verificación determinado centralizadamente por el backend */}
           {isRefundable ? (
             <div className="bg-[rgba(101,197,86,0.12)] border border-[#65c556] rounded-[10px] p-[14px] flex flex-col gap-1.5">
               <div className="flex items-center gap-1.5 text-[#65c556] font-bold text-[13px]">
-                <span>✓ Anticipación mayor a 24 horas ({Math.round(hoursUntilMatch)} hs restantes)</span>
+                <span>✓ Reintegro total de seña {hoursUntilMatch !== undefined ? `(Anticipación: ${Math.round(hoursUntilMatch)} hs restantes)` : ''}</span>
               </div>
               <p className="text-[12px] text-[#c0c0c0] leading-relaxed">
-                Corresponde la <strong>devolución íntegra de la seña abonada</strong>. Se acreditará a tu medio de pago original.
+                Corresponde la <strong>devolución íntegra de la seña abonada</strong> según la política del complejo (&gt;24 hs). Se acreditará a tu medio de pago original.
               </p>
               <div className="flex justify-between items-center text-[13px] pt-1 border-t border-[rgba(101,197,86,0.2)]">
                 <span className="text-[#a0a0a0]">Monto a reintegrar:</span>
@@ -77,7 +77,7 @@ export const CancelacionConfirmModal: React.FC<CancelacionConfirmModalProps> = (
           ) : (
             <div className="bg-[rgba(229,62,62,0.12)] border border-[#e53e3e] rounded-[10px] p-[14px] flex flex-col gap-1.5">
               <div className="flex items-center gap-1.5 text-[#e53e3e] font-bold text-[13px]">
-                <span>⚠️ Anticipación menor a 24 horas ({Math.max(0, Math.round(hoursUntilMatch))} hs restantes)</span>
+                <span>⚠️ Retención de seña {hoursUntilMatch !== undefined ? `(Anticipación: ${Math.max(0, Math.round(hoursUntilMatch))} hs restantes)` : ''}</span>
               </div>
               <p className="text-[12px] text-[#c0c0c0] leading-relaxed">
                 Por cancelarse con menos de 24 horas de antelación, <strong>la seña de ${depositAmount.toLocaleString('es-AR')} no será devuelta (devolución: $0)</strong> y queda retenida como compensación por el turno no ocupado.
