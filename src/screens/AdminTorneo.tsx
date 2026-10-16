@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
-import { type SportType, type Tournament, SQUAD_LIMITS } from '../data/mockData';
+import { type SportType, type Tournament, type FixtureMatch, SQUAD_LIMITS } from '../data/mockData';
 import { torneosApi } from '../api/endpoints';
 
 export interface AdminTorneoProps {
@@ -13,9 +13,11 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
     fixtures,
     standings,
     referees,
+    courts,
     createTournament,
     deleteTournament,
     assignReferee,
+    assignMatchSchedule,
     fetchTorneoData
   } = useComplejo();
 
@@ -60,14 +62,44 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteSuccessMsg, setDeleteSuccessMsg] = useState<string | null>(null);
 
-  // New Tournament Form
+  // Helper de fecha actual (YYYY-MM-DD)
+  const getTodayString = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  // Formulario de Nuevo Torneo con Validaciones Estrictas de Fecha
   const [tName, setTName] = useState('');
   const [tSport, setTSport] = useState<SportType>('Fútbol 5');
   const [tEntryFee, setTEntryFee] = useState(15000);
   const [tMatchFee, setTMatchFee] = useState(4000);
   const [tMaxTeams, setTMaxTeams] = useState(8);
-  const [tDates, setTDates] = useState('Octubre - Noviembre 2026');
+  const [tStartDate, setTStartDate] = useState(getTodayString());
+  const [tEndDate, setTEndDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
+  const [dateError, setDateError] = useState<string | null>(null);
   const [tPrize, setTPrize] = useState('$100.000 + Medallas y Trofeo Oficial');
+
+  // Estados de Asignación Manual de Cancha y Horario en Fixture
+  const [matchToSchedule, setMatchToSchedule] = useState<FixtureMatch | null>(null);
+  const [assignCourtId, setAssignCourtId] = useState<string>('');
+  const [assignDate, setAssignDate] = useState<string>('');
+  const [assignTime, setAssignTime] = useState<string>('19:00 hs');
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false);
+  const [scheduleSuccessMsg, setScheduleSuccessMsg] = useState<string | null>(null);
+
+  const normalizeSport = (s: string) =>
+    s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
   const handleSportChange = (s: SportType) => {
     setTSport(s);
@@ -83,9 +115,35 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
     }
   };
 
+  const validateDates = (start: string, end: string): string | null => {
+    const today = getTodayString();
+    if (!start) return 'La fecha de inicio del torneo es obligatoria.';
+    if (start < today) {
+      return 'La fecha de inicio del torneo no puede ser anterior a la fecha actual.';
+    }
+    if (!end) return 'La fecha de fin del torneo es obligatoria.';
+    if (end <= start) {
+      return 'La fecha de fin debe ser estrictamente posterior a la fecha de inicio.';
+    }
+    return null;
+  };
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tName.trim()) return;
+    setDateError(null);
+
+    if (!tName.trim()) {
+      setDateError('El nombre del torneo es obligatorio.');
+      return;
+    }
+
+    const err = validateDates(tStartDate, tEndDate);
+    if (err) {
+      setDateError(err);
+      return;
+    }
+
+    const datesDisplay = `${tStartDate} al ${tEndDate}`;
 
     createTournament({
       name: tName,
@@ -94,13 +152,123 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
       entryFee: tEntryFee,
       matchFee: tMatchFee,
       maxTeams: tMaxTeams,
-      dates: tDates,
+      dates: datesDisplay,
+      startDate: tStartDate,
+      endDate: tEndDate,
       prize: tPrize,
       format: 'Liga (Todos contra todos)'
     });
 
     setTName('');
+    setDateError(null);
     setIsCreateModalOpen(false);
+  };
+
+  const handleOpenScheduleModal = (match: FixtureMatch) => {
+    setMatchToSchedule(match);
+    setScheduleError(null);
+
+    const curTorneo = tournaments.find(t => t.id === selectedTorneoId);
+    const sport = curTorneo?.sport || 'Fútbol 5';
+
+    // Canchas que pertenecen al deporte del certamen
+    const matchingCourts = courts.filter(c => normalizeSport(c.sport) === normalizeSport(sport));
+    const defaultCourt = matchingCourts.find(c => c.name === match.court) || matchingCourts[0] || courts[0];
+    setAssignCourtId(defaultCourt ? defaultCourt.id : '1');
+
+    // Inicializar fecha al próximo sábado si no tiene
+    let initDate = match.date;
+    if (!initDate || initDate === 'Hoy') {
+      const now = new Date();
+      const day = now.getDay();
+      const diff = (6 - day + 7) % 7 || 7;
+      now.setDate(now.getDate() + diff);
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      initDate = `${y}-${m}-${d}`;
+    }
+    setAssignDate(initDate);
+    setAssignTime(match.time || '19:00 hs');
+  };
+
+  const handleSaveSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!matchToSchedule) return;
+    setScheduleError(null);
+
+    const curTorneo = tournaments.find(t => t.id === selectedTorneoId);
+
+    // 1. Validar que la cancha pertenezca al deporte del torneo
+    const selectedCourt = courts.find(c => c.id === assignCourtId);
+    if (!selectedCourt) {
+      setScheduleError('Debe seleccionar una cancha válida del complejo.');
+      return;
+    }
+
+    if (curTorneo && normalizeSport(selectedCourt.sport) !== normalizeSport(curTorneo.sport)) {
+      setScheduleError(
+        `La cancha asignada "${selectedCourt.name}" (${selectedCourt.sport}) no pertenece al deporte del certamen (${curTorneo.sport}).`
+      );
+      return;
+    }
+
+    // 2. Validar que el día sea Sábado o Domingo
+    if (!assignDate) {
+      setScheduleError('Debe seleccionar un día de fin de semana para el encuentro.');
+      return;
+    }
+    const [y, m, d] = assignDate.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    const dayOfWeek = dateObj.getDay(); // 0: Domingo, 6: Sábado
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      setScheduleError('Los partidos de torneos de fin de semana deben programarse exclusivamente un día sábado o domingo.');
+      return;
+    }
+
+    // 3. Validar que no interfiera con otros partidos previamente programados
+    const timeClean = assignTime.replace(' hs', '').trim().slice(0, 5);
+    const conflict = fixtures.find(
+      f =>
+        f.id !== matchToSchedule.id &&
+        (f.courtId === assignCourtId || f.court === selectedCourt.name) &&
+        f.date === assignDate &&
+        f.time.replace(' hs', '').trim().slice(0, 5) === timeClean &&
+        f.status !== 'Suspendido'
+    );
+
+    if (conflict) {
+      setScheduleError(
+        `Interferencia horaria: La cancha "${selectedCourt.name}" ya se encuentra asignada al partido ${conflict.homeTeam} vs ${conflict.awayTeam} (${conflict.round}) para el día ${assignDate} a las ${assignTime}.`
+      );
+      return;
+    }
+
+    setIsSavingSchedule(true);
+    try {
+      const res = await assignMatchSchedule(
+        matchToSchedule.id,
+        assignCourtId,
+        selectedCourt.name,
+        assignDate,
+        assignTime
+      );
+
+      if (!res.success) {
+        setScheduleError(res.error || 'Error al guardar la asignación del partido');
+        return;
+      }
+
+      setScheduleSuccessMsg(
+        `¡Partido #${matchToSchedule.id} programado con éxito en ${selectedCourt.name} (${assignDate} a las ${assignTime})!`
+      );
+      setTimeout(() => setScheduleSuccessMsg(null), 4000);
+      setMatchToSchedule(null);
+    } catch (err: any) {
+      setScheduleError(err?.message || 'Error al asignar cancha y horario.');
+    } finally {
+      setIsSavingSchedule(false);
+    }
   };
 
   const handleDeleteInitiate = (tournament: Tournament) => {
@@ -331,6 +499,13 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
             </div>
           )}
 
+          {scheduleSuccessMsg && (
+            <div className="p-3.5 rounded-xl bg-emerald-950/70 border border-emerald-500/50 text-emerald-200 text-xs flex items-center justify-between shadow-lg">
+              <span>✅ {scheduleSuccessMsg}</span>
+              <button onClick={() => setScheduleSuccessMsg(null)} className="text-emerald-400 hover:text-white bg-transparent border-none cursor-pointer">✕</button>
+            </div>
+          )}
+
           <div className="flex items-center justify-between flex-wrap gap-4 border-b border-[#3b4d38] pb-4">
             <div>
               <h3 className="text-lg font-bold text-white">Fixture del Torneo Liga Todos Contra Todos</h3>
@@ -429,24 +604,38 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
                 )}
 
                 {!m.isFreeDate && (
-                  <div className="pt-2 border-t border-[#3b4d38] flex items-center justify-between text-xs">
-                    <span className="text-[#a0a0a0]">
-                      Árbitro: <strong className="text-white">{m.refereeName || 'Sin asignar'}</strong>
-                    </span>
+                  <div className="pt-2 border-t border-[#3b4d38] flex flex-col gap-2 text-xs">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <span className="text-[#a0a0a0]">
+                        Árbitro: <strong className="text-white">{m.refereeName || 'Sin asignar'}</strong>
+                      </span>
 
-                    {/* Quick Referee Assignment */}
-                    <select
-                      value={m.refereeName || ''}
-                      onChange={(e) => assignReferee(m.id, e.target.value)}
-                      className="bg-[#1e281d] border border-[#5a7056] text-[11px] text-[#65c556] rounded px-2 py-1 focus:outline-none"
-                    >
-                      <option value="">Cambiar Árbitro...</option>
-                      {referees.map((r) => (
-                        <option key={r.id} value={r.name}>
-                          {r.name} ({r.badgeNumber})
-                        </option>
-                      ))}
-                    </select>
+                      {/* Quick Referee Assignment */}
+                      <select
+                        value={m.refereeName || ''}
+                        onChange={(e) => assignReferee(m.id, e.target.value)}
+                        className="bg-[#1e281d] border border-[#5a7056] text-[11px] text-[#65c556] rounded px-2 py-1 focus:outline-none"
+                      >
+                        <option value="">Cambiar Árbitro...</option>
+                        {referees.map((r) => (
+                          <option key={r.id} value={r.name}>
+                            {r.name} ({r.badgeNumber})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenScheduleModal(m)}
+                        className="w-full py-1.5 px-3 rounded-lg bg-[#1e281d] hover:bg-[#344832] border border-[#65c556] text-[#65c556] hover:text-[#57ef40] font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                        title="Asignar o reprogramar cancha, día y horario"
+                      >
+                        <span>🗓️</span>
+                        <span>Asignar Cancha, Día y Horario</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -635,16 +824,63 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-[#a0a0a0] uppercase block mb-1">
-                  Fechas Estimadas
-                </label>
-                <input
-                  type="text"
-                  value={tDates}
-                  onChange={(e) => setTDates(e.target.value)}
-                  className="w-full bg-[#293827] border border-[#5a7056] rounded-xl px-3 py-2 text-xs text-white"
-                />
+              {dateError && (
+                <div className="bg-red-950/80 border border-red-500/60 rounded-xl p-3 text-xs text-red-200 flex items-start gap-2 shadow">
+                  <span className="text-base leading-none">⚠️</span>
+                  <div className="leading-relaxed">{dateError}</div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-[#a0a0a0] uppercase block mb-1">
+                    Fecha de Inicio *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    min={getTodayString()}
+                    value={tStartDate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTStartDate(val);
+                      setDateError(validateDates(val, tEndDate));
+                    }}
+                    className={`w-full bg-[#293827] border rounded-xl px-3 py-2 text-xs text-white focus:outline-none ${
+                      tStartDate && tStartDate < getTodayString()
+                        ? 'border-red-500 focus:border-red-400'
+                        : 'border-[#5a7056] focus:border-[#65c556]'
+                    }`}
+                  />
+                  <span className="text-[10px] text-[#a0a0a0] mt-0.5 block">
+                    No puede ser anterior a la fecha actual
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-[#a0a0a0] uppercase block mb-1">
+                    Fecha de Finalización *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    min={tStartDate || getTodayString()}
+                    value={tEndDate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTEndDate(val);
+                      setDateError(validateDates(tStartDate, val));
+                    }}
+                    className={`w-full bg-[#293827] border rounded-xl px-3 py-2 text-xs text-white focus:outline-none ${
+                      tEndDate && tEndDate <= tStartDate
+                        ? 'border-red-500 focus:border-red-400'
+                        : 'border-[#5a7056] focus:border-[#65c556]'
+                    }`}
+                  />
+                  <span className="text-[10px] text-[#a0a0a0] mt-0.5 block">
+                    Debe ser estrictamente posterior al inicio
+                  </span>
+                </div>
               </div>
 
               <div>
@@ -673,9 +909,203 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs cursor-pointer transition-colors"
+                  disabled={Boolean(dateError) || !tStartDate || !tEndDate || tStartDate < getTodayString() || tEndDate <= tStartDate}
+                  className="flex-1 py-2.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Confirmar y Crear Torneo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Asignación Manual de Cancha, Día y Horario para Partido */}
+      {matchToSchedule && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={(e) => e.target === e.currentTarget && !isSavingSchedule && setMatchToSchedule(null)}
+        >
+          <div className="bg-[#1e281d] rounded-2xl border border-[#5a7056] w-full max-w-[540px] p-6 shadow-2xl text-white font-['Inter',sans-serif] relative">
+            <div className="flex items-center justify-between border-b border-[#5a7056] pb-3 mb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🗓️</span>
+                <div>
+                  <h3 className="text-base font-bold text-white">Programación Manual de Partido</h3>
+                  <span className="text-[11px] text-[#a0a0a0]">
+                    {matchToSchedule.round} • Torneo de Fin de Semana
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMatchToSchedule(null)}
+                disabled={isSavingSchedule}
+                className="text-[#a0a0a0] hover:text-white cursor-pointer bg-transparent border-none text-base disabled:opacity-40"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Partido a Programar Resumen */}
+            <div className="bg-[#293827] rounded-xl p-3.5 border border-[#5a7056] mb-4 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-[#65c556] font-bold uppercase tracking-wider block">
+                  Cruce de Equipos
+                </span>
+                <span className="text-sm font-bold text-white">
+                  {matchToSchedule.homeTeam} <span className="text-xs text-[#a0a0a0] font-normal">vs</span> {matchToSchedule.awayTeam}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] text-[#a0a0a0] block">Deporte del Torneo</span>
+                <span className="text-xs font-semibold text-white bg-[#1e281d] px-2 py-0.5 rounded border border-[#5a7056]">
+                  {tournaments.find(t => t.id === selectedTorneoId)?.sport || 'Fútbol 5'}
+                </span>
+              </div>
+            </div>
+
+            {scheduleError && (
+              <div className="bg-red-950/80 border border-red-500/60 rounded-xl p-3 text-xs text-red-200 flex items-start gap-2 mb-4 shadow">
+                <span className="text-base leading-none">⚠️</span>
+                <div className="leading-relaxed">{scheduleError}</div>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveSchedule} className="flex flex-col gap-4">
+              {/* Seleccionar Cancha */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-[#a0a0a0] uppercase block">
+                    Cancha Específica *
+                  </label>
+                  <span className="text-[11px] text-[#65c556]">
+                    Filtrada por deporte ({tournaments.find(t => t.id === selectedTorneoId)?.sport})
+                  </span>
+                </div>
+                <select
+                  value={assignCourtId}
+                  onChange={(e) => {
+                    setAssignCourtId(e.target.value);
+                    setScheduleError(null);
+                  }}
+                  className="w-full bg-[#293827] border border-[#5a7056] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#65c556]"
+                >
+                  {courts
+                    .filter((c) => {
+                      const curTorneo = tournaments.find(t => t.id === selectedTorneoId);
+                      return !curTorneo || normalizeSport(c.sport) === normalizeSport(curTorneo.sport);
+                    })
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} — {c.sport} ({c.surface}) {c.status !== 'activa' ? '⚠️ Mantenimiento' : '✓ Activa'}
+                      </option>
+                    ))}
+                  {courts.filter((c) => {
+                    const curTorneo = tournaments.find(t => t.id === selectedTorneoId);
+                    return curTorneo && normalizeSport(c.sport) !== normalizeSport(curTorneo.sport);
+                  }).length > 0 && (
+                    <optgroup label="Otras canchas (Deporte incompatible)">
+                      {courts
+                        .filter((c) => {
+                          const curTorneo = tournaments.find(t => t.id === selectedTorneoId);
+                          return curTorneo && normalizeSport(c.sport) !== normalizeSport(curTorneo.sport);
+                        })
+                        .map((c) => (
+                          <option key={c.id} value={c.id} disabled>
+                            {c.name} ({c.sport}) - Incompatible
+                          </option>
+                        ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+
+              {/* Día (Sábado o Domingo) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-[#a0a0a0] uppercase block">
+                    Día del Encuentro (Sábado o Domingo) *
+                  </label>
+                  {assignDate && (() => {
+                    const [y, m, d] = assignDate.split('-').map(Number);
+                    const dt = new Date(y, m - 1, d);
+                    const dayIdx = dt.getDay();
+                    const isWeekend = dayIdx === 0 || dayIdx === 6;
+                    const dayName = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][dayIdx];
+                    return (
+                      <span className={`text-[11px] font-bold ${isWeekend ? 'text-[#65c556]' : 'text-red-400'}`}>
+                        {dayName} {isWeekend ? '✓ Fin de semana válido' : '⚠️ Inválido (Debe ser Sáb o Dom)'}
+                      </span>
+                    );
+                  })()}
+                </div>
+                <input
+                  type="date"
+                  required
+                  value={assignDate}
+                  onChange={(e) => {
+                    setAssignDate(e.target.value);
+                    setScheduleError(null);
+                  }}
+                  className="w-full bg-[#293827] border border-[#5a7056] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#65c556]"
+                />
+                <span className="text-[10px] text-[#a0a0a0] mt-1 block">
+                  Regla de certamen: Los torneos se disputan únicamente los días sábados o domingos.
+                </span>
+              </div>
+
+              {/* Rango Horario */}
+              <div>
+                <label className="text-xs font-semibold text-[#a0a0a0] uppercase block mb-1">
+                  Rango Horario *
+                </label>
+                <select
+                  value={assignTime}
+                  onChange={(e) => {
+                    setAssignTime(e.target.value);
+                    setScheduleError(null);
+                  }}
+                  className="w-full bg-[#293827] border border-[#5a7056] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#65c556]"
+                >
+                  {[
+                    '09:00 hs', '10:00 hs', '11:00 hs', '12:00 hs', '13:00 hs',
+                    '14:00 hs', '15:00 hs', '16:00 hs', '17:00 hs', '18:00 hs',
+                    '19:00 hs', '20:00 hs', '21:00 hs', '22:00 hs', '23:00 hs'
+                  ].map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-[#293827] p-3 rounded-lg border border-[#5a7056] text-[11px] text-[#a0a0a0]">
+                * El sistema valida automáticamente que la cancha pertenezca al deporte del torneo y previene interferencias horarias con otros encuentros programados.
+              </div>
+
+              <div className="flex gap-2.5 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setMatchToSchedule(null)}
+                  disabled={isSavingSchedule}
+                  className="flex-1 py-2.5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold text-xs cursor-pointer disabled:opacity-40"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingSchedule}
+                  className="flex-1 py-2.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs cursor-pointer transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isSavingSchedule ? (
+                    <>
+                      <span className="inline-block w-3.5 h-3.5 border-2 border-[#293827] border-t-transparent rounded-full animate-spin" />
+                      <span>Verificando y Guardando...</span>
+                    </>
+                  ) : (
+                    'Confirmar Asignación'
+                  )}
                 </button>
               </div>
             </form>

@@ -89,6 +89,11 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     e.preventDefault();
     setErrorMessage(null);
 
+    if (!teamName.trim()) {
+      setErrorMessage('El nombre del equipo es obligatorio.');
+      return;
+    }
+
     // Check squad min
     if (players.length < limits.min) {
       setErrorMessage(
@@ -97,24 +102,39 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
       return;
     }
 
+    // Validate each player data
+    for (let i = 0; i < players.length; i++) {
+      if (!players[i].name.trim() || !players[i].dni.trim()) {
+        setErrorMessage(`Por favor completa el Nombre y DNI del jugador #${i + 1}.`);
+        return;
+      }
+    }
+
+    // Check duplicate DNIS in the squad
+    const dnis = players.map(p => p.dni.trim().toLowerCase());
+    if (new Set(dnis).size !== dnis.length) {
+      setErrorMessage('Existen jugadores con números de DNI duplicados dentro del mismo plantel.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Call context registerTeam which checks duplicate players in same tournament in MySQL
-      const res = await registerTeam(selectedTourneyId, teamName, players);
+      const res = await registerTeam(selectedTourneyId, teamName.trim(), players);
       if (!res.success) {
         setErrorMessage(res.error || 'Error al inscribir equipo');
         return;
       }
 
       if (onSubmit) {
-        onSubmit({ teamName, players });
+        onSubmit({ teamName: teamName.trim(), players });
       }
 
-      setSuccessMessage(`¡Equipo "${teamName}" inscripto con éxito en "${currentTourney.name}"!`);
+      setSuccessMessage(`¡Equipo "${teamName.trim()}" inscripto con éxito en "${currentTourney.name}"!`);
       setTimeout(() => {
         setSuccessMessage(null);
         onClose();
-      }, 1800);
+      }, 1600);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Error de conexión con el servidor.');
     } finally {
@@ -126,7 +146,7 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ backgroundColor: 'rgba(17, 26, 16, 0.8)' }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onClick={(e) => !isSubmitting && e.target === e.currentTarget && onClose()}
     >
       <div
         className="bg-[#1e281d] rounded-2xl border border-[#5a7056] w-full max-w-[620px] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-white font-['Inter',sans-serif]"
@@ -145,7 +165,8 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
 
           <button
             onClick={onClose}
-            className="text-[#a0a0a0] hover:text-white cursor-pointer bg-transparent border-none text-base"
+            disabled={isSubmitting}
+            className="text-[#a0a0a0] hover:text-white cursor-pointer bg-transparent border-none text-base disabled:opacity-40"
           >
             ✕
           </button>
@@ -286,16 +307,24 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold text-xs cursor-pointer"
+              disabled={isSubmitting}
+              className="flex-1 py-2.5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold text-xs cursor-pointer disabled:opacity-40"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 py-2.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs cursor-pointer transition-colors shadow disabled:opacity-50"
+              className="flex-1 py-2.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs cursor-pointer transition-colors shadow disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isSubmitting ? 'Inscribiendo...' : 'Confirmar Inscripción'}
+              {isSubmitting ? (
+                <>
+                  <span className="inline-block w-3.5 h-3.5 border-2 border-[#293827] border-t-transparent rounded-full animate-spin" />
+                  <span>Inscribiendo equipo...</span>
+                </>
+              ) : (
+                'Confirmar Inscripción'
+              )}
             </button>
           </div>
         </form>

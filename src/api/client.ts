@@ -42,12 +42,16 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     try {
       let response: Response;
       try {
         response = await fetch(url, {
           ...options,
           headers,
+          signal: options.signal || controller.signal,
         });
       } catch (networkErr: any) {
         // Fallback: Si falló la ruta relativa del proxy (/api/v1), intentar directo contra http://127.0.0.1:4000
@@ -56,13 +60,27 @@ class ApiClient {
           response = await fetch(directUrl, {
             ...options,
             headers,
+            signal: options.signal || controller.signal,
           });
         } else {
           throw networkErr;
         }
+      } finally {
+        clearTimeout(timeoutId);
       }
 
-      const json: ApiResponse<T> = await response.json();
+      let json: ApiResponse<T>;
+      try {
+        json = await response.json();
+      } catch {
+        json = {
+          success: response.ok,
+          error: {
+            message: `Respuesta no estructurada del servidor (${response.status})`,
+            statusCode: response.status,
+          },
+        };
+      }
 
       if (!response.ok || !json.success) {
         if (response.status === 401) {
@@ -77,7 +95,8 @@ class ApiClient {
 
       return json.data as T;
     } catch (err: any) {
-      // Si la conexión falla porque el backend no está corriendo, lanzamos error para activar fallback local
+      clearTimeout(timeoutId);
+      // Si la conexión falla porque el backend no está corriendo o hubo timeout, advertir
       console.warn(`[ApiClient] Solicitud a ${endpoint} falló (${err.message}).`);
       throw err;
     }

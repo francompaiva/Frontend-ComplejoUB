@@ -42,7 +42,7 @@ export const torneosApi = {
 export const equiposApi = {
   getAll: (torneoId?: number) => apiClient.get('/equipos' + (torneoId ? `?torneoId=${torneoId}` : '')),
   getById: (id: number) => apiClient.get(`/equipos/${id}`),
-  inscribir: (data: { torneoId: number; nombreEquipo: string }) => apiClient.post('/equipos', data),
+  inscribir: (data: { torneoId: number; nombreEquipo: string; players?: any[] }) => apiClient.post('/equipos', data),
   invitar: (equipoId: number, data: { emailUsuario: string; dorsal?: number }) =>
     apiClient.post(`/equipos/${equipoId}/invitar`, data),
   responderInvitacion: (equipoId: number, respuesta: 'ACEPTADA' | 'RECHAZADA') =>
@@ -63,6 +63,8 @@ export const partidosApi = {
     apiClient.put(`/partidos/${id}/resultado`, data),
   asignarArbitro: (id: number, arbitroId: number) => apiClient.put(`/partidos/${id}/asignar-arbitro`, { arbitroId }),
   cambiarEstado: (id: number, estado: string) => apiClient.put(`/partidos/${id}/estado`, { estado }),
+  reprogramar: (id: number, data: { canchaId: number; fecha: string; hora: string }) =>
+    apiClient.put(`/partidos/${id}/reprogramar`, data),
 };
 
 export const listaEsperaApi = {

@@ -48,6 +48,8 @@ export interface Tournament {
   maxTeams: number;
   registeredTeams: TournamentTeam[];
   dates: string;
+  startDate?: string;
+  endDate?: string;
   prize: string;
   format: 'Liga (Todos contra todos)';
 }
@@ -64,6 +66,7 @@ export interface FixtureMatch {
   date: string;
   time: string;
   court: string;
+  courtId?: string;
   refereeName?: string;
   status: 'Programado' | 'Disputado' | 'Suspendido' | 'Reprogramado';
   homeScore?: number;

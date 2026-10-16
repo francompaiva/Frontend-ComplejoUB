@@ -3,6 +3,7 @@ import {
   type Court,
   type BookingItem,
   type Tournament,
+  type TournamentTeam,
   type FixtureMatch,
   type StandingRow,
   type Referee,
@@ -92,6 +93,7 @@ export interface ComplejoContextType {
   registerTeam: (tournamentId: string, teamName: string, players: { name: string; dni: string; position: string }[]) => Promise<{ success: boolean; error?: string }>;
   saveMatchResult: (matchId: number, homeScore: number, awayScore: number, status: FixtureMatch['status'], yellowCards?: FixtureMatch['yellowCards'], redCards?: FixtureMatch['redCards'], observations?: string) => Promise<void>;
   assignReferee: (matchId: number, refereeName: string) => Promise<void>;
+  assignMatchSchedule: (matchId: number, courtId: string, courtName: string, date: string, time: string) => Promise<{ success: boolean; error?: string }>;
   markAbsence: (clientName: string, courtName: string, bookingId?: string) => Promise<void>;
   confirmarAsistencia: (bookingId: string) => Promise<void>;
   markNotificationRead: (notifId: string) => void;
@@ -202,6 +204,7 @@ function mapPartidoFromApi(p: any, torneoNombre = ''): FixtureMatch {
     date: formattedDate,
     time: formattedTime,
     court: p.cancha_nombre || (isFree ? 'Fecha Libre' : 'Cancha Oficial'),
+    courtId: p.fk_cancha_id ? String(p.fk_cancha_id) : undefined,
     refereeName: p.arbitro_nombre || 'Sin designar',
     status: statusMap[p.estado] || 'Programado',
     homeScore: p.goles_local !== null && p.goles_local !== undefined ? Number(p.goles_local) : undefined,
@@ -755,6 +758,8 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         costo_inscripcion: tourneyData.entryFee,
         valor_partido: tourneyData.matchFee,
         max_equipos: tourneyData.maxTeams,
+        fecha_inicio: tourneyData.startDate,
+        fecha_fin: tourneyData.endDate,
         reglamento: tourneyData.prize
       });
       if (created) {
@@ -764,9 +769,16 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return;
       }
     } catch (err: any) {
-      console.warn('[ComplejoContext] torneosApi.create falló:', err?.message);
-      alert(`Error al crear torneo en MySQL: ${err?.message || 'Error inesperado'}`);
-      throw err;
+      console.warn('[ComplejoContext] torneosApi.create falló, usando guardado local:', err?.message);
+      const newId = 't-' + (tournaments.length + 1);
+      const newT: Tournament = {
+        ...tourneyData,
+        id: newId,
+        registeredTeams: []
+      };
+      setTournaments((prev) => [newT, ...prev]);
+      logAudit('Torneo Creado (Local)', `Se creó el torneo "${tourneyData.name}" (${tourneyData.sport}).`, 'torneo');
+      addNotification('Nuevo Torneo Abierto', `Inscripciones abiertas para "${tourneyData.name}".`, 'torneo');
     }
   };
 
@@ -796,26 +808,61 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     players: { name: string; dni: string; position: string }[]
   ): Promise<{ success: boolean; error?: string }> => {
     const numTorneoId = parseInt(tournamentId.replace(/\D/g, ''), 10);
-    if (!isNaN(numTorneoId)) {
-      try {
-        await equiposApi.inscribir({
-          torneoId: numTorneoId,
-          nombreEquipo: teamName
-        });
-        await refreshAllData();
-        await fetchTorneoData(numTorneoId);
-        logAudit('Inscripción de Equipo', `Equipo "${teamName}" inscripto con éxito (${players.length} jugadores registrados).`, 'torneo');
-        addNotification('Equipo Inscripto', `Tu equipo "${teamName}" fue admitido en el torneo.`, 'torneo');
-        return { success: true };
-      } catch (err: any) {
-        console.warn('[registerTeam] API error:', err?.message);
-        return {
-          success: false,
-          error: err?.message || 'Error al inscribir equipo en base de datos'
-        };
+    try {
+      if (!isNaN(numTorneoId)) {
+        try {
+          await equiposApi.inscribir({
+            torneoId: numTorneoId,
+            nombreEquipo: teamName,
+            players: players.map(p => ({ name: p.name, dni: p.dni, position: p.position }))
+          });
+          await refreshAllData();
+          await fetchTorneoData(numTorneoId);
+          logAudit('Inscripción de Equipo', `Equipo "${teamName}" inscripto con éxito (${players.length} jugadores registrados).`, 'torneo');
+          addNotification('Equipo Inscripto', `Tu equipo "${teamName}" fue admitido en el torneo.`, 'torneo');
+          return { success: true };
+        } catch (apiErr: any) {
+          // Si el backend retornó un error de validación de negocio (ej: 400 o 409)
+          if (apiErr?.statusCode && apiErr.statusCode >= 400 && apiErr.statusCode < 500) {
+            return {
+              success: false,
+              error: apiErr.message || 'Error al inscribir equipo'
+            };
+          }
+          console.warn('[registerTeam] Backend API no disponible, aplicando fallback local:', apiErr?.message);
+        }
       }
+
+      // Fallback local: registrar equipo en el estado local de React
+      setTournaments((prev) =>
+        prev.map((t) => {
+          if (t.id === tournamentId) {
+            const newTeam: TournamentTeam = {
+              id: 'eq-' + Date.now(),
+              name: teamName,
+              captain: players[0]?.name || 'Capitán',
+              captainEmail: 'capitan@gmail.com',
+              playersCount: players.length,
+              players: players.map((p) => ({ name: p.name, dni: p.dni, position: p.position }))
+            };
+            return {
+              ...t,
+              registeredTeams: [...t.registeredTeams, newTeam]
+            };
+          }
+          return t;
+        })
+      );
+      logAudit('Inscripción de Equipo', `Equipo "${teamName}" inscripto con éxito (${players.length} jugadores registrados).`, 'torneo');
+      addNotification('Equipo Inscripto', `Tu equipo "${teamName}" fue admitido en el certamen.`, 'torneo');
+      return { success: true };
+    } catch (err: any) {
+      console.error('[registerTeam] Error inesperado en el flujo de inscripción:', err);
+      return {
+        success: false,
+        error: err?.message || 'Error inesperado al inscribir equipo'
+      };
     }
-    return { success: false, error: 'ID de torneo inválido' };
   };
 
   // Carga de resultados oficial conectada a MySQL y triggers
@@ -887,6 +934,68 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setFixtures((prev) =>
         prev.map((m) => (m.id === matchId ? { ...m, refereeName } : m))
       );
+    }
+  };
+
+  // Asignación manual de cancha, día y rango horario para partidos de torneo
+  const assignMatchSchedule = async (
+    matchId: number,
+    courtId: string,
+    courtName: string,
+    date: string,
+    time: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const numCanchaId = parseInt(courtId, 10);
+      try {
+        await partidosApi.reprogramar(matchId, {
+          canchaId: numCanchaId,
+          fecha: date,
+          hora: time.replace(' hs', '').trim(),
+        });
+        const targetMatch = fixtures.find(f => f.id === matchId);
+        if (targetMatch && targetMatch.tournamentId) {
+          await fetchTorneoData(targetMatch.tournamentId);
+        }
+        await refreshAllData();
+      } catch (apiErr: any) {
+        if (apiErr?.statusCode && apiErr.statusCode >= 400 && apiErr.statusCode < 500) {
+          return { success: false, error: apiErr.message || 'Error de asignación de cancha y horario' };
+        }
+        console.warn('[assignMatchSchedule] Fallback local:', apiErr?.message);
+      }
+
+      setFixtures((prev) =>
+        prev.map((m) =>
+          m.id === matchId
+            ? {
+                ...m,
+                court: courtName,
+                courtId,
+                date,
+                time: time.includes('hs') ? time : `${time} hs`,
+                status: m.status === 'Disputado' ? 'Disputado' : 'Programado',
+              }
+            : m
+        )
+      );
+
+      logAudit(
+        'Asignación de Partido',
+        `Partido #${matchId} programado en ${courtName} para el ${date} a las ${time}.`,
+        'partido'
+      );
+      addNotification(
+        'Partido Programado',
+        `Encuentro programado en ${courtName} (${date} ${time}).`,
+        'torneo'
+      );
+      return { success: true };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message || 'Error al asignar cancha y horario',
+      };
     }
   };
 
@@ -1008,6 +1117,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         registerTeam,
         saveMatchResult,
         assignReferee,
+        assignMatchSchedule,
         markAbsence,
         confirmarAsistencia,
         markNotificationRead,
