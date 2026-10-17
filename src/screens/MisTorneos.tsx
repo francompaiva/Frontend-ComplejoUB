@@ -42,7 +42,7 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
   };
 
   const filteredFixtures = fixtures.filter(
-    f => String(f.tournamentId) === String(selectedTorneo.id) || f.tournamentName.includes(selectedTorneo.name)
+    f => String(f.tournamentId) === String(selectedTorneo.id) || Boolean(f.tournamentName && selectedTorneo?.name && f.tournamentName.includes(selectedTorneo.name))
   );
 
   return (
@@ -60,14 +60,14 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
           <div className="flex items-center gap-3">
             <button
               onClick={() => onNavigate('landing')}
-              className="inline-flex items-center justify-center gap-2 bg-[#1e281d] hover:bg-[#3b4d38] border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold px-4 py-3 rounded-lg transition cursor-pointer text-xs"
+              className="inline-flex items-center justify-center gap-2 bg-[#1e281d] hover:bg-[#3b4d38] border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold px-5 py-3 rounded-xl transition cursor-pointer text-xs min-h-[44px]"
             >
               ← Volver a Canchas
             </button>
             {userRole !== 'arbitro' && (
               <button
                 onClick={() => onOpenInscripcion(selectedTorneo.id)}
-                className="inline-flex items-center justify-center gap-2 bg-[#65C556] hover:bg-[#54b045] text-[#293827] font-extrabold px-6 py-3 rounded-lg shadow-lg shadow-[#65C556]/20 transition cursor-pointer text-sm"
+                className="inline-flex items-center justify-center gap-2 bg-[#65C556] hover:bg-[#54b045] text-[#293827] font-extrabold px-6 py-3 rounded-xl shadow-lg shadow-[#65C556]/20 transition cursor-pointer text-sm min-h-[44px]"
               >
                 <IconPlus size={18} className="shrink-0" />
                 Inscribir Mi Equipo
@@ -111,7 +111,7 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
 
                   <h3 className="font-extrabold text-lg text-white mb-1 line-clamp-1">{torneo.name}</h3>
                   <p className="text-xs text-[#A3B89E] mb-4">
-                    📅 {torneo.dates} | 👥 {torneo.registeredTeams.length}/{torneo.maxTeams} Equipos
+                    📅 {torneo.dates} | 👥 {(torneo.registeredTeams || []).length}/{torneo.maxTeams || 8} Equipos
                   </p>
                 </div>
 
@@ -124,7 +124,7 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
                       setSelectedTorneoId(torneo.id);
                       setDetailModalTorneo(torneo);
                     }}
-                    className="text-xs font-bold text-[#65C556] hover:text-[#54b045] underline flex items-center gap-1 cursor-pointer"
+                    className="text-xs font-bold text-[#65C556] hover:text-[#54b045] underline flex items-center gap-1 cursor-pointer py-1"
                   >
                     <span>Ver Detalles</span>
                     <span>→</span>

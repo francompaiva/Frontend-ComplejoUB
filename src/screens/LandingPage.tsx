@@ -112,7 +112,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     const matchOnCourt = fixtures.find(
       (m) =>
         !m.isFreeDate &&
-        (m.court === courtName || courtName.includes(m.court) || m.court.includes(courtName)) &&
+        Boolean(m.court && courtName && (m.court === courtName || courtName.includes(m.court) || m.court.includes(courtName))) &&
         m.time?.slice(0, 5) === cleanHour &&
         m.date === selectedDate
     );
@@ -470,7 +470,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <button
             type="button"
             onClick={() => onOpenInscripcion()}
-            className="px-5 py-2.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs shadow-lg transition-all cursor-pointer self-start md:self-auto"
+            className="px-6 py-3 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-extrabold text-sm shadow-lg shadow-[#65c556]/20 transition-all cursor-pointer min-h-[44px] flex items-center justify-center self-start md:self-auto"
           >
             + Inscribir mi Equipo
           </button>
@@ -497,11 +497,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <div className="grid grid-cols-2 gap-2 text-xs my-3 bg-[#1e281d] p-3 rounded-xl border border-[#5a7056]/60">
                   <div>
                     <span className="text-[#a0a0a0] block">Inscripción:</span>
-                    <span className="text-white font-bold">${t.entryFee.toLocaleString('es-AR')}</span>
+                    <span className="text-white font-bold">${Number(t.entryFee || 0).toLocaleString('es-AR')}</span>
                   </div>
                   <div>
                     <span className="text-[#a0a0a0] block">Equipos:</span>
-                    <span className="text-[#65c556] font-bold">{t.registeredTeams.length} / {t.maxTeams}</span>
+                    <span className="text-[#65c556] font-bold">{(t.registeredTeams || []).length} / {t.maxTeams || 8}</span>
                   </div>
                 </div>
 
@@ -510,18 +510,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setDetailModalTorneo(t)}
-                  className="flex-1 py-2.5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white hover:border-[#65c556] font-bold text-xs transition-colors cursor-pointer text-center"
+                  className="flex-1 py-3 px-4 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white hover:border-[#65c556] font-bold text-xs transition-colors cursor-pointer text-center min-h-[42px] flex items-center justify-center"
                 >
                   Ver Detalles
                 </button>
                 <button
                   type="button"
                   onClick={() => onOpenInscripcion(t.id)}
-                  className="flex-1 py-2.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs transition-colors cursor-pointer text-center"
+                  className="flex-1 py-3 px-4 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-extrabold text-xs transition-colors cursor-pointer text-center shadow-md min-h-[42px] flex items-center justify-center"
                 >
                   Inscribir Equipo
                 </button>

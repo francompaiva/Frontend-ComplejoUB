@@ -17,6 +17,7 @@ import AdminLayout from './screens/AdminLayout';
 import ConfirmacionPagoModal, { type BookingSlotInfo } from './components/ConfirmacionPagoModal';
 import InscripcionTorneoModal from './components/InscripcionTorneoModal';
 import MisTorneos from './screens/MisTorneos';
+import ErrorBoundary from './components/ErrorBoundary';
 import {
   IconStadium,
   IconBall,
@@ -515,7 +516,7 @@ const AppContent: React.FC = () => {
             <button
               type="button"
               onClick={handleLogout}
-              className="bg-[#3d2424] hover:bg-[#c53030] text-[#ff8080] hover:text-white px-3.5 py-1.5 rounded-xl font-semibold transition border border-[rgba(229,62,62,0.3)] cursor-pointer text-xs flex items-center gap-1.5 shadow-sm"
+              className="bg-[#3d2424] hover:bg-[#c53030] text-[#ff8080] hover:text-white px-4 py-2 min-h-[36px] rounded-xl font-semibold transition border border-[rgba(229,62,62,0.3)] cursor-pointer text-xs flex items-center gap-2 shadow-sm"
               title="Cerrar sesión"
             >
               <IconLogout size={14} />
@@ -526,93 +527,91 @@ const AppContent: React.FC = () => {
       </header>
 
       {/* Main Screen Rendering */}
-      <main className="flex-1 flex flex-col">
-        {currentScreen === 'login' && <LoginScreen onLogin={handleLogin} />}
+      <ErrorBoundary>
+        <main className="flex-1 flex flex-col">
+          {currentScreen === 'login' && <LoginScreen onLogin={handleLogin} />}
 
-        {currentScreen === 'landing' && (
-          <LandingPage
-            onNavigate={(screen) => setCurrentScreen(screen as ScreenId)}
-            onOpenInscripcion={handleOpenInscripcion}
-            onOpenPago={handleOpenPago}
-          />
-        )}
+          {currentScreen === 'landing' && (
+            <LandingPage
+              onNavigate={(screen) => setCurrentScreen(screen as ScreenId)}
+              onOpenInscripcion={handleOpenInscripcion}
+              onOpenPago={handleOpenPago}
+            />
+          )}
 
-        {currentScreen === 'mis-reservas' && (
-          <MisReservas onNavigate={(screen) => setCurrentScreen(screen as ScreenId)} />
-        )}
+          {currentScreen === 'mis-reservas' && (
+            <MisReservas onNavigate={(screen) => setCurrentScreen(screen as ScreenId)} />
+          )}
 
-        {currentScreen === 'mis-torneos' && (
-          <MisTorneos
-            onNavigate={(screen) => setCurrentScreen(screen as ScreenId)}
-            onOpenInscripcion={handleOpenInscripcion}
-          />
-        )}
-
-        {currentScreen === 'arbitro' && (
-          <ArbitroPanel onNavigate={(screen) => setCurrentScreen(screen as ScreenId)} />
-        )}
-
-        {currentScreen === 'admin-agenda' && (
-          <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
-            <AdminAgenda />
-          </AdminLayout>
-        )}
-
-        {currentScreen === 'admin-overview' && (
-          <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
-            <AdminOverview
-              onNavigate={handleAdminNavigate}
+          {currentScreen === 'mis-torneos' && (
+            <MisTorneos
+              onNavigate={(screen) => setCurrentScreen(screen as ScreenId)}
               onOpenInscripcion={handleOpenInscripcion}
             />
-          </AdminLayout>
-        )}
+          )}
 
-        {currentScreen === 'admin-canchas' && (
-          <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
-            <AdminCanchas />
-          </AdminLayout>
-        )}
+          {currentScreen === 'arbitro' && (
+            <ArbitroPanel onNavigate={(screen) => setCurrentScreen(screen as ScreenId)} />
+          )}
 
-        {currentScreen === 'admin-torneo' && (
-          <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
-            <AdminTorneo onOpenInscripcion={handleOpenInscripcion} />
-          </AdminLayout>
-        )}
+          {currentScreen === 'admin-agenda' && (
+            <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
+              <AdminAgenda />
+            </AdminLayout>
+          )}
 
-        {currentScreen === 'admin-resultados' && (
-          <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
-            <AdminResultados />
-          </AdminLayout>
-        )}
+          {currentScreen === 'admin-overview' && (
+            <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
+              <AdminOverview
+                onNavigate={handleAdminNavigate}
+                onOpenInscripcion={handleOpenInscripcion}
+              />
+            </AdminLayout>
+          )}
 
-        {currentScreen === 'admin-reportes' && (
-          <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
-            <AdminReportes />
-          </AdminLayout>
-        )}
+          {currentScreen === 'admin-canchas' && (
+            <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
+              <AdminCanchas />
+            </AdminLayout>
+          )}
 
-        {currentScreen === 'admin-auditoria' && (
-          <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
-            <AdminAuditoria />
-          </AdminLayout>
-        )}
+          {currentScreen === 'admin-torneo' && (
+            <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
+              <AdminTorneo onOpenInscripcion={handleOpenInscripcion} />
+            </AdminLayout>
+          )}
 
-        {currentScreen === 'admin-usuarios' && (
-          <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
-            <AdminGestionUsuarios />
-          </AdminLayout>
-        )}
-      </main>
+          {currentScreen === 'admin-resultados' && (
+            <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
+              <AdminResultados />
+            </AdminLayout>
+          )}
+
+          {currentScreen === 'admin-reportes' && (
+            <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
+              <AdminReportes />
+            </AdminLayout>
+          )}
+
+          {currentScreen === 'admin-auditoria' && (
+            <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
+              <AdminAuditoria />
+            </AdminLayout>
+          )}
+
+          {currentScreen === 'admin-usuarios' && (
+            <AdminLayout activeSection={adminSection} onNavigate={handleAdminNavigate}>
+              <AdminGestionUsuarios />
+            </AdminLayout>
+          )}
+        </main>
+      </ErrorBoundary>
 
       {/* Global Modals */}
       <InscripcionTorneoModal
         isOpen={isInscripcionOpen}
         tournamentId={selectedTourneyIdForModal}
         onClose={() => {
-          setIsInscripcionOpen(false);
-          setSelectedTourneyIdForModal(undefined);
-        }}
-        onSubmit={() => {
           setIsInscripcionOpen(false);
           setSelectedTourneyIdForModal(undefined);
         }}

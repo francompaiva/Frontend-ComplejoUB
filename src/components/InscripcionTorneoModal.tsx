@@ -53,11 +53,12 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
   if (!isOpen) return null;
 
   const currentTourney = tournaments.find((t) => t.id === selectedTourneyId) || tournaments[0];
-  const limits = SQUAD_LIMITS[currentTourney?.sport || 'Fútbol 5'];
+  const sport = currentTourney?.sport || 'Fútbol 5';
+  const limits = SQUAD_LIMITS[sport] || { min: 5, max: 12 };
 
   const handleAddPlayer = () => {
     if (players.length >= limits.max) {
-      setErrorMessage(`Límite de plantel alcanzado: máximo ${limits.max} jugadores para ${currentTourney.sport}.`);
+      setErrorMessage(`Límite de plantel alcanzado: máximo ${limits.max} jugadores para ${sport}.`);
       return;
     }
     setErrorMessage(null);
@@ -67,7 +68,7 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
         id: String(Date.now()),
         name: '',
         dni: '',
-        position: currentTourney.sport === 'Pádel' ? 'Drive' : 'Delantero'
+        position: sport === 'Pádel' ? 'Drive' : 'Delantero'
       }
     ]);
   };
@@ -97,7 +98,7 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     // Check squad min
     if (players.length < limits.min) {
       setErrorMessage(
-        `Plantel insuficiente: se requiere un mínimo de ${limits.min} jugadores para ${currentTourney.sport} (actualmente hay ${players.length}).`
+        `Plantel insuficiente: se requiere un mínimo de ${limits.min} jugadores para ${sport} (actualmente hay ${players.length}).`
       );
       return;
     }
@@ -126,15 +127,14 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
         return;
       }
 
-      if (onSubmit) {
-        onSubmit({ teamName: teamName.trim(), players });
-      }
-
-      setSuccessMessage(`¡Equipo "${teamName.trim()}" inscripto con éxito en "${currentTourney.name}"!`);
+      setSuccessMessage(`¡Equipo "${teamName.trim()}" inscripto con éxito en "${currentTourney?.name || 'el torneo'}"!`);
       setTimeout(() => {
         setSuccessMessage(null);
+        if (onSubmit) {
+          onSubmit({ teamName: teamName.trim(), players });
+        }
         onClose();
-      }, 1600);
+      }, 1500);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Error de conexión con el servidor.');
     } finally {
@@ -303,23 +303,23 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
           </p>
 
           {/* Actions */}
-          <div className="flex gap-3 mt-2">
+          <div className="flex gap-3.5 mt-3">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="flex-1 py-2.5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold text-xs cursor-pointer disabled:opacity-40"
+              className="flex-1 py-3 px-5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white font-bold text-xs cursor-pointer disabled:opacity-40 min-h-[44px] transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 py-2.5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs cursor-pointer transition-colors shadow disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 py-3 px-6 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-extrabold text-sm cursor-pointer transition-all shadow-lg shadow-[#65c556]/20 disabled:opacity-50 flex items-center justify-center gap-2 min-h-[44px]"
             >
               {isSubmitting ? (
                 <>
-                  <span className="inline-block w-3.5 h-3.5 border-2 border-[#293827] border-t-transparent rounded-full animate-spin" />
+                  <span className="inline-block w-4 h-4 border-2 border-[#293827] border-t-transparent rounded-full animate-spin" />
                   <span>Inscribiendo equipo...</span>
                 </>
               ) : (

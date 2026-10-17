@@ -444,12 +444,12 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
                       </div>
                       <div>
                         <span className="text-[#a0a0a0] block">Cupo de equipos:</span>
-                        <span className="text-[#65c556] font-bold">{t.registeredTeams.length} / {t.maxTeams} inscriptos</span>
+                        <span className="text-[#65c556] font-bold">{(t.registeredTeams || []).length} / {t.maxTeams || 8} inscriptos</span>
                       </div>
                       <div>
                         <span className="text-[#a0a0a0] block">Límites de plantel:</span>
                         <span className="text-white font-medium">
-                          {SQUAD_LIMITS[t.sport].min} a {SQUAD_LIMITS[t.sport].max} jugadores
+                          {SQUAD_LIMITS[t.sport]?.min || 5} a {SQUAD_LIMITS[t.sport]?.max || 12} jugadores
                         </span>
                       </div>
                     </div>
@@ -463,11 +463,11 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
                   {/* Inscribed teams list preview */}
                   <div className="border-t border-[#3b4d38] pt-3">
                     <span className="text-[11px] font-bold text-[#a0a0a0] uppercase block mb-2">
-                      Equipos en competencia ({t.registeredTeams.length})
+                      Equipos en competencia ({(t.registeredTeams || []).length})
                     </span>
                     <div className="flex flex-wrap gap-1.5">
-                      {t.registeredTeams.length > 0 ? (
-                        t.registeredTeams.map((team) => (
+                      {(t.registeredTeams || []).length > 0 ? (
+                        (t.registeredTeams || []).map((team) => (
                           <span
                             key={team.id}
                             className="bg-[#293827] border border-[#5a7056] text-xs px-2.5 py-1 rounded-lg text-white font-medium"
@@ -1184,7 +1184,7 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
                     <div>
                       <span className="text-[#a0a0a0] block">Equipos inscriptos:</span>
                       <span className="font-semibold text-[#65c556]">
-                        {tournamentToDelete.registeredTeams.length} / {tournamentToDelete.maxTeams}
+                        {(tournamentToDelete.registeredTeams || []).length} / {tournamentToDelete.maxTeams || 8}
                       </span>
                     </div>
                     <div>

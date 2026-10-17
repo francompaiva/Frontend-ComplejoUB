@@ -132,10 +132,10 @@ export const AdminReportes: React.FC = () => {
                 <tr key={t.id} className="text-[#c0c0c0]">
                   <td className="py-3 font-semibold text-white">{t.name}</td>
                   <td className="py-3">{t.sport}</td>
-                  <td className="py-3 text-center font-mono">{t.registeredTeams.length} / {t.maxTeams}</td>
-                  <td className="py-3 text-center">${t.entryFee.toLocaleString('es-AR')}</td>
+                  <td className="py-3 text-center font-mono">{(t.registeredTeams || []).length} / {t.maxTeams || 8}</td>
+                  <td className="py-3 text-center">${Number(t.entryFee || 0).toLocaleString('es-AR')}</td>
                   <td className="py-3 text-center font-bold text-[#65c556]">
-                    ${(t.registeredTeams.length * t.entryFee).toLocaleString('es-AR')}
+                    ${((t.registeredTeams || []).length * Number(t.entryFee || 0)).toLocaleString('es-AR')}
                   </td>
                   <td className="py-3 text-right">
                     <span className="bg-[rgba(101,197,86,0.15)] text-[#65c556] px-2 py-0.5 rounded text-[11px] font-bold">

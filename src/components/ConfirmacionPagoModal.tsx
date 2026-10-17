@@ -166,11 +166,12 @@ export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
           </p>
 
           {/* Actions */}
-          <div className="flex gap-2.5 mt-1">
+          <div className="flex gap-3.5 mt-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-[8px] border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold text-xs cursor-pointer"
+              disabled={isProcessing}
+              className="flex-1 py-3 px-5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white font-bold text-xs cursor-pointer min-h-[44px] transition-colors"
             >
               Cancelar
             </button>
@@ -178,7 +179,7 @@ export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
               type="button"
               onClick={handlePay}
               disabled={isProcessing}
-              className="flex-1 py-2.5 rounded-[8px] bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className="flex-1 py-3 px-5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-extrabold text-sm transition-all shadow-lg shadow-[#65c556]/20 cursor-pointer flex items-center justify-center gap-2 min-h-[44px]"
             >
               {isProcessing ? 'Procesando seña...' : `Pagar Seña $${deposit.toLocaleString('es-AR')}`}
             </button>

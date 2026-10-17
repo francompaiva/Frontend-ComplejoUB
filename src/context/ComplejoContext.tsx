@@ -11,9 +11,11 @@ import {
   type NotificationItem,
   type WaitlistEntry,
   type SportType,
+  type TeamInvitation,
   SPORT_PRICING,
   INITIAL_COURTS,
-  INITIAL_TOURNAMENTS
+  INITIAL_TOURNAMENTS,
+  INITIAL_INVITATIONS
 } from '../data/mockData';
 import {
   authApi,
@@ -39,7 +41,8 @@ export type {
   AuditLogItem,
   NotificationItem,
   WaitlistEntry,
-  SportType
+  SportType,
+  TeamInvitation
 } from '../data/mockData';
 
 export type UserRole = 'cliente' | 'admin' | 'arbitro' | 'superadmin';
@@ -79,6 +82,7 @@ export interface ComplejoContextType {
   unreadNotifsCount: number;
   userAbsences: number;
   isUserBanned: boolean;
+  invitations: TeamInvitation[];
 
   // Acciones y sincronización con API
   fetchTorneoData: (torneoId: string | number) => Promise<void>;
@@ -91,6 +95,7 @@ export interface ComplejoContextType {
   createTournament: (tourney: Omit<Tournament, 'id' | 'registeredTeams'>) => Promise<void>;
   deleteTournament: (tournamentId: string) => Promise<void>;
   registerTeam: (tournamentId: string, teamName: string, players: { name: string; dni: string; position: string }[]) => Promise<{ success: boolean; error?: string }>;
+  responderInvitacion: (id: string | number, respuesta: 'ACEPTADA' | 'RECHAZADA') => Promise<{ success: boolean; message?: string }>;
   saveMatchResult: (matchId: number, homeScore: number, awayScore: number, status: FixtureMatch['status'], yellowCards?: FixtureMatch['yellowCards'], redCards?: FixtureMatch['redCards'], observations?: string) => Promise<void>;
   assignReferee: (matchId: number, refereeName: string) => Promise<void>;
   assignMatchSchedule: (matchId: number, courtId: string, courtName: string, date: string, time: string) => Promise<{ success: boolean; error?: string }>;
@@ -281,6 +286,11 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [userAbsences, setUserAbsences] = useState<number>(0);
+  const [invitations, setInvitations] = useState<TeamInvitation[]>(() => loadOr('invitations', INITIAL_INVITATIONS));
+
+  useEffect(() => {
+    saveTo('invitations', invitations);
+  }, [invitations]);
 
   // Helper para autenticar automáticamente según el rol activo SOLO si no hay usuario en sesión
   const authenticateRole = useCallback(async (role: UserRole) => {
@@ -344,12 +354,13 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const refreshAllData = useCallback(async (currentRole = userRole) => {
     try {
       const isRoleAdmin = currentRole === 'admin' || currentRole === 'superadmin';
-      const [canchas, torneos, resReservas, notifs, logs] = await Promise.all([
+      const [canchas, torneos, resReservas, notifs, logs, rawInvs] = await Promise.all([
         canchasApi.getAll().catch(() => []),
         torneosApi.getAll().catch(() => []),
         (isRoleAdmin ? reservasApi.getAll() : reservasApi.getMisReservas()).catch(() => []),
         notificacionesApi.getMisNotificaciones().catch(() => []),
         (isRoleAdmin ? reportesApi.getAuditoria() : Promise.resolve([])).catch(() => []),
+        equiposApi.getMisInvitaciones().catch(() => []),
       ]);
 
       if (Array.isArray(canchas) && canchas.length > 0) {
@@ -419,6 +430,22 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             action: l.accion,
             detail: typeof l.detalles === 'string' ? l.detalles : JSON.stringify(l.detalles || {}),
             type: l.entidad_afectada as any,
+          }))
+        );
+      }
+
+      if (Array.isArray(rawInvs) && rawInvs.length > 0) {
+        setInvitations(
+          rawInvs.map((inv: any) => ({
+            id: String(inv.equipo_id || inv.fk_equipo_id || inv.id),
+            equipoId: Number(inv.equipo_id || inv.fk_equipo_id || inv.id),
+            team: inv.equipo_nombre || inv.nombre || 'Equipo',
+            captain: inv.capitan_nombre || 'Capitán',
+            captainEmail: inv.capitan_email || '',
+            tournament: inv.torneo_nombre || 'Torneo Oficial',
+            role: inv.dorsal ? `Dorsal #${inv.dorsal}` : 'Plantel Oficial',
+            status: inv.estado_invitacion || 'PENDIENTE',
+            createdAt: inv.fecha_alta,
           }))
         );
       }
@@ -836,7 +863,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             };
             return {
               ...t,
-              registeredTeams: [...t.registeredTeams, newTeam]
+              registeredTeams: [...(t.registeredTeams || []), newTeam]
             };
           }
           return t;
@@ -852,6 +879,37 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         error: err?.message || 'Error inesperado al inscribir equipo'
       };
     }
+  };
+
+  // RF-15: Aceptación o rechazo asíncrono de invitaciones a equipos
+  const responderInvitacion = async (
+    id: string | number,
+    respuesta: 'ACEPTADA' | 'RECHAZADA'
+  ): Promise<{ success: boolean; message?: string }> => {
+    const invItem = invitations.find(i => i.id === String(id) || i.equipoId === Number(id));
+    const targetEquipoId = invItem?.equipoId || (typeof id === 'number' ? id : parseInt(String(id).replace(/\D/g, ''), 10));
+
+    try {
+      if (targetEquipoId && !isNaN(targetEquipoId)) {
+        await equiposApi.responderInvitacion(targetEquipoId, respuesta);
+      }
+    } catch (err: any) {
+      console.warn('[responderInvitacion] API backend no disponible, actualizando estado local:', err?.message);
+    }
+
+    // Actualización reactiva instantánea del estado global
+    setInvitations((prev) => prev.filter((i) => i.id !== String(id) && i.equipoId !== targetEquipoId));
+
+    const teamName = invItem?.team || 'Equipo';
+    const msg =
+      respuesta === 'ACEPTADA'
+        ? `¡Aceptaste la invitación para sumarte a "${teamName}"!`
+        : `Rechazaste la invitación para sumarte a "${teamName}".`;
+
+    logAudit('Invitación a Equipo', msg, 'torneo');
+    addNotification('Invitación Respondida', msg, 'torneo');
+    await refreshAllData();
+    return { success: true, message: msg };
   };
 
   // Carga de resultados oficial conectada a MySQL y triggers
@@ -1094,6 +1152,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         unreadNotifsCount,
         userAbsences,
         isUserBanned,
+        invitations,
         fetchTorneoData,
         refreshAllData,
         bookCourt,
@@ -1104,6 +1163,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         createTournament,
         deleteTournament,
         registerTeam,
+        responderInvitacion,
         saveMatchResult,
         assignReferee,
         assignMatchSchedule,

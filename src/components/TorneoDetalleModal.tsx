@@ -107,7 +107,7 @@ export const TorneoDetalleModal: React.FC<TorneoDetalleModalProps> = ({
             <div className="flex items-center justify-between text-xs">
               <span className="text-[#c0c0c0] font-semibold">Cupo de Equipos Participantes:</span>
               <span className="font-bold text-white">
-                <strong className="text-[#65c556]">{torneo.registeredTeams.length}</strong> de {torneo.maxTeams} equipos ({cupoPercentage}%)
+                <strong className="text-[#65c556]">{(torneo.registeredTeams || []).length}</strong> de {torneo.maxTeams} equipos ({cupoPercentage}%)
               </span>
             </div>
             <div className="w-full bg-[#1e281d] h-2.5 rounded-full overflow-hidden border border-[#5a7056]/50">
@@ -125,7 +125,7 @@ export const TorneoDetalleModal: React.FC<TorneoDetalleModalProps> = ({
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                 <IconCheck size={16} className="text-[#65c556]" />
-                <span>Equipos Inscriptos ({torneo.registeredTeams.length})</span>
+                <span>Equipos Inscriptos ({(torneo.registeredTeams || []).length})</span>
               </h3>
               {isCupoLleno ? (
                 <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/30">
@@ -133,14 +133,14 @@ export const TorneoDetalleModal: React.FC<TorneoDetalleModalProps> = ({
                 </span>
               ) : (
                 <span className="text-[10px] font-bold text-[#65c556] bg-[#65c556]/10 px-2 py-0.5 rounded-full border border-[#65c556]/30">
-                  {torneo.maxTeams - torneo.registeredTeams.length} cupos disponibles
+                  {torneo.maxTeams - (torneo.registeredTeams || []).length} cupos disponibles
                 </span>
               )}
             </div>
 
-            {torneo.registeredTeams.length > 0 ? (
+            {(torneo.registeredTeams || []).length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {torneo.registeredTeams.map((team, idx) => (
+                {(torneo.registeredTeams || []).map((team, idx) => (
                   <div
                     key={team.id || idx}
                     className="bg-[#293827] border border-[#5a7056] p-3 rounded-xl flex items-center justify-between gap-2"
@@ -194,7 +194,7 @@ export const TorneoDetalleModal: React.FC<TorneoDetalleModalProps> = ({
                   onVerFixture(torneo.id);
                   onClose();
                 }}
-                className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[#65c556] font-bold text-xs transition cursor-pointer text-center"
+                className="flex-1 sm:flex-initial px-5 py-3 rounded-xl bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[#65c556] font-bold text-xs transition cursor-pointer text-center min-h-[44px] flex items-center justify-center"
               >
                 Ver Tabla y Fixture →
               </button>
@@ -207,7 +207,7 @@ export const TorneoDetalleModal: React.FC<TorneoDetalleModalProps> = ({
                   onInscribir(torneo.id);
                   onClose();
                 }}
-                className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-[#65c556] hover:bg-[#54b045] text-[#293827] font-extrabold text-xs shadow-lg shadow-[#65c556]/20 transition cursor-pointer text-center"
+                className="flex-1 sm:flex-initial px-6 py-3 rounded-xl bg-[#65c556] hover:bg-[#54b045] text-[#293827] font-extrabold text-sm shadow-lg shadow-[#65c556]/20 transition cursor-pointer text-center min-h-[44px] flex items-center justify-center"
               >
                 Inscribir Mi Equipo
               </button>

@@ -15,17 +15,15 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
     userAbsences,
     isUserBanned,
     notifications,
-    markAllNotificationsRead
+    markAllNotificationsRead,
+    invitations,
+    responderInvitacion
   } = useComplejo();
 
   const [activeTab, setActiveTab] = useState<'activos' | 'historial' | 'perfil' | 'notificaciones'>('activos');
   const [bookingToCancel, setBookingToCancel] = useState<BookingItem | null>(null);
-
-  // Invitaciones demo
-  const [invitations, setInvitations] = useState([
-    { id: 'inv-1', team: 'Pico y Pala FC', captain: 'Carlos Tévez', tournament: 'Copa Apertura F5', role: 'Delantero' },
-    { id: 'inv-2', team: 'Volea Perfecta', captain: 'Guillermo Vilas', tournament: 'Torneo Relámpago Pádel', role: 'Drive' }
-  ]);
+  const [isResponding, setIsResponding] = useState<Record<string, boolean>>({});
+  const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   const activeBookings = bookings.filter((b) => b.status === 'Confirmada' || b.status === 'Pendiente');
   const pastBookings = bookings.filter((b) => b.status === 'Completada' || b.status === 'Cancelada');
@@ -37,13 +35,42 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
     }
   };
 
-  const handleAcceptInvite = (id: string, team: string) => {
-    setInvitations((prev) => prev.filter((i) => i.id !== id));
-    alert(`¡Aceptaste la invitación para sumarte a "${team}"!`);
+  const handleAcceptInvite = async (id: string, team: string) => {
+    setIsResponding((prev) => ({ ...prev, [id]: true }));
+    try {
+      const res = await responderInvitacion(id, 'ACEPTADA');
+      setFeedbackMsg({
+        text: res.message || `¡Aceptaste la invitación para sumarte a "${team}"!`,
+        type: 'success'
+      });
+      setTimeout(() => setFeedbackMsg(null), 4000);
+    } catch (err: any) {
+      setFeedbackMsg({
+        text: err?.message || 'Error al procesar la respuesta a la invitación.',
+        type: 'error'
+      });
+    } finally {
+      setIsResponding((prev) => ({ ...prev, [id]: false }));
+    }
   };
 
-  const handleRejectInvite = (id: string) => {
-    setInvitations((prev) => prev.filter((i) => i.id !== id));
+  const handleRejectInvite = async (id: string, team: string) => {
+    setIsResponding((prev) => ({ ...prev, [id]: true }));
+    try {
+      const res = await responderInvitacion(id, 'RECHAZADA');
+      setFeedbackMsg({
+        text: res.message || `Rechazaste la invitación de "${team}".`,
+        type: 'success'
+      });
+      setTimeout(() => setFeedbackMsg(null), 4000);
+    } catch (err: any) {
+      setFeedbackMsg({
+        text: err?.message || 'Error al procesar la respuesta a la invitación.',
+        type: 'error'
+      });
+    } finally {
+      setIsResponding((prev) => ({ ...prev, [id]: false }));
+    }
   };
 
   return (
@@ -357,6 +384,19 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
                 </p>
               </div>
 
+              {feedbackMsg && (
+                <div
+                  className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                    feedbackMsg.type === 'success'
+                      ? 'bg-[rgba(101,197,86,0.15)] border border-[#65c556] text-[#65c556]'
+                      : 'bg-[rgba(229,62,62,0.15)] border border-[#e53e3e] text-[#e53e3e]'
+                  }`}
+                >
+                  <span>{feedbackMsg.type === 'success' ? '✅' : '⚠️'}</span>
+                  <span>{feedbackMsg.text}</span>
+                </div>
+              )}
+
               <div className="flex flex-col gap-3">
                 {invitations.length === 0 ? (
                   <p className="text-xs text-[#a0a0a0] italic py-4 text-center">
@@ -366,32 +406,41 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
                   invitations.map((inv) => (
                     <div
                       key={inv.id}
-                      className="bg-[#293827] p-4 rounded-xl border border-[#5a7056] flex flex-col gap-2.5"
+                      className="bg-[#293827] p-4 rounded-xl border border-[#5a7056] flex flex-col gap-3 shadow-md"
                     >
                       <div className="flex items-start justify-between">
                         <div>
                           <h4 className="font-bold text-sm text-white">{inv.team}</h4>
-                          <p className="text-xs text-[#a0a0a0]">
+                          <p className="text-xs text-[#a0a0a0] mt-0.5">
                             Capitán: <strong className="text-[#c0c0c0]">{inv.captain}</strong> • {inv.tournament}
                           </p>
                         </div>
-                        <span className="bg-[#1e281d] text-[#65c556] text-[10px] font-bold px-2 py-0.5 rounded border border-[#5a7056]">
+                        <span className="bg-[#1e281d] text-[#65c556] text-[10px] font-bold px-2.5 py-1 rounded-lg border border-[#5a7056]">
                           Posición: {inv.role}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2 pt-1 border-t border-[#3b4d38]">
+                      <div className="flex items-center gap-3 pt-2 border-t border-[#3b4d38]">
                         <button
                           type="button"
+                          disabled={isResponding[inv.id]}
                           onClick={() => handleAcceptInvite(inv.id, inv.team)}
-                          className="flex-1 py-1.5 rounded-lg bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-xs cursor-pointer transition-colors"
+                          className="flex-1 py-2.5 px-4 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-extrabold text-xs cursor-pointer transition-all shadow-md flex items-center justify-center gap-2 min-h-[40px] disabled:opacity-50"
                         >
-                          ✓ Aceptar Invitación
+                          {isResponding[inv.id] ? (
+                            <>
+                              <span className="inline-block w-3.5 h-3.5 border-2 border-[#293827] border-t-transparent rounded-full animate-spin" />
+                              <span>Procesando...</span>
+                            </>
+                          ) : (
+                            '✓ Aceptar Invitación'
+                          )}
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleRejectInvite(inv.id)}
-                          className="px-3 py-1.5 rounded-lg border border-[#5a7056] text-[#a0a0a0] hover:text-white font-semibold text-xs cursor-pointer"
+                          disabled={isResponding[inv.id]}
+                          onClick={() => handleRejectInvite(inv.id, inv.team)}
+                          className="px-4 py-2.5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white hover:border-[#e53e3e] hover:bg-[rgba(229,62,62,0.15)] font-semibold text-xs cursor-pointer transition-colors min-h-[40px] disabled:opacity-50"
                         >
                           ✕ Rechazar
                         </button>

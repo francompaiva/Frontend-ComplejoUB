@@ -536,3 +536,22 @@ export const INITIAL_WAITLIST: WaitlistEntry[] = [
   { id: 'w1', courtName: 'Cancha 1 – Fútbol 5', date: 'Hoy', time: '21:00 hs', userName: 'Gonzalo Martínez', userPhone: '11-4567-8901', position: 1 },
   { id: 'w2', courtName: 'Pádel Cristal 1', date: 'Hoy', time: '20:00 hs', userName: 'Rodrigo De Paul', userPhone: '11-9876-5432', position: 1 }
 ];
+
+// INVITACIONES A EQUIPOS (RF-14, RF-15)
+export interface TeamInvitation {
+  id: string;
+  equipoId: number;
+  team: string;
+  captain: string;
+  captainEmail?: string;
+  tournament: string;
+  role: string;
+  status: 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA';
+  createdAt?: string;
+}
+
+export const INITIAL_INVITATIONS: TeamInvitation[] = [
+  { id: 'inv-1', equipoId: 1, team: 'Pico y Pala FC', captain: 'Carlos Tévez', tournament: 'Copa Apertura F5', role: 'Delantero', status: 'PENDIENTE' },
+  { id: 'inv-2', equipoId: 2, team: 'Volea Perfecta', captain: 'Guillermo Vilas', tournament: 'Torneo Relámpago Pádel', role: 'Drive', status: 'PENDIENTE' }
+];
+

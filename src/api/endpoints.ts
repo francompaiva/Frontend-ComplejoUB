@@ -46,8 +46,9 @@ export const equiposApi = {
   inscribir: (data: { torneoId: number; nombreEquipo: string; players?: any[] }) => apiClient.post('/equipos', data),
   invitar: (equipoId: number, data: { emailUsuario: string; dorsal?: number }) =>
     apiClient.post(`/equipos/${equipoId}/invitar`, data),
-  responderInvitacion: (equipoId: number, respuesta: 'ACEPTADA' | 'RECHAZADA') =>
-    apiClient.put(`/equipos/${equipoId}/responder-invitacion`, { respuesta }),
+  getMisInvitaciones: () => apiClient.get('/equipos/mis-invitaciones'),
+  responderInvitacion: (equipoId: number | string, respuesta: 'ACEPTADA' | 'RECHAZADA') =>
+    apiClient.post(`/equipos/invitaciones/${equipoId}/responder`, { respuesta, estado: respuesta }),
 };
 
 export const partidosApi = {
