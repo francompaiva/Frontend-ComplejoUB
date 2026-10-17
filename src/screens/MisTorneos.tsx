@@ -66,7 +66,11 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
             </button>
             {userRole !== 'arbitro' && (
               <button
-                onClick={() => onOpenInscripcion(selectedTorneo.id)}
+                onClick={() => {
+                  const openTorneo = tournaments.find(t => t.status === 'Inscripciones abiertas');
+                  const targetId = selectedTorneo?.status === 'Inscripciones abiertas' ? selectedTorneo.id : (openTorneo?.id || selectedTorneo?.id);
+                  onOpenInscripcion(targetId);
+                }}
                 className="inline-flex items-center justify-center gap-2 bg-[#65C556] hover:bg-[#54b045] text-[#293827] font-extrabold px-6 py-3 rounded-xl shadow-lg shadow-[#65C556]/20 transition cursor-pointer text-sm min-h-[44px]"
               >
                 <IconPlus size={18} className="shrink-0" />

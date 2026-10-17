@@ -53,6 +53,7 @@ export interface CurrentUser {
   email: string;
   rol: string;
   token?: string;
+  dni?: string | null;
   inasistencias?: number;
   estado_cuenta?: string;
   suspension_hasta?: string | null;

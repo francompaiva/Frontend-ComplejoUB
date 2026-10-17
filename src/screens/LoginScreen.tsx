@@ -55,8 +55,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const handleOfflineLogin = (emailToUse?: string) => {
     const emailTarget = (emailToUse || loginEmail || 'lucas@gmail.com').trim().toLowerCase();
     let targetRole: UserRole = 'cliente';
-    const clientProfiles: Record<string, { id: number; nombre: string; inasistencias?: number; estado_cuenta?: string; suspension_hasta?: string | null }> = {
-      'lucas@gmail.com': { id: 4, nombre: 'Lucas Díaz (Cliente / Capitán)', inasistencias: 0, estado_cuenta: 'Activa' },
+    const clientProfiles: Record<string, { id: number; nombre: string; dni?: string; inasistencias?: number; estado_cuenta?: string; suspension_hasta?: string | null }> = {
+      'lucas@gmail.com': { id: 4, nombre: 'Lucas Díaz (Cliente / Capitán)', dni: '40.123.456', inasistencias: 0, estado_cuenta: 'Activa' },
       'mateo@gmail.com': { id: 5, nombre: 'Mateo Fernández', inasistencias: 1, estado_cuenta: 'Activa' },
       'juan@gmail.com': { id: 6, nombre: 'Juan Paiva', inasistencias: 0, estado_cuenta: 'Activa' },
       'diego@gmail.com': { id: 7, nombre: 'Diego López', inasistencias: 0, estado_cuenta: 'Activa' },

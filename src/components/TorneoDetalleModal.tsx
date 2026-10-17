@@ -19,8 +19,10 @@ export const TorneoDetalleModal: React.FC<TorneoDetalleModalProps> = ({
 }) => {
   if (!isOpen || !torneo) return null;
 
-  const cupoPercentage = Math.min(100, Math.round((torneo.registeredTeams.length / torneo.maxTeams) * 100));
-  const isCupoLleno = torneo.registeredTeams.length >= torneo.maxTeams;
+  const teamsCount = (torneo.registeredTeams || []).length;
+  const maxTeamsCount = torneo.maxTeams || 8;
+  const cupoPercentage = Math.min(100, Math.round((teamsCount / maxTeamsCount) * 100));
+  const isCupoLleno = teamsCount >= maxTeamsCount;
 
   return (
     <div

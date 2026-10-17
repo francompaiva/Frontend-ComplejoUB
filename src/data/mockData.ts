@@ -324,6 +324,19 @@ export const INITIAL_TOURNAMENTS: Tournament[] = [
         ]
       }
     ]
+  },
+  {
+    id: 't3',
+    name: 'Copa Clausura Fútbol 5 UB',
+    sport: 'Fútbol 5',
+    status: 'Inscripciones abiertas',
+    entryFee: 45000,
+    matchFee: 7500,
+    maxTeams: 8,
+    dates: 'Noviembre y Diciembre',
+    prize: '$120.000 + Medallas Oficiales UB',
+    format: 'Liga (Todos contra todos)',
+    registeredTeams: []
   }
 ];
 

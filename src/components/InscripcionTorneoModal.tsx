@@ -30,27 +30,74 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
   tournamentId,
   onSubmit
 }) => {
-  const { tournaments, registerTeam } = useComplejo();
+  const { tournaments, registerTeam, currentUser } = useComplejo();
 
-  const [selectedTourneyId, setSelectedTourneyId] = useState<string>(
-    tournamentId || tournaments.find(t => t.status === 'Inscripciones abiertas')?.id || tournaments[0]?.id || '1'
-  );
+  const getInitialTourneyId = () => {
+    if (tournamentId) return tournamentId;
+    const openT = tournaments.find(t => t.status === 'Inscripciones abiertas');
+    return openT ? openT.id : (tournaments[0]?.id || '1');
+  };
+
+  const [selectedTourneyId, setSelectedTourneyId] = useState<string>(getInitialTourneyId);
   const [teamName, setTeamName] = useState('Los Imparables FC');
   const [players, setPlayers] = useState<TournamentPlayer[]>(DEFAULT_PLAYERS);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  React.useEffect(() => {
-    if (tournamentId) {
-      setSelectedTourneyId(tournamentId);
-    } else if (tournaments.length > 0) {
-      const openT = tournaments.find((t) => t.status === 'Inscripciones abiertas');
-      if (openT) setSelectedTourneyId(openT.id);
-      else setSelectedTourneyId(tournaments[0].id);
+  // Helper to generate squad members matching sport and currentUser without colliding with existing seeds
+  const buildSquadForSport = React.useCallback((sportName: string) => {
+    const captainName = currentUser?.nombre ? `${currentUser.nombre} (Capitán)` : 'Lucas Díaz (Capitán)';
+    const captainDni = currentUser?.dni || '40.123.456';
+
+    if (sportName === 'Pádel' || sportName === 'Tenis') {
+      return [
+        { id: '1', name: captainName, dni: captainDni, position: sportName === 'Pádel' ? 'Drive' : 'Single' },
+        { id: '2', name: 'Rodrigo De Paul', dni: '38.221.990', position: sportName === 'Pádel' ? 'Revés' : 'Single' }
+      ];
     }
-  }, [tournamentId, isOpen, tournaments]);
+    if (sportName === 'Fútbol 8') {
+      return [
+        { id: '1', name: captainName, dni: captainDni, position: 'Delantero' },
+        { id: '2', name: 'Leandro Paredes', dni: '38.455.912', position: 'Mediocampista' },
+        { id: '3', name: 'Cristian Romero', dni: '41.002.341', position: 'Defensor' },
+        { id: '4', name: 'Nahuel Molina', dni: '40.998.112', position: 'Defensor' },
+        { id: '5', name: 'Alexis Mac Allister', dni: '41.332.190', position: 'Mediocampista' },
+        { id: '6', name: 'Julián Álvarez', dni: '42.500.122', position: 'Delantero' },
+        { id: '7', name: 'Lisandro Martínez', dni: '40.678.910', position: 'Defensor' },
+        { id: '8', name: 'Emiliano Martínez', dni: '37.899.201', position: 'Arquero' }
+      ];
+    }
+    // Fútbol 5 (default)
+    return [
+      { id: '1', name: captainName, dni: captainDni, position: 'Delantero' },
+      { id: '2', name: 'Leandro Paredes', dni: '38.455.912', position: 'Mediocampista' },
+      { id: '3', name: 'Cristian Romero', dni: '41.002.341', position: 'Defensor' },
+      { id: '4', name: 'Nahuel Molina', dni: '40.998.112', position: 'Defensor' },
+      { id: '5', name: 'Emiliano Martínez', dni: '37.899.201', position: 'Arquero' }
+    ];
+  }, [currentUser]);
 
-  if (!isOpen) return null;
+  // Synchronize modal state on open or tournament selection
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    let target = tournamentId ? tournaments.find(t => t.id === tournamentId) : null;
+    // If specific tournament is closed, prefer the open one
+    if (!target || target.status !== 'Inscripciones abiertas') {
+      const openT = tournaments.find(t => t.status === 'Inscripciones abiertas');
+      if (openT) target = openT;
+      else if (!target && tournaments.length > 0) target = tournaments[0];
+    }
+
+    if (target) {
+      setSelectedTourneyId(target.id);
+      const sp = target.sport || 'Fútbol 5';
+      setPlayers(buildSquadForSport(sp));
+    }
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  }, [tournamentId, isOpen, tournaments, buildSquadForSport]);
 
   const currentTourney = tournaments.find((t) => t.id === selectedTourneyId) || tournaments[0];
   const sport = currentTourney?.sport || 'Fútbol 5';
@@ -84,7 +131,17 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     );
   };
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const handleTournamentSelect = (newTourneyId: string) => {
+    setSelectedTourneyId(newTourneyId);
+    const target = tournaments.find(t => t.id === newTourneyId);
+    if (target) {
+      const sp = target.sport || 'Fútbol 5';
+      const lim = SQUAD_LIMITS[sp] || { min: 2, max: 10 };
+      if (players.length < lim.min || players.length > lim.max) {
+        setPlayers(buildSquadForSport(sp));
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,6 +199,11 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     }
   };
 
+  // Safe early return strictly AFTER all hooks and callback declarations
+  if (!isOpen) return null;
+
+  const isTorneoCerrado = currentTourney && currentTourney.status !== 'Inscripciones abiertas';
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -188,6 +250,15 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
             </div>
           )}
 
+          {isTorneoCerrado && (
+            <div className="bg-amber-500/15 border border-amber-500/40 rounded-xl p-3 text-xs text-amber-300 flex items-center gap-2">
+              <span>ℹ️</span>
+              <span>
+                El torneo seleccionado se encuentra <strong>{currentTourney?.status}</strong>. Selecciona un certamen con <strong>Inscripciones abiertas</strong> para registrar tu equipo.
+              </span>
+            </div>
+          )}
+
           {/* Tournament selector */}
           <div>
             <label className="text-xs font-semibold text-[#a0a0a0] uppercase block mb-1">
@@ -195,12 +266,12 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
             </label>
             <select
               value={selectedTourneyId}
-              onChange={(e) => setSelectedTourneyId(e.target.value)}
+              onChange={(e) => handleTournamentSelect(e.target.value)}
               className="w-full bg-[#293827] border border-[#5a7056] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#65c556]"
             >
               {tournaments.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name} ({t.sport}) • {t.status} • Inscripción: ${t.entryFee.toLocaleString('es-AR')}
+                  {t.name} ({t.sport}) • {t.status === 'Inscripciones abiertas' ? '🟢 ABIERTO' : `🔒 ${t.status}`} • Inscripción: ${t.entryFee.toLocaleString('es-AR')}
                 </option>
               ))}
             </select>
