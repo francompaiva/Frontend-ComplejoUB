@@ -628,12 +628,12 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const cleanHour = time.replace(' hs', '').trim() + (time.includes(':') ? (time.split(':').length === 2 ? ':00' : '') : ':00:00');
 
     // Validación Docente: No permitir turnos en fechas u horarios concluidos
-    const [year, month, day] = cleanDate.split('-').map(Number);
-    const [hours, minutes] = cleanHour.split(':').map(Number);
-    const targetTurnoDate = new Date(year, month - 1, day, hours || 0, minutes || 0, 0);
-    if (targetTurnoDate.getTime() <= Date.now()) {
+    const cleanTimeFormatted = cleanHour.length === 5 ? `${cleanHour}:00` : cleanHour;
+    const targetTurnoDate = new Date(`${cleanDate}T${cleanTimeFormatted}-03:00`);
+    const toleranciaGraciaMs = 5 * 60 * 1000;
+
+    if (targetTurnoDate.getTime() + toleranciaGraciaMs <= Date.now()) {
       const msg = 'No es posible reservar un turno para una fecha u horario que ya ha transcurrido.';
-      alert(msg);
       throw new Error(msg);
     }
 
@@ -650,8 +650,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     } catch (err: any) {
       console.warn('[bookCourt] Error al guardar en MySQL:', err?.message);
-      alert(`No se pudo completar la reserva en la base de datos: ${err?.message || 'Error al persistir turno'}`);
-      throw err;
+      throw new Error(err?.message || 'Error al persistir turno en la base de datos.');
     }
 
     const newBooking: BookingItem = {

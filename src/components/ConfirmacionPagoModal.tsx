@@ -13,14 +13,14 @@ export interface ConfirmacionPagoModalProps {
   isOpen: boolean;
   slot: BookingSlotInfo | null;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => Promise<void> | void;
 }
 
 export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
   isOpen,
   slot,
   onClose,
-  onConfirm
+  onConfirm,
 }) => {
   const [method, setMethod] = useState<'tarjeta' | 'mercadopago'>('tarjeta');
   const [cardNum, setCardNum] = useState('');
@@ -35,7 +35,7 @@ export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
   const deposit = Math.round(totalPrice * 0.3);
   const remaining = totalPrice - deposit;
 
-  const handlePay = () => {
+  const handlePay = async () => {
     setCardError(null);
     if (method === 'tarjeta') {
       if (!cardNum.trim() || !cardHolder.trim()) {
@@ -44,10 +44,13 @@ export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
       }
     }
     setIsProcessing(true);
-    setTimeout(() => {
+    try {
+      await onConfirm();
+    } catch (err: any) {
+      setCardError(err?.message || 'No se pudo completar la reserva en la base de datos.');
+    } finally {
       setIsProcessing(false);
-      onConfirm();
-    }, 600);
+    }
   };
 
   return (

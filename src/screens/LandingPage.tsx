@@ -95,11 +95,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const getSlotStatus = (courtName: string, hour: string) => {
     const cleanHour = hour.replace(' hs', '').trim();
 
-    // 0. Horario concluido en el pasado
-    const [y, m, d] = selectedDate.split('-').map(Number);
+    // 0. Horario concluido en el pasado (zona horaria oficial del Complejo: UTC-3)
     const hourNum = parseInt(cleanHour.split(':')[0], 10);
     const minuteNum = parseInt(cleanHour.split(':')[1] || '0', 10);
-    const slotDateTime = new Date(y, m - 1, d, hourNum, minuteNum, 0);
+    const hourFormatted = `${hourNum.toString().padStart(2, '0')}:${minuteNum.toString().padStart(2, '0')}:00`;
+    const slotDateTime = new Date(`${selectedDate}T${hourFormatted}-03:00`);
 
     if (slotDateTime.getTime() <= Date.now()) {
       return {

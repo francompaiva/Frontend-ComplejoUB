@@ -228,21 +228,16 @@ const AppContent: React.FC = () => {
 
   const handleConfirmPago = async () => {
     if (selectedSlot) {
-      try {
-        await bookCourt(
-          selectedSlot.courtId || '1',
-          selectedSlot.court,
-          (selectedSlot.sport as any) || 'Fútbol 5',
-          selectedSlot.date,
-          selectedSlot.time
-        );
-        setIsPagoOpen(false);
-        setSelectedSlot(null);
-        setCurrentScreen('mis-reservas');
-      } catch (err: any) {
-        setIsPagoOpen(false);
-        setSelectedSlot(null);
-      }
+      await bookCourt(
+        selectedSlot.courtId || '1',
+        selectedSlot.court,
+        (selectedSlot.sport as any) || 'Fútbol 5',
+        selectedSlot.date,
+        selectedSlot.time
+      );
+      setIsPagoOpen(false);
+      setSelectedSlot(null);
+      setCurrentScreen('mis-reservas');
     }
   };
 
