@@ -17,7 +17,9 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
     notifications,
     markAllNotificationsRead,
     invitations,
-    responderInvitacion
+    responderInvitacion,
+    currentUser,
+    userParticipations
   } = useComplejo();
 
   const [activeTab, setActiveTab] = useState<'activos' | 'historial' | 'perfil' | 'notificaciones'>('activos');
@@ -337,13 +339,25 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
             {/* Player Card */}
             <div className="bg-[#1e281d] border border-[#5a7056] rounded-2xl p-6 shadow-xl flex flex-col gap-4">
               <div className="flex items-center gap-4">
-                <div className="size-16 rounded-2xl bg-[#65c556] text-[#293827] font-black text-2xl flex items-center justify-center">
-                  JP
+                <div className="size-16 rounded-2xl bg-[#65c556] text-[#293827] font-black text-2xl flex items-center justify-center shrink-0">
+                  {currentUser?.nombre
+                    ? currentUser.nombre
+                        .split(' ')
+                        .filter(Boolean)
+                        .map((n) => n[0])
+                        .join('')
+                        .slice(0, 2)
+                        .toUpperCase()
+                    : 'U'}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Juan Pérez</h3>
-                  <p className="text-xs text-[#65c556] font-semibold">Capitán / Jugador Registrado</p>
-                  <p className="text-xs text-[#a0a0a0]">DNI: 40.123.456 • juan.perez@ub.edu.ar</p>
+                  <h3 className="text-lg font-bold text-white">{currentUser?.nombre || 'Usuario Registrado'}</h3>
+                  <p className="text-xs text-[#65c556] font-semibold">
+                    {userParticipations.some(p => p.isCaptain) ? 'Capitán / Jugador Registrado' : 'Jugador Registrado'}
+                  </p>
+                  <p className="text-xs text-[#a0a0a0]">
+                    DNI: {currentUser?.dni || 'Sin especificar'} • {currentUser?.email || 'Sin especificar'}
+                  </p>
                 </div>
               </div>
 
@@ -351,25 +365,33 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
                 <span className="text-xs font-bold text-[#a0a0a0] uppercase">
                   Historial de Equipos y Torneos
                 </span>
-                <div className="bg-[#293827] p-3.5 rounded-xl border border-[#5a7056] flex flex-col gap-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-sm text-white">Los Galácticos FC</span>
-                    <span className="text-xs text-[#65c556] font-bold">Activo (Capitán)</span>
+                {userParticipations.length === 0 ? (
+                  <div className="bg-[#293827] p-3.5 rounded-xl border border-[#5a7056] text-center">
+                    <p className="text-xs text-[#a0a0a0] italic">
+                      Aún no integras ningún equipo.
+                    </p>
                   </div>
-                  <p className="text-xs text-[#a0a0a0]">
-                    Torneo: Copa Apertura Fútbol 5 • Rol: Delantero (#10)
-                  </p>
-                </div>
-
-                <div className="bg-[#293827] p-3.5 rounded-xl border border-[#5a7056] flex flex-col gap-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-sm text-white">Deportivo Agronomía</span>
-                    <span className="text-xs text-gray-400">Torneo 2025 (Finalizado)</span>
-                  </div>
-                  <p className="text-xs text-[#a0a0a0]">
-                    Torneo Clausura Fútbol 8 • Subcampeón
-                  </p>
-                </div>
+                ) : (
+                  userParticipations.map((part) => (
+                    <div key={part.id} className="bg-[#293827] p-3.5 rounded-xl border border-[#5a7056] flex flex-col gap-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-sm text-white">{part.teamName}</span>
+                        <span
+                          className={`text-xs font-bold ${
+                            part.status === 'Activo' ? 'text-[#65c556]' : 'text-gray-400'
+                          }`}
+                        >
+                          {part.status === 'Activo'
+                            ? `Activo (${part.isCaptain ? 'Capitán' : 'Miembro'})`
+                            : `Torneo ${part.year || ''} (${part.status})`}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#a0a0a0]">
+                        Torneo: {part.tournamentName} • Rol: {part.role}
+                      </p>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 

@@ -23,8 +23,10 @@ export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
   onConfirm
 }) => {
   const [method, setMethod] = useState<'tarjeta' | 'mercadopago'>('tarjeta');
-  const [cardNum, setCardNum] = useState('•••• •••• •••• 4242');
-  const [cardHolder, setCardHolder] = useState('JUAN PEREZ');
+  const [cardNum, setCardNum] = useState('');
+  const [cardHolder, setCardHolder] = useState('');
+  const [cardExpiryCvv, setCardExpiryCvv] = useState('');
+  const [cardError, setCardError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   if (!isOpen || !slot) return null;
@@ -34,6 +36,13 @@ export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
   const remaining = totalPrice - deposit;
 
   const handlePay = () => {
+    setCardError(null);
+    if (method === 'tarjeta') {
+      if (!cardNum.trim() || !cardHolder.trim()) {
+        setCardError('Por favor ingresa el número de tarjeta y el nombre del titular para continuar.');
+        return;
+      }
+    }
     setIsProcessing(true);
     setTimeout(() => {
       setIsProcessing(false);
@@ -133,9 +142,10 @@ export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
                 <span className="text-[10px] text-[#a0a0a0] uppercase block">Número de tarjeta</span>
                 <input
                   type="text"
+                  placeholder="•••• •••• •••• 4242"
                   value={cardNum}
                   onChange={(e) => setCardNum(e.target.value)}
-                  className="w-full bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1 text-xs text-white"
+                  className="w-full bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1 text-xs text-white placeholder-[#71856d] focus:outline-none focus:border-[#65c556]"
                 />
               </div>
               <div className="flex gap-2">
@@ -143,20 +153,30 @@ export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
                   <span className="text-[10px] text-[#a0a0a0] uppercase block">Titular</span>
                   <input
                     type="text"
+                    placeholder="JUAN PEREZ"
                     value={cardHolder}
                     onChange={(e) => setCardHolder(e.target.value)}
-                    className="w-full bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1 text-xs text-white"
+                    className="w-full bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1 text-xs text-white placeholder-[#71856d] focus:outline-none focus:border-[#65c556]"
                   />
                 </div>
-                <div className="w-20">
+                <div className="w-24">
                   <span className="text-[10px] text-[#a0a0a0] uppercase block">Venc / CVV</span>
                   <input
                     type="text"
-                    defaultValue="12/28 • 321"
-                    className="w-full bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1 text-xs text-white text-center"
+                    placeholder="MM/AA • 123"
+                    value={cardExpiryCvv}
+                    onChange={(e) => setCardExpiryCvv(e.target.value)}
+                    className="w-full bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1 text-xs text-white text-center placeholder-[#71856d] focus:outline-none focus:border-[#65c556]"
                   />
                 </div>
               </div>
+            </div>
+          )}
+
+          {cardError && (
+            <div className="bg-[rgba(229,62,62,0.15)] border border-[#e53e3e] rounded-xl p-2.5 text-xs text-[#e53e3e] flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{cardError}</span>
             </div>
           )}
 

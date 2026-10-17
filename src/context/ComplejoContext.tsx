@@ -12,10 +12,12 @@ import {
   type WaitlistEntry,
   type SportType,
   type TeamInvitation,
+  type UserTeamParticipation,
   SPORT_PRICING,
   INITIAL_COURTS,
   INITIAL_TOURNAMENTS,
-  INITIAL_INVITATIONS
+  INITIAL_INVITATIONS,
+  INITIAL_USER_PARTICIPATIONS
 } from '../data/mockData';
 import {
   authApi,
@@ -42,8 +44,9 @@ export type {
   NotificationItem,
   WaitlistEntry,
   SportType,
-  TeamInvitation
-} from '../data/mockData';
+  TeamInvitation,
+  UserTeamParticipation
+};
 
 export type UserRole = 'cliente' | 'admin' | 'arbitro' | 'superadmin';
 
@@ -84,6 +87,7 @@ export interface ComplejoContextType {
   userAbsences: number;
   isUserBanned: boolean;
   invitations: TeamInvitation[];
+  userParticipations: UserTeamParticipation[];
 
   // Acciones y sincronización con API
   fetchTorneoData: (torneoId: string | number) => Promise<void>;
@@ -288,10 +292,17 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [userAbsences, setUserAbsences] = useState<number>(0);
   const [invitations, setInvitations] = useState<TeamInvitation[]>(() => loadOr('invitations', INITIAL_INVITATIONS));
+  const [userParticipations, setUserParticipations] = useState<UserTeamParticipation[]>(() =>
+    loadOr('userParticipations', INITIAL_USER_PARTICIPATIONS)
+  );
 
   useEffect(() => {
     saveTo('invitations', invitations);
   }, [invitations]);
+
+  useEffect(() => {
+    saveTo('userParticipations', userParticipations);
+  }, [userParticipations]);
 
   // Helper para autenticar automáticamente según el rol activo SOLO si no hay usuario en sesión
   const authenticateRole = useCallback(async (role: UserRole) => {
@@ -316,16 +327,19 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     }
 
-    try {
-      const email = DEMO_EMAILS[role];
-      const res: any = await authApi.login(email, 'password123');
-      if (res && res.token && res.user) {
-        apiClient.setToken(res.token);
-        localStorage.setItem('complejo_user', JSON.stringify(res.user));
-        setCurrentUser(res.user);
+    const demoPassword = import.meta.env.VITE_DEMO_PASSWORD || '';
+    if (demoPassword) {
+      try {
+        const email = DEMO_EMAILS[role];
+        const res: any = await authApi.login(email, demoPassword);
+        if (res && res.token && res.user) {
+          apiClient.setToken(res.token);
+          localStorage.setItem('complejo_user', JSON.stringify(res.user));
+          setCurrentUser(res.user);
+        }
+      } catch (err: any) {
+        console.warn(`[ComplejoContext] Error al autenticar como ${role}:`, err?.message);
       }
-    } catch (err: any) {
-      console.warn(`[ComplejoContext] Error al autenticar como ${role}:`, err?.message);
     }
   }, []);
 
@@ -355,13 +369,14 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const refreshAllData = useCallback(async (currentRole = userRole) => {
     try {
       const isRoleAdmin = currentRole === 'admin' || currentRole === 'superadmin';
-      const [canchas, torneos, resReservas, notifs, logs, rawInvs] = await Promise.all([
+      const [canchas, torneos, resReservas, notifs, logs, rawInvs, rawEquipos] = await Promise.all([
         canchasApi.getAll().catch(() => []),
         torneosApi.getAll().catch(() => []),
         (isRoleAdmin ? reservasApi.getAll() : reservasApi.getMisReservas()).catch(() => []),
         notificacionesApi.getMisNotificaciones().catch(() => []),
         (isRoleAdmin ? reportesApi.getAuditoria() : Promise.resolve([])).catch(() => []),
         equiposApi.getMisInvitaciones().catch(() => []),
+        equiposApi.getMisEquipos().catch(() => []),
       ]);
 
       if (Array.isArray(canchas) && canchas.length > 0) {
@@ -449,6 +464,36 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             createdAt: inv.fecha_alta,
           }))
         );
+      }
+
+      if (Array.isArray(rawEquipos) && rawEquipos.length > 0) {
+        setUserParticipations((prev) => {
+          const apiParts: UserTeamParticipation[] = rawEquipos.map((eq: any) => ({
+            id: 'part-' + (eq.equipo_id || eq.id),
+            teamId: eq.equipo_id || eq.id,
+            teamName: eq.equipo_nombre || eq.nombre || 'Equipo',
+            tournamentName: eq.torneo_nombre || 'Torneo Oficial',
+            sport: eq.deporte,
+            role: eq.es_capitan ? 'Capitán' : (eq.dorsal ? `Dorsal #${eq.dorsal}` : 'Jugador Registrado'),
+            dorsal: eq.dorsal,
+            status: eq.torneo_estado === 'FINALIZADO' ? 'Finalizado' : 'Activo',
+            isCaptain: Boolean(eq.es_capitan),
+            year: eq.fecha_alta ? new Date(eq.fecha_alta).getFullYear().toString() : '2026'
+          }));
+
+          // Preservar participaciones previas sin duplicar
+          const merged = [...apiParts];
+          for (const old of prev) {
+            const exists = merged.some(
+              m => m.teamName.trim().toLowerCase() === old.teamName.trim().toLowerCase() &&
+                   m.tournamentName.trim().toLowerCase() === old.tournamentName.trim().toLowerCase()
+            );
+            if (!exists) {
+              merged.push(old);
+            }
+          }
+          return merged;
+        });
       }
     } catch (err: any) {
       console.warn('[ComplejoContext] Error en sincronización general con API:', err?.message);
@@ -835,6 +880,30 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           });
           await refreshAllData();
           await fetchTorneoData(numTorneoId);
+
+          const targetTourney = tournaments.find(t => t.id === tournamentId || t.id === `t${numTorneoId}`);
+          const newPart: UserTeamParticipation = {
+            id: 'part-' + Date.now(),
+            teamId: numTorneoId,
+            teamName: teamName,
+            tournamentName: targetTourney?.name || 'Torneo Oficial',
+            sport: targetTourney?.sport,
+            role: 'Capitán',
+            status: 'Activo',
+            isCaptain: true,
+            year: new Date().getFullYear().toString()
+          };
+          setUserParticipations(prev => {
+            const exists = prev.some(
+              p => p.teamName.trim().toLowerCase() === teamName.trim().toLowerCase() &&
+                   p.tournamentName.trim().toLowerCase() === newPart.tournamentName.trim().toLowerCase()
+            );
+            if (exists) return prev;
+            const updated = [newPart, ...prev];
+            saveTo('userParticipations', updated);
+            return updated;
+          });
+
           logAudit('Inscripción de Equipo', `Equipo "${teamName}" inscripto con éxito (${players.length} jugadores registrados).`, 'torneo');
           addNotification('Equipo Inscripto', `Tu equipo "${teamName}" fue admitido en el torneo.`, 'torneo');
           return { success: true };
@@ -870,6 +939,29 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           return t;
         })
       );
+
+      const targetTourneyLocal = tournaments.find(t => t.id === tournamentId || t.id === `t${numTorneoId}`);
+      const newPartLocal: UserTeamParticipation = {
+        id: 'part-' + Date.now(),
+        teamName: teamName,
+        tournamentName: targetTourneyLocal?.name || 'Torneo Oficial',
+        sport: targetTourneyLocal?.sport,
+        role: 'Capitán',
+        status: 'Activo',
+        isCaptain: true,
+        year: new Date().getFullYear().toString()
+      };
+      setUserParticipations(prev => {
+        const exists = prev.some(
+          p => p.teamName.trim().toLowerCase() === teamName.trim().toLowerCase() &&
+               p.tournamentName.trim().toLowerCase() === newPartLocal.tournamentName.trim().toLowerCase()
+        );
+        if (exists) return prev;
+        const updated = [newPartLocal, ...prev];
+        saveTo('userParticipations', updated);
+        return updated;
+      });
+
       logAudit('Inscripción de Equipo', `Equipo "${teamName}" inscripto con éxito (${players.length} jugadores registrados).`, 'torneo');
       addNotification('Equipo Inscripto', `Tu equipo "${teamName}" fue admitido en el certamen.`, 'torneo');
       return { success: true };
@@ -890,16 +982,47 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const invItem = invitations.find(i => i.id === String(id) || i.equipoId === Number(id));
     const targetEquipoId = invItem?.equipoId || (typeof id === 'number' ? id : parseInt(String(id).replace(/\D/g, ''), 10));
 
-    try {
-      if (targetEquipoId && !isNaN(targetEquipoId)) {
+    if (targetEquipoId && !isNaN(targetEquipoId)) {
+      try {
         await equiposApi.responderInvitacion(targetEquipoId, respuesta);
+      } catch (err: any) {
+        // Si el backend retornó un error de validación de negocio (ej: 400, 404, 409), propagar para que no se sume al historial
+        if (err?.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
+          throw new Error(err.message || 'Error de validación al responder la invitación');
+        }
+        console.warn('[responderInvitacion] API backend no disponible, actualizando estado local:', err?.message);
       }
-    } catch (err: any) {
-      console.warn('[responderInvitacion] API backend no disponible, actualizando estado local:', err?.message);
     }
 
-    // Actualización reactiva instantánea del estado global
+    // Actualización reactiva instantánea del estado global de invitaciones
     setInvitations((prev) => prev.filter((i) => i.id !== String(id) && i.equipoId !== targetEquipoId));
+
+    // Si la invitación fue ACEPTADA, agregar inmediatamente a las participaciones del historial
+    if (respuesta === 'ACEPTADA' && invItem) {
+      setUserParticipations((prev) => {
+        const alreadyExists = prev.some(
+          (p) =>
+            (p.teamId && p.teamId === invItem.equipoId) ||
+            (p.teamName.trim().toLowerCase() === invItem.team.trim().toLowerCase() &&
+             p.tournamentName.trim().toLowerCase() === invItem.tournament.trim().toLowerCase())
+        );
+        if (alreadyExists) return prev;
+
+        const newParticipation: UserTeamParticipation = {
+          id: 'part-' + (invItem.equipoId || Date.now()),
+          teamId: invItem.equipoId,
+          teamName: invItem.team,
+          tournamentName: invItem.tournament,
+          role: invItem.role || 'Jugador Registrado',
+          status: 'Activo',
+          isCaptain: false,
+          year: new Date().getFullYear().toString()
+        };
+        const updated = [newParticipation, ...prev];
+        saveTo('userParticipations', updated);
+        return updated;
+      });
+    }
 
     const teamName = invItem?.team || 'Equipo';
     const msg =
@@ -1154,6 +1277,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         userAbsences,
         isUserBanned,
         invitations,
+        userParticipations,
         fetchTorneoData,
         refreshAllData,
         bookCourt,

@@ -47,6 +47,7 @@ export const equiposApi = {
   invitar: (equipoId: number, data: { emailUsuario: string; dorsal?: number }) =>
     apiClient.post(`/equipos/${equipoId}/invitar`, data),
   getMisInvitaciones: () => apiClient.get('/equipos/mis-invitaciones'),
+  getMisEquipos: () => apiClient.get('/equipos/mis-equipos'),
   responderInvitacion: (equipoId: number | string, respuesta: 'ACEPTADA' | 'RECHAZADA') =>
     apiClient.post(`/equipos/invitaciones/${equipoId}/responder`, { respuesta, estado: respuesta }),
 };

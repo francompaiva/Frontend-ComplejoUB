@@ -22,8 +22,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
 
   // Formulario Login
-  const [loginEmail, setLoginEmail] = useState('lucas@gmail.com');
-  const [loginPassword, setLoginPassword] = useState('password123');
+  const [loginEmail, setLoginEmail] = useState(import.meta.env.VITE_DEMO_CLIENT_EMAIL || '');
+  const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loadingLogin, setLoadingLogin] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -121,10 +121,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     onLogin(targetRole);
   };
 
-  const handleQuickFill = (email: string, pass = 'password123') => {
+  const handleQuickFill = (email: string) => {
     setActiveTab('login');
     setLoginEmail(email);
-    setLoginPassword(pass);
+    setLoginPassword('');
     setLoginError(null);
     setBackendOffline(false);
   };
@@ -540,7 +540,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     <input
                       type={showLoginPassword ? 'text' : 'password'}
                       required
-                      placeholder="••••••••"
+                      placeholder="Ingresa tu contraseña"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
                       style={{
@@ -582,7 +582,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     <button
                       type="button"
-                      onClick={() => handleQuickFill('lucas@gmail.com', 'password123')}
+                      onClick={() => handleQuickFill('lucas@gmail.com')}
                       className="px-2.5 py-1.5 rounded-lg bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[11px] font-semibold text-white transition text-center cursor-pointer truncate"
                       title="Lucas Díaz (Cliente / Capitán)"
                     >
@@ -590,7 +590,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleQuickFill('complejoub.soporte@gmail.com', 'admin123')}
+                      onClick={() => handleQuickFill('complejoub.soporte@gmail.com')}
                       className="px-2.5 py-1.5 rounded-lg bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[11px] font-semibold text-white transition text-center cursor-pointer truncate"
                       title="Superadministrador Titular"
                     >
@@ -598,7 +598,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleQuickFill('operador@complejoub.com', 'password123')}
+                      onClick={() => handleQuickFill('operador@complejoub.com')}
                       className="px-2.5 py-1.5 rounded-lg bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[11px] font-semibold text-white transition text-center cursor-pointer truncate"
                       title="Administrador de Sede"
                     >
@@ -606,7 +606,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleQuickFill('arbitro@complejoub.com', 'password123')}
+                      onClick={() => handleQuickFill('arbitro@complejoub.com')}
                       className="px-2.5 py-1.5 rounded-lg bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[11px] font-semibold text-white transition text-center cursor-pointer truncate"
                       title="Sebastián Norjean (Árbitro)"
                     >
@@ -614,7 +614,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleQuickFill('sancionado@gmail.com', 'password123')}
+                      onClick={() => handleQuickFill('sancionado@gmail.com')}
                       className="px-2.5 py-1.5 rounded-lg bg-[#2b1818] hover:bg-[#3f2121] border border-[#ef4444]/60 text-[11px] font-semibold text-red-300 transition text-center cursor-pointer truncate"
                       title="Usuario Sancionado Test (3 inasistencias consecutivas)"
                     >

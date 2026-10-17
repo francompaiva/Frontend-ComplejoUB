@@ -16,13 +16,20 @@ export interface InscripcionTorneoModalProps {
   onSubmit?: (data: { teamName: string; players: TournamentPlayer[] }) => void;
 }
 
-const DEFAULT_PLAYERS: TournamentPlayer[] = [
-  { id: '1', name: 'Juan Pérez (Capitán)', dni: '40.123.456', position: 'Delantero' },
-  { id: '2', name: 'Lucas Paiva', dni: '41.229.400', position: 'Defensor' },
-  { id: '3', name: 'Sebastián Norjean', dni: '42.110.339', position: 'Mediocampista' },
-  { id: '4', name: 'Nicolás Marco', dni: '40.887.652', position: 'Defensor' },
-  { id: '5', name: 'Tomás Cerro', dni: '41.554.912', position: 'Arquero' }
-];
+export const POSICIONES_POR_DEPORTE: Record<string, string[]> = {
+  'Fútbol 5': ['Arquero', 'Defensor', 'Mediocampista', 'Delantero'],
+  'Fútbol 8': ['Arquero', 'Defensor', 'Mediocampista', 'Delantero'],
+  'Fútbol 11': ['Arquero', 'Defensor', 'Mediocampista', 'Delantero'],
+  'Pádel': ['Drive', 'Revés'],
+  'Tenis': ['Single', 'Dobles', 'Drive', 'Revés']
+};
+
+const getCaptainPlayer = (name?: string, dni?: string | null, position = 'Delantero'): TournamentPlayer => ({
+  id: 'capitan-1',
+  name: name ? `${name} (Capitán)` : 'Capitán',
+  dni: dni ? String(dni).replace(/\D/g, '') : '',
+  position
+});
 
 export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
   isOpen,
@@ -39,42 +46,19 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
   };
 
   const [selectedTourneyId, setSelectedTourneyId] = useState<string>(getInitialTourneyId);
-  const [teamName, setTeamName] = useState('Los Imparables FC');
-  const [players, setPlayers] = useState<TournamentPlayer[]>(DEFAULT_PLAYERS);
+  const [teamName, setTeamName] = useState('');
+  const [players, setPlayers] = useState<TournamentPlayer[]>(() => [
+    getCaptainPlayer(currentUser?.nombre, currentUser?.dni)
+  ]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Helper to generate squad members matching sport and currentUser without colliding with existing seeds
-  const buildSquadForSport = React.useCallback((sportName: string) => {
-    const captainName = currentUser?.nombre ? `${currentUser.nombre} (Capitán)` : 'Lucas Díaz (Capitán)';
-    const captainDni = currentUser?.dni || '40.123.456';
-
-    if (sportName === 'Pádel' || sportName === 'Tenis') {
-      return [
-        { id: '1', name: captainName, dni: captainDni, position: sportName === 'Pádel' ? 'Drive' : 'Single' },
-        { id: '2', name: 'Rodrigo De Paul', dni: '38.221.990', position: sportName === 'Pádel' ? 'Revés' : 'Single' }
-      ];
-    }
-    if (sportName === 'Fútbol 8') {
-      return [
-        { id: '1', name: captainName, dni: captainDni, position: 'Delantero' },
-        { id: '2', name: 'Leandro Paredes', dni: '38.455.912', position: 'Mediocampista' },
-        { id: '3', name: 'Cristian Romero', dni: '41.002.341', position: 'Defensor' },
-        { id: '4', name: 'Nahuel Molina', dni: '40.998.112', position: 'Defensor' },
-        { id: '5', name: 'Alexis Mac Allister', dni: '41.332.190', position: 'Mediocampista' },
-        { id: '6', name: 'Julián Álvarez', dni: '42.500.122', position: 'Delantero' },
-        { id: '7', name: 'Lisandro Martínez', dni: '40.678.910', position: 'Defensor' },
-        { id: '8', name: 'Emiliano Martínez', dni: '37.899.201', position: 'Arquero' }
-      ];
-    }
-    // Fútbol 5 (default)
+  // Inicializa el plantel únicamente con los datos reales del usuario capitán autenticado
+  const getInitialSquad = React.useCallback((sportName: string) => {
+    const defaultPos = (POSICIONES_POR_DEPORTE[sportName] || ['Delantero'])[0];
     return [
-      { id: '1', name: captainName, dni: captainDni, position: 'Delantero' },
-      { id: '2', name: 'Leandro Paredes', dni: '38.455.912', position: 'Mediocampista' },
-      { id: '3', name: 'Cristian Romero', dni: '41.002.341', position: 'Defensor' },
-      { id: '4', name: 'Nahuel Molina', dni: '40.998.112', position: 'Defensor' },
-      { id: '5', name: 'Emiliano Martínez', dni: '37.899.201', position: 'Arquero' }
+      getCaptainPlayer(currentUser?.nombre, currentUser?.dni, defaultPos)
     ];
   }, [currentUser]);
 
@@ -93,15 +77,17 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     if (target) {
       setSelectedTourneyId(target.id);
       const sp = target.sport || 'Fútbol 5';
-      setPlayers(buildSquadForSport(sp));
+      setPlayers(getInitialSquad(sp));
     }
     setErrorMessage(null);
     setSuccessMessage(null);
-  }, [tournamentId, isOpen, tournaments, buildSquadForSport]);
+  }, [tournamentId, isOpen, tournaments, getInitialSquad]);
 
   const currentTourney = tournaments.find((t) => t.id === selectedTourneyId) || tournaments[0];
   const sport = currentTourney?.sport || 'Fútbol 5';
   const limits = SQUAD_LIMITS[sport] || { min: 5, max: 12 };
+
+  const allowedPositions = POSICIONES_POR_DEPORTE[sport] || ['Arquero', 'Defensor', 'Mediocampista', 'Delantero'];
 
   const handleAddPlayer = () => {
     if (players.length >= limits.max) {
@@ -115,7 +101,7 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
         id: String(Date.now()),
         name: '',
         dni: '',
-        position: sport === 'Pádel' ? 'Drive' : 'Delantero'
+        position: allowedPositions[0] || 'Delantero'
       }
     ]);
   };
@@ -138,7 +124,7 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
       const sp = target.sport || 'Fútbol 5';
       const lim = SQUAD_LIMITS[sp] || { min: 2, max: 10 };
       if (players.length < lim.min || players.length > lim.max) {
-        setPlayers(buildSquadForSport(sp));
+        setPlayers(getInitialSquad(sp));
       }
     }
   };
@@ -160,10 +146,28 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
       return;
     }
 
-    // Validate each player data
+    // Validar DNI (estricto 7 u 8 dígitos numéricos) y posición permitida por deporte
+    const DNI_REGEX = /^\d{7,8}$/;
     for (let i = 0; i < players.length; i++) {
-      if (!players[i].name.trim() || !players[i].dni.trim()) {
-        setErrorMessage(`Por favor completa el Nombre y DNI del jugador #${i + 1}.`);
+      const p = players[i];
+      if (!p.name.trim()) {
+        setErrorMessage(`Por favor completa el Nombre y Apellido del jugador #${i + 1}.`);
+        return;
+      }
+      if (!p.dni.trim()) {
+        setErrorMessage(`Por favor completa el DNI del jugador #${i + 1}.`);
+        return;
+      }
+      if (!DNI_REGEX.test(p.dni.trim())) {
+        setErrorMessage(
+          `El DNI del jugador #${i + 1} (${p.name.trim()}) es inválido: debe contener exactamente 7 u 8 dígitos numéricos sin letras, espacios, puntos ni símbolos.`
+        );
+        return;
+      }
+      if (!p.position || !allowedPositions.includes(p.position)) {
+        setErrorMessage(
+          `La posición '${p.position || 'No definida'}' del jugador #${i + 1} no es válida para ${sport}. Posiciones permitidas: ${allowedPositions.join(', ')}.`
+        );
         return;
       }
     }
@@ -236,13 +240,6 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
 
         {/* Content Form */}
         <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4 overflow-y-auto flex-1">
-          {errorMessage && (
-            <div className="bg-[rgba(229,62,62,0.15)] border border-[#e53e3e] rounded-xl p-3 text-xs text-[#e53e3e] flex items-center gap-2">
-              <span>⚠️</span>
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
           {successMessage && (
             <div className="bg-[rgba(101,197,86,0.15)] border border-[#65c556] rounded-xl p-3 text-xs text-[#65c556] flex items-center gap-2 font-bold">
               <span>✅</span>
@@ -285,9 +282,10 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
             <input
               type="text"
               required
+              placeholder="Ej: Los Imparables FC"
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
-              className="w-full bg-[#293827] border border-[#5a7056] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#65c556]"
+              className="w-full bg-[#293827] border border-[#5a7056] rounded-xl px-3 py-2 text-sm text-white placeholder-[#71856d] focus:outline-none focus:border-[#65c556]"
             />
           </div>
 
@@ -343,18 +341,24 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
                   <input
                     type="text"
                     required
-                    placeholder="Número de DNI"
+                    placeholder="DNI (7-8 dígitos)"
+                    inputMode="numeric"
+                    maxLength={8}
                     value={p.dni}
-                    onChange={(e) => handlePlayerChange(p.id, 'dni', e.target.value)}
-                    className="w-28 bg-[#1e281d] border border-[#5a7056] rounded px-2 py-1 text-xs text-white font-mono"
+                    onChange={(e) => handlePlayerChange(p.id, 'dni', e.target.value.replace(/\D/g, ''))}
+                    className="w-28 bg-[#1e281d] border border-[#5a7056] rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-[#65c556]"
                   />
-                  <input
-                    type="text"
-                    placeholder="Posición"
+                  <select
                     value={p.position}
                     onChange={(e) => handlePlayerChange(p.id, 'position', e.target.value)}
-                    className="w-24 bg-[#1e281d] border border-[#5a7056] rounded px-2 py-1 text-xs text-white"
-                  />
+                    className="w-28 bg-[#1e281d] border border-[#5a7056] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#65c556]"
+                  >
+                    {allowedPositions.map((pos) => (
+                      <option key={pos} value={pos}>
+                        {pos}
+                      </option>
+                    ))}
+                  </select>
                   {players.length > 1 && (
                     <button
                       type="button"
@@ -373,8 +377,16 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
             * El sistema verifica que ningún jugador esté inscripto en más de un equipo en el mismo torneo.
           </p>
 
+          {/* Mensaje de error posicionado inmediatamente arriba de los botones de acción */}
+          {errorMessage && (
+            <div className="bg-[rgba(229,62,62,0.15)] border border-[#e53e3e] rounded-xl p-3 text-xs text-[#e53e3e] flex items-center gap-2 animate-fadeIn">
+              <span>⚠️</span>
+              <span className="font-medium">{errorMessage}</span>
+            </div>
+          )}
+
           {/* Actions */}
-          <div className="flex gap-3.5 mt-3">
+          <div className="flex gap-3.5 mt-2">
             <button
               type="button"
               onClick={onClose}

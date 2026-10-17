@@ -568,3 +568,20 @@ export const INITIAL_INVITATIONS: TeamInvitation[] = [
   { id: 'inv-2', equipoId: 2, team: 'Volea Perfecta', captain: 'Guillermo Vilas', tournament: 'Torneo Relámpago Pádel', role: 'Drive', status: 'PENDIENTE' }
 ];
 
+// HISTORIAL DE EQUIPOS Y TORNEOS DEL PERFIL
+export interface UserTeamParticipation {
+  id: string;
+  teamId?: number | string;
+  teamName: string;
+  tournamentName: string;
+  sport?: string;
+  role: string;
+  dorsal?: number;
+  status: 'Activo' | 'Finalizado';
+  isCaptain?: boolean;
+  year?: string;
+  subtitulo?: string;
+}
+
+export const INITIAL_USER_PARTICIPATIONS: UserTeamParticipation[] = [];
+
