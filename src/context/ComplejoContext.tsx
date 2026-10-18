@@ -918,7 +918,27 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       }
 
-      // Fallback local: registrar equipo en el estado local de React
+      // Fallback local: verificar nombre único y que ningún jugador pertenezca ya a otro equipo del mismo torneo
+      const targetTourneyLocal = tournaments.find(t => t.id === tournamentId || t.id === `t${numTorneoId}`);
+      if (targetTourneyLocal && Array.isArray(targetTourneyLocal.registeredTeams)) {
+        for (const existingTeam of targetTourneyLocal.registeredTeams) {
+          if (existingTeam.name.trim().toLowerCase() === teamName.trim().toLowerCase()) {
+            return { success: false, error: 'Ya existe un equipo con ese nombre en este torneo' };
+          }
+          for (const p of players) {
+            const pDni = p.dni.trim();
+            const exists = (existingTeam.players || []).some(ep => ep.dni.trim() === pDni);
+            if (exists) {
+              return {
+                success: false,
+                error: `El jugador "${p.name}" (DNI: ${pDni}) ya se encuentra inscripto en el equipo "${existingTeam.name}" en este mismo torneo. No se permite participar en más de un equipo por certamen.`
+              };
+            }
+          }
+        }
+      }
+
+      // Registrar equipo en el estado local de React
       setTournaments((prev) =>
         prev.map((t) => {
           if (t.id === tournamentId) {
@@ -939,7 +959,6 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         })
       );
 
-      const targetTourneyLocal = tournaments.find(t => t.id === tournamentId || t.id === `t${numTorneoId}`);
       const newPartLocal: UserTeamParticipation = {
         id: 'part-' + Date.now(),
         teamName: teamName,
