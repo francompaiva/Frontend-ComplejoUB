@@ -92,7 +92,7 @@ export const reportesApi = {
 export const adminApi = {
   getAdministradores: () => apiClient.get('/admin/administradores'),
   promoverUsuario: (email: string, rol?: string) => apiClient.post('/admin/promover', { email, rol }),
-  crearAdministrador: (data: { nombre: string; email: string; contrasena: string; telefono?: string; rol?: string }) =>
+  crearAdministrador: (data: { nombre: string; email: string; contrasena: string; dni: string; telefono?: string; rol?: string }) =>
     apiClient.post('/admin/crear-admin', data),
   revocarAdministrador: (id: number) => apiClient.delete(`/admin/revocar/${id}`),
 };

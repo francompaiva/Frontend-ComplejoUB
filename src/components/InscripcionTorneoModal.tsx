@@ -45,7 +45,7 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
   tournamentId,
   onSubmit
 }) => {
-  const { tournaments, registerTeam, currentUser } = useComplejo();
+  const { tournaments, registerTeam, currentUser, userRole } = useComplejo();
 
   const getInitialTourneyId = () => {
     if (tournamentId) return tournamentId;
@@ -155,18 +155,35 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
 
         if (nombreEncontrado) {
           const isSuspended = data.estado_cuenta === 'Suspendida' || data.estado === 'Suspendida';
-          setPlayers((prev) =>
-            prev.map((p) =>
-              p.id === id && p.dni === cleanDni
-                ? {
-                    ...p,
-                    name: isCaptain ? `${nombreEncontrado} (Capitán)` : nombreEncontrado,
-                    statusLookup: isSuspended ? 'suspended' : 'found',
-                    statusMessage: isSuspended ? 'Cuenta suspendida por inasistencias o sanciones' : undefined
-                  }
-                : p
-            )
-          );
+          const isArbitro = data.rol === 'Arbitro' || data.rol === 'Árbitro';
+
+          if (isArbitro) {
+            setPlayers((prev) =>
+              prev.map((p) =>
+                p.id === id && p.dni === cleanDni
+                  ? {
+                      ...p,
+                      name: '',
+                      statusLookup: 'suspended',
+                      statusMessage: 'Un usuario con rol Árbitro no puede participar como jugador de torneos'
+                    }
+                  : p
+              )
+            );
+          } else {
+            setPlayers((prev) =>
+              prev.map((p) =>
+                p.id === id && p.dni === cleanDni
+                  ? {
+                      ...p,
+                      name: isCaptain ? `${nombreEncontrado} (Capitán)` : nombreEncontrado,
+                      statusLookup: isSuspended ? 'suspended' : 'found',
+                      statusMessage: isSuspended ? 'Cuenta suspendida por inasistencias o sanciones' : undefined
+                    }
+                  : p
+              )
+            );
+          }
         } else {
           // Si el servidor devolvió 200 pero sin nombre válido, no dejar en searching
           setPlayers((prev) =>
@@ -222,6 +239,11 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    if (userRole === 'arbitro' || currentUser?.rol === 'Arbitro') {
+      setErrorMessage('Un usuario con rol Árbitro no tiene permitido inscribir equipos ni participar en torneos.');
+      return;
+    }
 
     if (!teamName.trim()) {
       setErrorMessage('El nombre del equipo es obligatorio.');
@@ -356,6 +378,13 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
             <div className="bg-[rgba(101,197,86,0.15)] border border-[#65c556] rounded-xl p-3 text-xs text-[#65c556] flex items-center gap-2 font-bold">
               <span>✅</span>
               <span>{successMessage}</span>
+            </div>
+          )}
+
+          {(userRole === 'arbitro' || currentUser?.rol === 'Arbitro') && (
+            <div className="bg-[#7f1d1d]/85 border border-[#ef4444] rounded-xl p-3 text-xs text-[#fecaca] flex items-center gap-2 font-bold shadow-lg">
+              <span>⚠️</span>
+              <span>Los usuarios con rol Árbitro Oficial no pueden inscribir equipos ni disputar torneos como jugadores.</span>
             </div>
           )}
 
@@ -565,7 +594,7 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || userRole === 'arbitro' || currentUser?.rol === 'Arbitro'}
               className="flex-1 py-3 px-6 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-extrabold text-sm cursor-pointer transition-all shadow-lg shadow-[#65c556]/20 disabled:opacity-50 flex items-center justify-center gap-2 min-h-[44px]"
             >
               {isSubmitting ? (

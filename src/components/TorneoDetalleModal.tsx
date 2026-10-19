@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Tournament } from '../data/mockData';
 import { IconCalendar, IconCheck } from './Icons';
+import { useComplejo } from '../context/ComplejoContext';
 
 interface TorneoDetalleModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export const TorneoDetalleModal: React.FC<TorneoDetalleModalProps> = ({
   onInscribir,
   onVerFixture,
 }) => {
+  const { userRole } = useComplejo();
   if (!isOpen || !torneo) return null;
 
   const teamsCount = (torneo.registeredTeams || []).length;
@@ -202,7 +204,7 @@ export const TorneoDetalleModal: React.FC<TorneoDetalleModalProps> = ({
               </button>
             )}
 
-            {onInscribir && torneo.status !== 'Finalizado' && !isCupoLleno && (
+            {onInscribir && torneo.status !== 'Finalizado' && !isCupoLleno && userRole !== 'arbitro' && (
               <button
                 type="button"
                 onClick={() => {

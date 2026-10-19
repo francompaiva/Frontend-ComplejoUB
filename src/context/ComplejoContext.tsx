@@ -26,7 +26,8 @@ import {
   partidosApi,
   listaEsperaApi,
   notificacionesApi,
-  reportesApi
+  reportesApi,
+  adminApi
 } from '../api/endpoints';
 import { apiClient } from '../api/client';
 import { formatTimeAgo, normalizeBookingDate } from '../utils/dateUtils';
@@ -284,7 +285,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [tournaments, setTournaments] = useState<Tournament[]>(INITIAL_TOURNAMENTS);
   const [fixtures, setFixtures] = useState<FixtureMatch[]>([]);
   const [standings, setStandings] = useState<StandingRow[]>([]);
-  const [referees] = useState<Referee[]>(DEFAULT_REFEREES);
+  const [referees, setReferees] = useState<Referee[]>(DEFAULT_REFEREES);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -357,7 +358,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const refreshAllData = useCallback(async (currentRole = userRole) => {
     try {
       const isRoleAdmin = currentRole === 'admin' || currentRole === 'superadmin';
-      const [canchas, torneos, resReservas, notifs, logs, rawInvs, rawEquipos] = await Promise.all([
+      const [canchas, torneos, resReservas, notifs, logs, rawInvs, rawEquipos, rawAdmins] = await Promise.all([
         canchasApi.getAll().catch(() => []),
         torneosApi.getAll().catch(() => []),
         (isRoleAdmin ? reservasApi.getAll() : reservasApi.getMisReservas()).catch(() => []),
@@ -365,6 +366,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         (isRoleAdmin ? reportesApi.getAuditoria() : Promise.resolve([])).catch(() => []),
         equiposApi.getMisInvitaciones().catch(() => []),
         equiposApi.getMisEquipos().catch(() => []),
+        (isRoleAdmin ? adminApi.getAdministradores() : Promise.resolve([])).catch(() => []),
       ]);
 
       if (Array.isArray(canchas) && canchas.length > 0) {
@@ -468,6 +470,25 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           year: eq.fecha_alta ? new Date(eq.fecha_alta).getFullYear().toString() : '2026'
         }));
         setUserParticipations(apiParts);
+      }
+
+      if (rawAdmins) {
+        const adminList = Array.isArray((rawAdmins as any)?.data)
+          ? (rawAdmins as any).data
+          : Array.isArray(rawAdmins)
+          ? rawAdmins
+          : [];
+        const arbitrosDb = adminList.filter((u: any) => u.rol === 'Arbitro');
+        if (arbitrosDb.length > 0) {
+          const mappedReferees: Referee[] = arbitrosDb.map((u: any) => ({
+            id: String(u.id),
+            name: `${u.nombre} (Árbitro)`,
+            badgeNumber: `ARB-${String(u.id).padStart(3, '0')}`,
+            sport: 'Fútbol Oficial',
+            activeMatches: 0,
+          }));
+          setReferees(mappedReferees);
+        }
       }
     } catch (err: any) {
       console.warn('[ComplejoContext] Error en sincronización general con API:', err?.message);
@@ -1034,9 +1055,10 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   // Asignación de árbitros conectada a MySQL
-  const assignReferee = async (matchId: number, refereeName: string): Promise<void> => {
-    const ref = referees.find((r) => r.name.toLowerCase().includes(refereeName.toLowerCase())) || referees[0];
+  const assignReferee = async (matchId: number, refereeNameOrId: string): Promise<void> => {
+    const ref = referees.find((r) => r.id === refereeNameOrId || r.name.toLowerCase().includes(refereeNameOrId.toLowerCase())) || referees[0];
     const arbitroId = ref ? parseInt(ref.id, 10) : 2;
+    const displayName = ref?.name || refereeNameOrId;
 
     try {
       await partidosApi.asignarArbitro(matchId, arbitroId);
@@ -1045,11 +1067,11 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         await fetchTorneoData(targetMatch.tournamentId);
       }
       await refreshAllData();
-      logAudit('Designación Arbitral', `Árbitro ${refereeName} asignado al partido ID #${matchId} en base de datos.`, 'torneo');
+      logAudit('Designación Arbitral', `Árbitro ${displayName} asignado al partido ID #${matchId} en base de datos.`, 'torneo');
     } catch (err: any) {
       console.warn('[assignReferee] API error:', err?.message);
       setFixtures((prev) =>
-        prev.map((m) => (m.id === matchId ? { ...m, refereeName } : m))
+        prev.map((m) => (m.id === matchId ? { ...m, refereeName: displayName } : m))
       );
     }
   };

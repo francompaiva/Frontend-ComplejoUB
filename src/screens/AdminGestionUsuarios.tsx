@@ -32,6 +32,7 @@ export const AdminGestionUsuarios: React.FC = () => {
   const [newUser, setNewUser] = useState({
     nombre: '',
     email: '',
+    dni: '',
     contrasena: '',
     telefono: '',
     rol: 'Administrador' as 'Administrador' | 'Arbitro'
@@ -84,14 +85,33 @@ export const AdminGestionUsuarios: React.FC = () => {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUser.nombre || !newUser.email || !newUser.contrasena) return;
+    const cleanDni = newUser.dni.replace(/\D/g, '').trim();
+
+    if (!newUser.nombre.trim() || !newUser.email.trim() || !newUser.contrasena.trim()) {
+      setErrorMsg('Nombre, email y contraseña son obligatorios.');
+      return;
+    }
+
+    if (!cleanDni) {
+      setErrorMsg('El DNI es obligatorio para dar de alta autoridades y personal oficial.');
+      return;
+    }
+
+    if (cleanDni.length < 7 || cleanDni.length > 8) {
+      setErrorMsg('El DNI debe contener exactamente 7 u 8 dígitos numéricos.');
+      return;
+    }
+
     setIsCreating(true);
     setErrorMsg(null);
     try {
-      const res: any = await adminApi.crearAdministrador(newUser);
+      const res: any = await adminApi.crearAdministrador({
+        ...newUser,
+        dni: cleanDni
+      });
       setSuccessMsg(res?.message || res?.mensaje || `Nuevo ${newUser.rol} creado con éxito.`);
       setIsCreateModalOpen(false);
-      setNewUser({ nombre: '', email: '', contrasena: '', telefono: '', rol: activeTab === 'arbitro' ? 'Arbitro' : 'Administrador' });
+      setNewUser({ nombre: '', email: '', dni: '', contrasena: '', telefono: '', rol: activeTab === 'arbitro' ? 'Arbitro' : 'Administrador' });
       await fetchUsers();
       setTimeout(() => setSuccessMsg(null), 5000);
     } catch (err: any) {
@@ -336,6 +356,11 @@ export const AdminGestionUsuarios: React.FC = () => {
                               Planilla Digital
                             </span>
                           )}
+                          {user.dni && (
+                            <span className="block text-[10px] text-[#a0a0a0] font-mono">
+                              DNI: {user.dni}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="py-4 px-6 text-[#c0c0c0] font-mono">{user.email}</td>
@@ -521,6 +546,19 @@ export const AdminGestionUsuarios: React.FC = () => {
                   value={newUser.nombre}
                   onChange={(e) => setNewUser({ ...newUser, nombre: e.target.value })}
                   className="bg-[#293827] border border-[#5a7056] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#65c556]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-[#c0c0c0]">DNI / Documento de Identidad (7 u 8 dígitos)</label>
+                <input
+                  type="text"
+                  required
+                  maxLength={8}
+                  placeholder="Ej: 38456123"
+                  value={newUser.dni}
+                  onChange={(e) => setNewUser({ ...newUser, dni: e.target.value.replace(/\D/g, '').slice(0, 8) })}
+                  className="bg-[#293827] border border-[#5a7056] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#65c556] font-mono"
                 />
               </div>
 

@@ -245,8 +245,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         setOtpEmail(emailTrimmed);
         setOtpCode('');
         setOtpError(null);
-        setOtpSuccess('¡Código enviado con éxito! Revisa tu casilla de correo.');
+        setOtpSuccess(res.message || '¡Código enviado con éxito! Revisa tu casilla de correo.');
         setIsOtpModalOpen(true);
+        setResendCooldown(60);
+        const timer = setInterval(() => {
+          setResendCooldown((prev) => {
+            if (prev <= 1) {
+              clearInterval(timer);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
       }
     } catch (err: any) {
       setRegisterError(err?.message || 'Error al registrar usuario.');
@@ -295,9 +305,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     if (resendCooldown > 0) return;
     setOtpError(null);
     try {
-      await authApi.reenviarCodigo(otpEmail);
-      setOtpSuccess('Hemos enviado un nuevo código de 6 dígitos a tu correo.');
-      setResendCooldown(45);
+      const res: any = await authApi.reenviarCodigo(otpEmail);
+      setOtpSuccess(res?.message || 'Hemos enviado un nuevo código de 6 dígitos a tu correo.');
+      setResendCooldown(60);
       const timer = setInterval(() => {
         setResendCooldown((prev) => {
           if (prev <= 1) {
