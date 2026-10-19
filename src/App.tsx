@@ -201,6 +201,8 @@ const AppContent: React.FC = () => {
     setCurrentUser(null);
     localStorage.removeItem('complejo_user');
     localStorage.removeItem('complejo_ub_token');
+    localStorage.removeItem('complejo_userParticipations');
+    localStorage.removeItem('complejo_invitations');
     setCurrentScreen('login');
   };
 

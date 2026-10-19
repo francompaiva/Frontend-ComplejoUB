@@ -563,10 +563,7 @@ export interface TeamInvitation {
   createdAt?: string;
 }
 
-export const INITIAL_INVITATIONS: TeamInvitation[] = [
-  { id: 'inv-1', equipoId: 1, team: 'Pico y Pala FC', captain: 'Carlos Tévez', tournament: 'Copa Apertura F5', role: 'Delantero', status: 'PENDIENTE' },
-  { id: 'inv-2', equipoId: 2, team: 'Volea Perfecta', captain: 'Guillermo Vilas', tournament: 'Torneo Relámpago Pádel', role: 'Drive', status: 'PENDIENTE' }
-];
+export const INITIAL_INVITATIONS: TeamInvitation[] = [];
 
 // HISTORIAL DE EQUIPOS Y TORNEOS DEL PERFIL
 export interface UserTeamParticipation {

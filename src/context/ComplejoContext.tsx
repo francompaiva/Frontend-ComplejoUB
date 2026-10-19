@@ -15,9 +15,7 @@ import {
   type UserTeamParticipation,
   SPORT_PRICING,
   INITIAL_COURTS,
-  INITIAL_TOURNAMENTS,
-  INITIAL_INVITATIONS,
-  INITIAL_USER_PARTICIPATIONS
+  INITIAL_TOURNAMENTS
 } from '../data/mockData';
 import {
   authApi,
@@ -291,18 +289,8 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [userAbsences, setUserAbsences] = useState<number>(0);
-  const [invitations, setInvitations] = useState<TeamInvitation[]>(() => loadOr('invitations', INITIAL_INVITATIONS));
-  const [userParticipations, setUserParticipations] = useState<UserTeamParticipation[]>(() =>
-    loadOr('userParticipations', INITIAL_USER_PARTICIPATIONS)
-  );
-
-  useEffect(() => {
-    saveTo('invitations', invitations);
-  }, [invitations]);
-
-  useEffect(() => {
-    saveTo('userParticipations', userParticipations);
-  }, [userParticipations]);
+  const [invitations, setInvitations] = useState<TeamInvitation[]>([]);
+  const [userParticipations, setUserParticipations] = useState<UserTeamParticipation[]>([]);
 
   // Helper para autenticar automáticamente según el rol activo SOLO si no hay usuario en sesión
   const authenticateRole = useCallback(async (role: UserRole) => {
@@ -416,11 +404,11 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       }
 
-      if (Array.isArray(resReservas) && resReservas.length > 0) {
+      if (Array.isArray(resReservas)) {
         setBookings(resReservas.map(mapReservaFromApi));
       }
 
-      if (Array.isArray(notifs) && notifs.length > 0) {
+      if (Array.isArray(notifs)) {
         setNotifications(
           notifs.map((n: any) => {
             const rawDate = n.created_at || n.createdAt;
@@ -437,7 +425,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         );
       }
 
-      if (Array.isArray(logs) && logs.length > 0) {
+      if (Array.isArray(logs)) {
         setAuditLogs(
           logs.map((l: any) => ({
             id: String(l.id),
@@ -450,7 +438,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         );
       }
 
-      if (Array.isArray(rawInvs) && rawInvs.length > 0) {
+      if (Array.isArray(rawInvs)) {
         setInvitations(
           rawInvs.map((inv: any) => ({
             id: String(inv.equipo_id || inv.fk_equipo_id || inv.id),
@@ -466,34 +454,20 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         );
       }
 
-      if (Array.isArray(rawEquipos) && rawEquipos.length > 0) {
-        setUserParticipations((prev) => {
-          const apiParts: UserTeamParticipation[] = rawEquipos.map((eq: any) => ({
-            id: 'part-' + (eq.equipo_id || eq.id),
-            teamId: eq.equipo_id || eq.id,
-            teamName: eq.equipo_nombre || eq.nombre || 'Equipo',
-            tournamentName: eq.torneo_nombre || 'Torneo Oficial',
-            sport: eq.deporte,
-            role: eq.es_capitan ? 'Capitán' : (eq.dorsal ? `Dorsal #${eq.dorsal}` : 'Jugador Registrado'),
-            dorsal: eq.dorsal,
-            status: eq.torneo_estado === 'FINALIZADO' ? 'Finalizado' : 'Activo',
-            isCaptain: Boolean(eq.es_capitan),
-            year: eq.fecha_alta ? new Date(eq.fecha_alta).getFullYear().toString() : '2026'
-          }));
-
-          // Preservar participaciones previas sin duplicar
-          const merged = [...apiParts];
-          for (const old of prev) {
-            const exists = merged.some(
-              m => m.teamName.trim().toLowerCase() === old.teamName.trim().toLowerCase() &&
-                   m.tournamentName.trim().toLowerCase() === old.tournamentName.trim().toLowerCase()
-            );
-            if (!exists) {
-              merged.push(old);
-            }
-          }
-          return merged;
-        });
+      if (Array.isArray(rawEquipos)) {
+        const apiParts: UserTeamParticipation[] = rawEquipos.map((eq: any) => ({
+          id: 'part-' + (eq.equipo_id || eq.id),
+          teamId: eq.equipo_id || eq.id,
+          teamName: eq.equipo_nombre || eq.nombre || 'Equipo',
+          tournamentName: eq.torneo_nombre || 'Torneo Oficial',
+          sport: eq.deporte,
+          role: eq.es_capitan ? 'Capitán' : (eq.dorsal ? `Dorsal #${eq.dorsal}` : 'Jugador Registrado'),
+          dorsal: eq.dorsal,
+          status: eq.torneo_estado === 'FINALIZADO' ? 'Finalizado' : 'Activo',
+          isCaptain: Boolean(eq.es_capitan),
+          year: eq.fecha_alta ? new Date(eq.fecha_alta).getFullYear().toString() : '2026'
+        }));
+        setUserParticipations(apiParts);
       }
     } catch (err: any) {
       console.warn('[ComplejoContext] Error en sincronización general con API:', err?.message);
@@ -510,6 +484,9 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } else {
       await authenticateRole(newRole);
     }
+    // Purgar estado específico de usuario anterior para evitar mezcla de perfiles
+    setUserParticipations([]);
+    setInvitations([]);
     await refreshAllData(newRole);
   }, [authenticateRole, refreshAllData]);
 
@@ -517,6 +494,14 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     let isMounted = true;
     const init = async () => {
+      // Purgar claves legacy que contenían participaciones acumuladas de todos los usuarios
+      try {
+        localStorage.removeItem('complejo_userParticipations');
+        localStorage.removeItem('complejo_invitations');
+      } catch {
+        // ignore
+      }
+
       const storedUserRaw = localStorage.getItem('complejo_user');
       const token = apiClient.getToken();
       if (storedUserRaw && token) {
@@ -848,29 +833,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           });
           await refreshAllData();
           await fetchTorneoData(numTorneoId);
-
-          const targetTourney = tournaments.find(t => t.id === tournamentId || t.id === `t${numTorneoId}`);
-          const newPart: UserTeamParticipation = {
-            id: 'part-' + Date.now(),
-            teamId: numTorneoId,
-            teamName: teamName,
-            tournamentName: targetTourney?.name || 'Torneo Oficial',
-            sport: targetTourney?.sport,
-            role: 'Capitán',
-            status: 'Activo',
-            isCaptain: true,
-            year: new Date().getFullYear().toString()
-          };
-          setUserParticipations(prev => {
-            const exists = prev.some(
-              p => p.teamName.trim().toLowerCase() === teamName.trim().toLowerCase() &&
-                   p.tournamentName.trim().toLowerCase() === newPart.tournamentName.trim().toLowerCase()
-            );
-            if (exists) return prev;
-            const updated = [newPart, ...prev];
-            saveTo('userParticipations', updated);
-            return updated;
-          });
+          await refreshAllData();
 
           logAudit('Inscripción de Equipo', `Equipo "${teamName}" inscripto con éxito (${players.length} jugadores registrados).`, 'torneo');
           addNotification('Equipo Inscripto', `Tu equipo "${teamName}" fue admitido en el torneo.`, 'torneo');
@@ -944,9 +907,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                p.tournamentName.trim().toLowerCase() === newPartLocal.tournamentName.trim().toLowerCase()
         );
         if (exists) return prev;
-        const updated = [newPartLocal, ...prev];
-        saveTo('userParticipations', updated);
-        return updated;
+        return [newPartLocal, ...prev];
       });
 
       logAudit('Inscripción de Equipo', `Equipo "${teamName}" inscripto con éxito (${players.length} jugadores registrados).`, 'torneo');
@@ -1005,9 +966,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           isCaptain: false,
           year: new Date().getFullYear().toString()
         };
-        const updated = [newParticipation, ...prev];
-        saveTo('userParticipations', updated);
-        return updated;
+        return [newParticipation, ...prev];
       });
     }
 

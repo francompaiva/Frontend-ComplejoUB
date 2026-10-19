@@ -43,7 +43,15 @@ class ApiClient {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    let isTimedOut = false;
+    const timeoutId = setTimeout(() => {
+      isTimedOut = true;
+      try {
+        controller.abort();
+      } catch {
+        // ignore
+      }
+    }, 35000);
 
     try {
       let response: Response;
@@ -54,6 +62,11 @@ class ApiClient {
           signal: options.signal || controller.signal,
         });
       } catch (networkErr: any) {
+        // Si el error fue por timeout del controlador, propagar inmediatamente sin reintentar
+        if (isTimedOut || controller.signal.aborted) {
+          throw networkErr;
+        }
+
         // Fallback: Si falló la ruta relativa del proxy (/api/v1), intentar directo contra http://127.0.0.1:4000
         if (API_BASE_URL.startsWith('/')) {
           const directUrl = `http://127.0.0.1:4000${url}`;
@@ -96,7 +109,20 @@ class ApiClient {
       return json.data as T;
     } catch (err: any) {
       clearTimeout(timeoutId);
-      // Si la conexión falla porque el backend no está corriendo o hubo timeout, advertir
+      // Transformar abortos de red y timeouts en mensajes comprensibles para el usuario
+      if (
+        isTimedOut ||
+        err?.name === 'AbortError' ||
+        String(err?.message || '').toLowerCase().includes('abort') ||
+        String(err?.message || '').toLowerCase().includes('signal is aborted')
+      ) {
+        const timeoutError: any = new Error(
+          'El servidor tardó en responder o está iniciando su servicio en la nube. Por favor, aguarda unos segundos y reintenta.'
+        );
+        timeoutError.statusCode = 504;
+        throw timeoutError;
+      }
+
       console.warn(`[ApiClient] Solicitud a ${endpoint} falló (${err.message}).`);
       throw err;
     }
