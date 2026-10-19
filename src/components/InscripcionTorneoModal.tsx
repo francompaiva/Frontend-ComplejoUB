@@ -148,42 +148,46 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
 
     if (cleanDni.length === 7 || cleanDni.length === 8) {
       try {
-        const res = await equiposApi.buscarJugadorPorDni(cleanDni);
-        const data = res.data?.data || res.data;
-        if (data && data.nombre) {
-          if (data.estado_cuenta === 'Suspendida') {
-            setPlayers((prev) =>
-              prev.map((p) =>
-                p.id === id
-                  ? {
-                      ...p,
-                      name: isCaptain ? `${data.nombre} (Capitán)` : data.nombre,
-                      statusLookup: 'suspended',
-                      statusMessage: 'Cuenta suspendida por inasistencias'
-                    }
-                  : p
-              )
-            );
-          } else {
-            setPlayers((prev) =>
-              prev.map((p) =>
-                p.id === id
-                  ? {
-                      ...p,
-                      name: isCaptain ? `${data.nombre} (Capitán)` : data.nombre,
-                      statusLookup: 'found',
-                      statusMessage: undefined
-                    }
-                  : p
-              )
-            );
-          }
+        const res: any = await equiposApi.buscarJugadorPorDni(cleanDni);
+        // Desestructuración robusta: apiClient devuelve json.data as T, por lo que res ya contiene los datos directos
+        const data = (res && typeof res === 'object' && 'data' in res && res.data) ? res.data : res;
+        const nombreEncontrado = data?.nombre || data?.name;
+
+        if (nombreEncontrado) {
+          const isSuspended = data.estado_cuenta === 'Suspendida' || data.estado === 'Suspendida';
+          setPlayers((prev) =>
+            prev.map((p) =>
+              p.id === id && p.dni === cleanDni
+                ? {
+                    ...p,
+                    name: isCaptain ? `${nombreEncontrado} (Capitán)` : nombreEncontrado,
+                    statusLookup: isSuspended ? 'suspended' : 'found',
+                    statusMessage: isSuspended ? 'Cuenta suspendida por inasistencias o sanciones' : undefined
+                  }
+                : p
+            )
+          );
+        } else {
+          // Si el servidor devolvió 200 pero sin nombre válido, no dejar en searching
+          setPlayers((prev) =>
+            prev.map((p) =>
+              p.id === id && p.dni === cleanDni
+                ? {
+                    ...p,
+                    name: '',
+                    statusLookup: 'notFound',
+                    statusMessage: 'Usuario no registrado en Complejo Deportivo UB'
+                  }
+                : p
+            )
+          );
         }
       } catch (err: any) {
-        const errText = err?.response?.data?.message || 'Usuario no registrado en el sistema';
+        // apiClient lanza un Error con err.message directamente
+        const errText = err?.message || err?.response?.data?.message || 'Usuario no registrado en el sistema';
         setPlayers((prev) =>
           prev.map((p) =>
-            p.id === id
+            p.id === id && p.dni === cleanDni
               ? {
                   ...p,
                   name: '',
