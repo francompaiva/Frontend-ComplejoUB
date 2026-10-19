@@ -61,6 +61,7 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteSuccessMsg, setDeleteSuccessMsg] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Helper de fecha actual (YYYY-MM-DD)
   const getTodayString = () => {
@@ -275,35 +276,33 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
     setTournamentToDelete(tournament);
     setDeleteStep(1);
     setDeleteConfirmationText('');
+    setDeleteError(null);
   };
 
   const handleCancelDelete = () => {
     setTournamentToDelete(null);
     setDeleteStep(1);
     setDeleteConfirmationText('');
+    setDeleteError(null);
   };
 
   const handleConfirmDelete = async () => {
     if (!tournamentToDelete) return;
 
     setIsDeleting(true);
+    setDeleteError(null);
     try {
-      // 1. Eliminar del contexto y almacenamiento local
-      deleteTournament(tournamentToDelete.id);
-
-      // 2. Notificar / sincronizar con API backend si cuenta con id numérico
       const numericId = parseInt(tournamentToDelete.id.replace(/\D/g, ''), 10);
       if (!isNaN(numericId)) {
-        try {
-          await torneosApi.delete(numericId);
-        } catch {
-          // Backend en memoria/mock o desconectado
-        }
+        await torneosApi.delete(numericId);
       }
 
+      deleteTournament(tournamentToDelete.id);
       setDeleteSuccessMsg(`El torneo "${tournamentToDelete.name}" fue eliminado exitosamente.`);
       setTimeout(() => setDeleteSuccessMsg(null), 4500);
       handleCancelDelete();
+    } catch (err: any) {
+      setDeleteError(err?.message || 'No es posible eliminar un torneo con partidos o historial deportivo.');
     } finally {
       setIsDeleting(false);
     }
@@ -1198,15 +1197,27 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
                   </div>
                 </div>
 
-                <div className="bg-amber-500/10 border border-amber-500/40 rounded-xl p-3.5 text-xs text-amber-200 flex items-start gap-2.5">
-                  <span className="text-base leading-none">⚠️</span>
-                  <div className="leading-relaxed">
-                    <strong>Atención Administrador:</strong> Esta acción dará de baja el torneo y desvinculará sus fixtures generados, resultados disputados y listas de planteles inscriptos.
-                    <p className="mt-1 text-amber-300/80">
-                      Para evitar borrados accidentales, se requiere avanzar a una segunda pantalla de confirmación antes de aplicar los cambios de manera definitiva.
-                    </p>
+                {tournamentToDelete && (tournamentToDelete.status !== 'Inscripciones abiertas' || fixtures.some((m: FixtureMatch) => String(m.tournamentId) === String(tournamentToDelete.id))) ? (
+                  <div className="bg-red-500/15 border border-red-500/50 rounded-xl p-3.5 text-xs text-red-200 flex items-start gap-2.5">
+                    <span className="text-base leading-none">🛡️</span>
+                    <div className="leading-relaxed">
+                      <strong className="text-red-300">Historial Deportivo Protegido:</strong> Este certamen ya posee un fixture generado, partidos en curso o historial deportivo registrado.
+                      <p className="mt-1 text-red-200/90">
+                        Por reglas de integridad del complejo, no es posible eliminarlo físicamente. Debe mantenerse archivado o marcarse como Finalizado para preservar las estadísticas y registros deportivos.
+                      </p>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="bg-amber-500/10 border border-amber-500/40 rounded-xl p-3.5 text-xs text-amber-200 flex items-start gap-2.5">
+                    <span className="text-base leading-none">⚠️</span>
+                    <div className="leading-relaxed">
+                      <strong>Atención Administrador:</strong> Esta acción dará de baja el torneo de forma definitiva. Solo es posible eliminar torneos en inscripción abierta sin partidos jugados ni fixtures activos.
+                      <p className="mt-1 text-amber-300/80">
+                        Para evitar borrados accidentales, se requiere avanzar a una segunda pantalla de confirmación antes de aplicar los cambios.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-end gap-3 mt-1">
                   <button
@@ -1218,8 +1229,14 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
                   </button>
                   <button
                     type="button"
+                    disabled={tournamentToDelete && (tournamentToDelete.status !== 'Inscripciones abiertas' || fixtures.some((m: FixtureMatch) => String(m.tournamentId) === String(tournamentToDelete.id)))}
                     onClick={() => setDeleteStep(2)}
-                    className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs shadow-lg transition-all flex items-center gap-1.5 cursor-pointer border-none"
+                    className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg transition-all flex items-center gap-1.5 border-none ${
+                      tournamentToDelete && (tournamentToDelete.status !== 'Inscripciones abiertas' || fixtures.some((m: FixtureMatch) => String(m.tournamentId) === String(tournamentToDelete.id)))
+                        ? 'bg-[#3b4d38] text-[#808080] cursor-not-allowed opacity-60'
+                        : 'bg-amber-500 hover:bg-amber-400 text-black cursor-pointer'
+                    }`}
+                    title={tournamentToDelete && (tournamentToDelete.status !== 'Inscripciones abiertas' || fixtures.some((m: FixtureMatch) => String(m.tournamentId) === String(tournamentToDelete.id))) ? 'No se puede eliminar un torneo con fixture o historial' : 'Continuar al Paso 2'}
                   >
                     <span>Continuar al Paso 2</span>
                     <span>→</span>
@@ -1241,6 +1258,13 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
                     Todos los datos asociados se eliminarán inmediatamente y no podrán recuperarse.
                   </p>
                 </div>
+
+                {deleteError && (
+                  <div className="bg-red-950/80 border border-red-500 rounded-xl p-3 text-xs text-red-200 flex items-center gap-2">
+                    <span>⚠️</span>
+                    <span>{deleteError}</span>
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold text-[#c0c0c0]">
