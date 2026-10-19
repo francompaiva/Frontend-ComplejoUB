@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import { SQUAD_LIMITS } from '../data/mockData';
+import { equiposApi } from '../api/endpoints';
 
 export interface TournamentPlayer {
   id: string;
   name: string;
   dni: string;
   position: string;
+  statusLookup?: 'idle' | 'searching' | 'found' | 'notFound' | 'suspended';
+  statusMessage?: string;
 }
 
 export interface InscripcionTorneoModalProps {
@@ -24,12 +27,17 @@ export const POSICIONES_POR_DEPORTE: Record<string, string[]> = {
   'Tenis': ['Single', 'Dobles', 'Drive', 'Revés']
 };
 
-const getCaptainPlayer = (name?: string, dni?: string | null, position = 'Delantero'): TournamentPlayer => ({
-  id: 'capitan-1',
-  name: name ? `${name} (Capitán)` : 'Capitán',
-  dni: dni ? String(dni).replace(/\D/g, '') : '',
-  position
-});
+const getCaptainPlayer = (name?: string, dni?: string | null, position = 'Delantero'): TournamentPlayer => {
+  const cleanDni = dni ? String(dni).replace(/\D/g, '') : '';
+  return {
+    id: 'capitan-1',
+    name: name ? `${name} (Capitán)` : '',
+    dni: cleanDni,
+    position,
+    statusLookup: cleanDni ? 'found' : 'idle',
+    statusMessage: cleanDni ? 'Capitán autenticado' : undefined
+  };
+};
 
 export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
   isOpen,
@@ -98,10 +106,11 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     setPlayers((prev) => [
       ...prev,
       {
-        id: String(Date.now()),
+        id: 'jugador-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
         name: '',
         dni: '',
-        position: allowedPositions[0] || 'Delantero'
+        position: allowedPositions[0] || 'Delantero',
+        statusLookup: 'idle'
       }
     ]);
   };
@@ -111,9 +120,86 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     setPlayers((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const handlePlayerChange = (id: string, field: keyof TournamentPlayer, value: string) => {
+  const handleDniChange = async (id: string, rawVal: string) => {
+    const cleanDni = rawVal.replace(/\D/g, '').slice(0, 8);
+    const isCaptain = id === 'capitan-1';
+
+    // Actualiza DNI y cambia estado a searching si tiene 7 u 8 dígitos
     setPlayers((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, [field]: value } : p))
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        if (cleanDni.length < 7) {
+          return {
+            ...p,
+            dni: cleanDni,
+            name: '',
+            statusLookup: 'idle',
+            statusMessage: undefined
+          };
+        }
+        return {
+          ...p,
+          dni: cleanDni,
+          statusLookup: 'searching',
+          statusMessage: 'Buscando en padrón de usuarios...'
+        };
+      })
+    );
+
+    if (cleanDni.length === 7 || cleanDni.length === 8) {
+      try {
+        const res = await equiposApi.buscarJugadorPorDni(cleanDni);
+        const data = res.data?.data || res.data;
+        if (data && data.nombre) {
+          if (data.estado_cuenta === 'Suspendida') {
+            setPlayers((prev) =>
+              prev.map((p) =>
+                p.id === id
+                  ? {
+                      ...p,
+                      name: isCaptain ? `${data.nombre} (Capitán)` : data.nombre,
+                      statusLookup: 'suspended',
+                      statusMessage: 'Cuenta suspendida por inasistencias'
+                    }
+                  : p
+              )
+            );
+          } else {
+            setPlayers((prev) =>
+              prev.map((p) =>
+                p.id === id
+                  ? {
+                      ...p,
+                      name: isCaptain ? `${data.nombre} (Capitán)` : data.nombre,
+                      statusLookup: 'found',
+                      statusMessage: undefined
+                    }
+                  : p
+              )
+            );
+          }
+        }
+      } catch (err: any) {
+        const errText = err?.response?.data?.message || 'Usuario no registrado en el sistema';
+        setPlayers((prev) =>
+          prev.map((p) =>
+            p.id === id
+              ? {
+                  ...p,
+                  name: '',
+                  statusLookup: 'notFound',
+                  statusMessage: errText
+                }
+              : p
+          )
+        );
+      }
+    }
+  };
+
+  const handlePositionChange = (id: string, position: string) => {
+    setPlayers((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, position } : p))
     );
   };
 
@@ -146,21 +232,43 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
       return;
     }
 
-    // Validar DNI (estricto 7 u 8 dígitos numéricos) y posición permitida por deporte
+    // Validar que cada jugador tenga DNI válido (7 u 8 dígitos), posición correcta y usuario registrado confirmado
     const DNI_REGEX = /^\d{7,8}$/;
     for (let i = 0; i < players.length; i++) {
       const p = players[i];
-      if (!p.name.trim()) {
-        setErrorMessage(`Por favor completa el Nombre y Apellido del jugador #${i + 1}.`);
-        return;
-      }
-      if (!p.dni.trim()) {
+      const dniClean = (p.dni || '').trim();
+
+      if (!dniClean) {
         setErrorMessage(`Por favor completa el DNI del jugador #${i + 1}.`);
         return;
       }
-      if (!DNI_REGEX.test(p.dni.trim())) {
+      if (!DNI_REGEX.test(dniClean)) {
         setErrorMessage(
-          `El DNI del jugador #${i + 1} (${p.name.trim()}) es inválido: debe contener exactamente 7 u 8 dígitos numéricos sin letras, espacios, puntos ni símbolos.`
+          `El DNI del jugador #${i + 1} (${dniClean}) es inválido: debe contener exactamente 7 u 8 dígitos numéricos sin letras, espacios, puntos ni símbolos.`
+        );
+        return;
+      }
+      if (p.statusLookup === 'searching') {
+        setErrorMessage(
+          `Aún se está verificando el DNI del jugador #${i + 1}. Por favor aguarda un instante.`
+        );
+        return;
+      }
+      if (p.statusLookup === 'notFound') {
+        setErrorMessage(
+          `El jugador #${i + 1} (DNI ${dniClean}) no se encuentra registrado en el sistema. Todos los integrantes del plantel deben poseer cuenta en Complejo Deportivo UB.`
+        );
+        return;
+      }
+      if (p.statusLookup === 'suspended') {
+        setErrorMessage(
+          `El jugador #${i + 1} (${p.name || dniClean}) posee su cuenta suspendida por inasistencias y no puede ser inscripto.`
+        );
+        return;
+      }
+      if (!p.name.trim() || p.statusLookup !== 'found') {
+        setErrorMessage(
+          `No se pudo verificar el usuario para el jugador #${i + 1} (DNI ${dniClean}). Ingresa un DNI registrado válido.`
         );
         return;
       }
@@ -311,70 +419,126 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
           {/* Players Roster */}
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-center">
-              <label className="text-xs font-semibold text-[#a0a0a0] uppercase">
-                Lista de Jugadores Oficiales
-              </label>
+              <div>
+                <label className="text-xs font-semibold text-[#a0a0a0] uppercase block">
+                  Plantel Oficial (DNI y Posición)
+                </label>
+                <span className="text-[11px] text-[#71856d]">
+                  El nombre oficial se obtiene automáticamente de la cuenta registrada en el sistema.
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={handleAddPlayer}
-                className="text-xs text-[#65c556] font-bold hover:underline cursor-pointer bg-transparent border-none"
+                className="text-xs text-[#65c556] font-bold hover:underline cursor-pointer bg-transparent border-none flex items-center gap-1"
               >
                 + Agregar Jugador
               </button>
             </div>
 
             <div className="flex flex-col gap-2">
-              {players.map((p, idx) => (
-                <div
-                  key={p.id}
-                  className="bg-[#293827] p-2.5 rounded-xl border border-[#5a7056] flex items-center gap-2 text-xs"
-                >
-                  <span className="text-gray-400 font-mono w-5 text-center">{idx + 1}.</span>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Nombre y Apellido"
-                    value={p.name}
-                    onChange={(e) => handlePlayerChange(p.id, 'name', e.target.value)}
-                    className="flex-1 bg-[#1e281d] border border-[#5a7056] rounded px-2 py-1 text-xs text-white"
-                  />
-                  <input
-                    type="text"
-                    required
-                    placeholder="DNI (7-8 dígitos)"
-                    inputMode="numeric"
-                    maxLength={8}
-                    value={p.dni}
-                    onChange={(e) => handlePlayerChange(p.id, 'dni', e.target.value.replace(/\D/g, ''))}
-                    className="w-28 bg-[#1e281d] border border-[#5a7056] rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-[#65c556]"
-                  />
-                  <select
-                    value={p.position}
-                    onChange={(e) => handlePlayerChange(p.id, 'position', e.target.value)}
-                    className="w-28 bg-[#1e281d] border border-[#5a7056] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-[#65c556]"
+              {players.map((p, idx) => {
+                const isCaptain = idx === 0;
+                return (
+                  <div
+                    key={p.id}
+                    className="bg-[#293827] p-2.5 rounded-xl border border-[#5a7056] flex flex-col sm:flex-row sm:items-center gap-2 text-xs"
                   >
-                    {allowedPositions.map((pos) => (
-                      <option key={pos} value={pos}>
-                        {pos}
-                      </option>
-                    ))}
-                  </select>
-                  {players.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemovePlayer(p.id)}
-                      className="text-[#e53e3e] hover:text-white px-2 py-1 bg-transparent border-none cursor-pointer"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              ))}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-gray-400 font-mono w-5 text-center">{idx + 1}.</span>
+                      <input
+                        type="text"
+                        required
+                        placeholder="DNI (7-8 dígitos)"
+                        inputMode="numeric"
+                        maxLength={8}
+                        value={p.dni}
+                        disabled={isCaptain && Boolean(currentUser?.dni)}
+                        onChange={(e) => handleDniChange(p.id, e.target.value)}
+                        className="w-32 bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-[#65c556] disabled:opacity-75 disabled:cursor-not-allowed"
+                        title={isCaptain && currentUser?.dni ? "DNI del Capitán (asociado a la cuenta)" : "Ingresa DNI sin puntos ni espacios"}
+                      />
+                    </div>
+
+                    {/* Nombre oficial verificado desde la BD (Modo solo lectura) */}
+                    <div className="flex-1 min-w-0 bg-[#1e281d] border border-[#5a7056] rounded px-3 py-1.5 flex items-center justify-between">
+                      {p.statusLookup === 'searching' && (
+                        <span className="text-amber-300 text-xs flex items-center gap-1.5 animate-pulse">
+                          <span>⏳</span> Buscando en padrón...
+                        </span>
+                      )}
+                      {p.statusLookup === 'found' && (
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className="text-[#65c556] text-xs font-bold">✓</span>
+                          <span className="font-semibold text-white truncate" title={p.name}>
+                            {p.name}
+                          </span>
+                          {isCaptain && (
+                            <span className="text-[10px] bg-[#65c556]/20 text-[#65c556] font-bold px-1.5 py-0.5 rounded ml-1">
+                              Capitán
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {p.statusLookup === 'notFound' && (
+                        <div className="flex items-center gap-1.5 truncate text-[#e53e3e]">
+                          <span className="font-bold text-xs">✕</span>
+                          <span className="text-xs truncate font-medium">
+                            No registrado en Complejo UB
+                          </span>
+                        </div>
+                      )}
+                      {p.statusLookup === 'suspended' && (
+                        <div className="flex items-center gap-1.5 truncate text-amber-400">
+                          <span className="font-bold text-xs">⛔</span>
+                          <span className="text-xs truncate font-medium">
+                            Cuenta suspendida
+                          </span>
+                        </div>
+                      )}
+                      {(!p.statusLookup || p.statusLookup === 'idle') && (
+                        <span className="text-[#71856d] italic text-xs truncate">
+                          Ingresa DNI para verificar jugador...
+                        </span>
+                      )}
+
+                      <span className="text-[10px] text-[#71856d] ml-1 uppercase font-mono flex-shrink-0">
+                        Solo Lectura
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={p.position}
+                        onChange={(e) => handlePositionChange(p.id, e.target.value)}
+                        className="w-32 bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#65c556]"
+                      >
+                        {allowedPositions.map((pos) => (
+                          <option key={pos} value={pos}>
+                            {pos}
+                          </option>
+                        ))}
+                      </select>
+
+                      {!isCaptain && players.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePlayer(p.id)}
+                          className="text-[#e53e3e] hover:text-white px-2 py-1 bg-transparent border-none cursor-pointer rounded hover:bg-red-500/20 transition-colors"
+                          title="Quitar jugador"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           <p className="text-[11px] text-[#a0a0a0] italic">
-            * El sistema verifica que ningún jugador esté inscripto en más de un equipo en el mismo torneo.
+            * Solamente se pueden inscribir jugadores que ya tengan cuenta registrada en la plataforma. El sistema verifica que ningún jugador esté inscripto en más de un equipo del mismo torneo.
           </p>
 
           {/* Mensaje de error posicionado inmediatamente arriba de los botones de acción */}

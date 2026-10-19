@@ -48,6 +48,7 @@ export const equiposApi = {
     apiClient.post(`/equipos/${equipoId}/invitar`, data),
   getMisInvitaciones: () => apiClient.get('/equipos/mis-invitaciones'),
   getMisEquipos: () => apiClient.get('/equipos/mis-equipos'),
+  buscarJugadorPorDni: (dni: string) => apiClient.get(`/equipos/buscar-jugador/${encodeURIComponent(dni)}`),
   responderInvitacion: (equipoId: number | string, respuesta: 'ACEPTADA' | 'RECHAZADA') =>
     apiClient.post(`/equipos/invitaciones/${equipoId}/responder`, { respuesta, estado: respuesta }),
 };
