@@ -1245,11 +1245,12 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         await refreshAllData();
       } catch (err: any) {
         console.warn('[confirmarAsistencia] API error:', err?.message);
+        throw new Error(err?.message || 'Error al persistir confirmación de asistencia en el servidor.');
       }
     }
     setUserAbsences(0); // Resetea contador consecutivo de inasistencias al asistir
     setBookings((prev) =>
-      prev.map((b) => (b.id === bookingId ? { ...b, status: 'Completada' } : b))
+      prev.map((b) => (b.id === bookingId ? { ...b, status: 'Completada', asistencia_confirmada: true, rawStatus: 'FINALIZADA' } : b))
     );
     addNotification('Asistencia Confirmada', 'Se confirmó la asistencia y se restableció a 0 el contador de inasistencias consecutivas.', 'reserva');
   };
