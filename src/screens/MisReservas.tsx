@@ -3,6 +3,7 @@ import { useComplejo } from '../context/ComplejoContext';
 import CancelacionConfirmModal from '../components/CancelacionConfirmModal';
 import { type BookingItem } from '../data/mockData';
 import { formatTimeAgo } from '../utils/dateUtils';
+import { authApi } from '../api/endpoints';
 
 export interface MisReservasProps {
   onNavigate: (screen: string) => void;
@@ -19,6 +20,7 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
     invitations,
     responderInvitacion,
     currentUser,
+    setCurrentUser,
     userParticipations
   } = useComplejo();
 
@@ -26,6 +28,13 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
   const [bookingToCancel, setBookingToCancel] = useState<BookingItem | null>(null);
   const [isResponding, setIsResponding] = useState<Record<string, boolean>>({});
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Estados para carga y edición de DNI en perfil de usuario
+  const [isEditingDni, setIsEditingDni] = useState(false);
+  const [dniInput, setDniInput] = useState(currentUser?.dni ? String(currentUser.dni).replace(/\D/g, '') : '');
+  const [dniUpdating, setDniUpdating] = useState(false);
+  const [dniError, setDniError] = useState<string | null>(null);
+  const [dniSuccess, setDniSuccess] = useState<string | null>(null);
 
   const activeBookings = bookings.filter((b) => b.status === 'Confirmada' || b.status === 'Pendiente');
   const pastBookings = bookings.filter((b) => b.status === 'Completada' || b.status === 'Cancelada');
@@ -72,6 +81,38 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
       });
     } finally {
       setIsResponding((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const handleSaveDni = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDniError(null);
+    setDniSuccess(null);
+    const cleanDni = dniInput.replace(/\D/g, '').trim();
+    if (!cleanDni) {
+      setDniError('Ingresa tu número de DNI.');
+      return;
+    }
+    if (cleanDni.length < 7 || cleanDni.length > 8) {
+      setDniError('El DNI debe tener exactamente 7 u 8 dígitos numéricos.');
+      return;
+    }
+
+    setDniUpdating(true);
+    try {
+      await authApi.actualizarDni(cleanDni);
+      if (currentUser) {
+        const updatedUser = { ...currentUser, dni: cleanDni };
+        setCurrentUser(updatedUser);
+        localStorage.setItem('complejo_user', JSON.stringify(updatedUser));
+      }
+      setDniSuccess('¡DNI actualizado y verificado con éxito!');
+      setIsEditingDni(false);
+      setTimeout(() => setDniSuccess(null), 4000);
+    } catch (err: any) {
+      setDniError(err?.message || 'Error al guardar el DNI.');
+    } finally {
+      setDniUpdating(false);
     }
   };
 
@@ -355,11 +396,76 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
                   <p className="text-xs text-[#65c556] font-semibold">
                     {userParticipations.some(p => p.isCaptain) ? 'Capitán / Jugador Registrado' : 'Jugador Registrado'}
                   </p>
-                  <p className="text-xs text-[#a0a0a0]">
-                    DNI: {currentUser?.dni || 'Sin especificar'} • {currentUser?.email || 'Sin especificar'}
-                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-xs text-[#a0a0a0]">
+                      DNI: <strong className={currentUser?.dni ? "text-white font-mono" : "text-amber-400 font-bold"}>{currentUser?.dni || 'Sin registrar'}</strong> • {currentUser?.email || 'Sin especificar'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDniInput(currentUser?.dni ? String(currentUser.dni).replace(/\D/g, '') : '');
+                        setIsEditingDni((prev) => !prev);
+                        setDniError(null);
+                        setDniSuccess(null);
+                      }}
+                      className="text-[11px] text-[#65c556] hover:underline cursor-pointer bg-transparent border-none font-bold"
+                    >
+                      {currentUser?.dni ? (isEditingDni ? '✕ Cancelar' : '✎ Modificar') : '+ Cargar DNI'}
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              {/* Formulario / Aviso de DNI */}
+              {(!currentUser?.dni || isEditingDni) && (
+                <form onSubmit={handleSaveDni} className="bg-[#293827] border border-[#5a7056] p-4 rounded-xl flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>🪪</span>
+                      <span>{currentUser?.dni ? 'Modificar DNI Oficial' : 'Completar DNI de Cuenta'}</span>
+                    </span>
+                    <span className="text-[11px] text-[#65c556]">7 u 8 dígitos</span>
+                  </div>
+
+                  {!currentUser?.dni && !isEditingDni && (
+                    <p className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-lg">
+                      ⚠️ Tu cuenta no posee un DNI registrado. Es necesario completarlo para poder ser inscripto en las nóminas oficiales de torneos.
+                    </p>
+                  )}
+
+                  {dniError && (
+                    <div className="bg-red-950/60 border border-red-500/60 p-2.5 rounded-lg text-xs text-red-200">
+                      {dniError}
+                    </div>
+                  )}
+
+                  {dniSuccess && (
+                    <div className="bg-emerald-950/60 border border-emerald-500/60 p-2.5 rounded-lg text-xs text-emerald-200">
+                      {dniSuccess}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      required
+                      inputMode="numeric"
+                      maxLength={8}
+                      placeholder="Ej: 38123456"
+                      value={dniInput}
+                      onChange={(e) => setDniInput(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                      className="flex-1 bg-[#1e281d] border border-[#5a7056] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-[#65c556]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={dniUpdating}
+                      className="px-4 py-2 bg-[#65c556] hover:bg-[#54b045] text-[#293827] font-bold text-xs rounded-xl shadow transition cursor-pointer border-none disabled:opacity-50"
+                    >
+                      {dniUpdating ? 'Guardando...' : 'Guardar DNI'}
+                    </button>
+                  </div>
+                </form>
+              )}
 
               <div className="border-t border-[#3b4d38] pt-4 flex flex-col gap-2">
                 <span className="text-xs font-bold text-[#a0a0a0] uppercase">

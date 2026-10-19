@@ -31,6 +31,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
   // Formulario Registro
   const [regName, setRegName] = useState('');
+  const [regDni, setRegDni] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
@@ -202,9 +203,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     setRegisterError(null);
 
     const emailTrimmed = regEmail.trim();
+    const cleanDni = regDni.replace(/\D/g, '').trim();
 
     if (!regName.trim()) {
       setRegisterError('El nombre completo es obligatorio.');
+      return;
+    }
+
+    if (!cleanDni) {
+      setRegisterError('El DNI / Documento es obligatorio para registrarse.');
+      return;
+    }
+
+    if (cleanDni.length < 7 || cleanDni.length > 8) {
+      setRegisterError('El DNI debe contener exactamente 7 u 8 dígitos numéricos sin puntos, letras ni espacios.');
       return;
     }
 
@@ -225,6 +237,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         nombre: regName.trim(),
         email: emailTrimmed,
         contrasena: regPassword,
+        dni: cleanDni,
         telefono: regPhone.trim() || undefined,
       });
 
@@ -687,6 +700,50 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                       className="placeholder-[#71856d]"
                     />
                   </div>
+                </div>
+
+                {/* Campo DNI / Documento de Identidad */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-[#c0c0c0]">DNI / Documento de Identidad</label>
+                    <span className="text-[11px] text-[#65c556]">7 u 8 dígitos numéricos</span>
+                  </div>
+                  <div
+                    className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
+                    style={{
+                      backgroundColor: '#293827',
+                      padding: '14px 20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '16px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a0a0a0', flexShrink: 0 }}>
+                      <IconCheck size={18} />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      inputMode="numeric"
+                      maxLength={8}
+                      placeholder="Ej: 38456123 (sin puntos ni espacios)"
+                      value={regDni}
+                      onChange={(e) => setRegDni(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                      style={{
+                        width: '100%',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        outline: 'none',
+                        color: '#ffffff',
+                        fontSize: '14px',
+                        padding: 0
+                      }}
+                      className="placeholder-[#71856d] font-mono"
+                    />
+                  </div>
+                  <span className="text-[11px] text-[#a0a0a0]">
+                    Requerido para ser identificado en nóminas de torneos y equipos oficiales.
+                  </span>
                 </div>
 
                 {/* Campo Email */}

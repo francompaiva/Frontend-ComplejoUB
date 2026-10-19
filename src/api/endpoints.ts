@@ -2,13 +2,14 @@ import { apiClient } from './client';
 
 export const authApi = {
   login: (email: string, contrasena: string) => apiClient.post('/auth/login', { email, contrasena }),
-  register: (data: { nombre: string; email: string; contrasena: string; rol?: string; telefono?: string }) =>
+  register: (data: { nombre: string; email: string; contrasena: string; dni: string; rol?: string; telefono?: string }) =>
     apiClient.post('/auth/register', data),
   verificarCodigo: (email: string, codigo: string) =>
     apiClient.post('/auth/verificar-codigo', { email, codigo }),
   reenviarCodigo: (email: string) =>
     apiClient.post('/auth/reenviar-codigo', { email }),
   getMe: () => apiClient.get('/auth/me'),
+  actualizarDni: (dni: string) => apiClient.put('/auth/dni', { dni }),
 };
 
 export const canchasApi = {
