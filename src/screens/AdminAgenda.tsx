@@ -8,6 +8,12 @@ import {
   IconTrophy,
   IconBall
 } from '../components/Icons';
+import {
+  getQuickDatesBuenosAires,
+  formatDateSpanish,
+  addDaysToDate,
+  getDayOfWeekFromDateStr
+} from '../utils/dateUtils';
 
 const ALL_HOURS = [
   '09:00 hs',
@@ -39,25 +45,11 @@ export const AdminAgenda: React.FC = () => {
     isUserBanned
   } = useComplejo();
 
-  // Fechas dinámicas de referencia
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
-  const tomorrowStr = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().split('T')[0];
-  }, []);
-  const saturdayStr = useMemo(() => {
-    const d = new Date();
-    const diff = (6 - d.getDay() + 7) % 7 || 7;
-    d.setDate(d.getDate() + diff);
-    return d.toISOString().split('T')[0];
-  }, []);
-  const sundayStr = useMemo(() => {
-    const d = new Date();
-    const diff = (7 - d.getDay()) % 7 || 7;
-    d.setDate(d.getDate() + diff);
-    return d.toISOString().split('T')[0];
-  }, []);
+  // Fechas dinámicas de referencia sincronizadas con zona horaria de Argentina (UTC-3)
+  const { today: todayStr, tomorrow: tomorrowStr, saturday: saturdayStr, sunday: sundayStr } = useMemo(
+    () => getQuickDatesBuenosAires(),
+    []
+  );
 
   // Filtros de fecha, deporte y franja horaria
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
@@ -71,37 +63,16 @@ export const AdminAgenda: React.FC = () => {
     setTimeout(() => setToastMsg(null), 3800);
   };
 
-  // Cálculo de día de la semana
-  const dateObj = useMemo(() => new Date(selectedDate + 'T00:00:00'), [selectedDate]);
-  const dayOfWeek = dateObj.getDay(); // 0 = Domingo, 6 = Sábado
+  // Cálculo de día de la semana sin desfasaje horario
+  const dayOfWeek = useMemo(() => getDayOfWeekFromDateStr(selectedDate), [selectedDate]); // 0 = Domingo, 6 = Sábado
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
   // Formato en español para el título
-  const formattedSelectedDate = useMemo(() => {
-    try {
-      const parts = selectedDate.split('-');
-      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-      return d.toLocaleDateString('es-AR', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      });
-    } catch {
-      return selectedDate;
-    }
-  }, [selectedDate]);
+  const formattedSelectedDate = useMemo(() => formatDateSpanish(selectedDate), [selectedDate]);
 
-  // Navegación día anterior / posterior
+  // Navegación día anterior / posterior segura sobre cadena YYYY-MM-DD
   const handleStepDay = (step: number) => {
-    try {
-      const parts = selectedDate.split('-');
-      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-      d.setDate(d.getDate() + step);
-      setSelectedDate(d.toISOString().split('T')[0]);
-    } catch {
-      // ignore
-    }
+    setSelectedDate((prev) => addDaysToDate(prev, step));
   };
 
   // Filtrado de canchas

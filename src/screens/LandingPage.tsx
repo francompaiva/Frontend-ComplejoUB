@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import { type BookingSlotInfo } from '../components/ConfirmacionPagoModal';
 import { type SportType, type Tournament, SPORT_PRICING } from '../data/mockData';
 import ListaEsperaModal from '../components/ListaEsperaModal';
 import TorneoDetalleModal from '../components/TorneoDetalleModal';
 import { IconCalendar, IconClock } from '../components/Icons';
+import { getQuickDatesBuenosAires, formatDateSpanish } from '../utils/dateUtils';
 
 export interface LandingPageProps {
   onNavigate: (screen: string) => void;
@@ -39,25 +40,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [selectedSport, setSelectedSport] = useState<SportType>('Fútbol 5');
   const [detailModalTorneo, setDetailModalTorneo] = useState<Tournament | null>(null);
 
-  // Fechas de conveniencia
-  const todayStr = new Date().toISOString().split('T')[0];
-  const tomorrowStr = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().split('T')[0];
-  })();
-  const saturdayStr = (() => {
-    const d = new Date();
-    const diff = (6 - d.getDay() + 7) % 7 || 7;
-    d.setDate(d.getDate() + diff);
-    return d.toISOString().split('T')[0];
-  })();
-  const sundayStr = (() => {
-    const d = new Date();
-    const diff = (7 - d.getDay()) % 7 || 7;
-    d.setDate(d.getDate() + diff);
-    return d.toISOString().split('T')[0];
-  })();
+  // Fechas de conveniencia sincronizadas con la zona horaria del complejo (Argentina UTC-3)
+  const { today: todayStr, tomorrow: tomorrowStr, saturday: saturdayStr, sunday: sundayStr } = useMemo(
+    () => getQuickDatesBuenosAires(),
+    []
+  );
 
   // Selección de fecha interactiva (por defecto Hoy)
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
@@ -150,15 +137,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   };
 
   // Formato legible para la fecha seleccionada
-  const formattedSelectedDate = (() => {
-    try {
-      const parts = selectedDate.split('-');
-      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-      return d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    } catch {
-      return selectedDate;
-    }
-  })();
+  const formattedSelectedDate = useMemo(() => formatDateSpanish(selectedDate), [selectedDate]);
 
   return (
     <div className="bg-[#293827] min-h-full w-full font-['Inter',sans-serif] text-white flex flex-col">

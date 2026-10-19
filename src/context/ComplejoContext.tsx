@@ -31,7 +31,7 @@ import {
   reportesApi
 } from '../api/endpoints';
 import { apiClient } from '../api/client';
-import { formatTimeAgo } from '../utils/dateUtils';
+import { formatTimeAgo, normalizeBookingDate } from '../utils/dateUtils';
 
 export type {
   Court,
@@ -593,38 +593,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const remainingBalance = totalPrice - depositPaid;
     const numCanchaId = parseInt(courtId.replace(/\D/g, ''), 10) || 1;
 
-    let cleanDate = date;
-    const now = new Date();
-    if (date === 'Hoy') {
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      cleanDate = `${year}-${month}-${day}`;
-    } else if (date === 'Mañana') {
-      const d = new Date();
-      d.setDate(d.getDate() + 1);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      cleanDate = `${year}-${month}-${day}`;
-    } else if (date === 'Sábado') {
-      const diff = (6 - now.getDay() + 7) % 7 || 7;
-      const d = new Date();
-      d.setDate(d.getDate() + diff);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      cleanDate = `${year}-${month}-${day}`;
-    } else if (date === 'Domingo') {
-      const diff = (7 - now.getDay()) % 7 || 7;
-      const d = new Date();
-      d.setDate(d.getDate() + diff);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      cleanDate = `${year}-${month}-${day}`;
-    }
-
+    const cleanDate = normalizeBookingDate(date);
     const cleanHour = time.replace(' hs', '').trim() + (time.includes(':') ? (time.split(':').length === 2 ? ':00' : '') : ':00:00');
 
     // Validación Docente: No permitir turnos en fechas u horarios concluidos
