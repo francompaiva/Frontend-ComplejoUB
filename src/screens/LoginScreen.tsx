@@ -10,7 +10,19 @@ import {
   IconAlert,
   IconUsers,
   IconEye,
-  IconEyeOff
+  IconEyeOff,
+  IconBall,
+  IconCrown,
+  IconShield,
+  IconWhistle,
+  IconBan,
+  IconBolt,
+  IconInfo,
+  IconIdCard,
+  IconSmartphone,
+  IconArrowLeft,
+  IconTrophy,
+  IconCalendar
 } from '../components/Icons';
 
 export interface LoginScreenProps {
@@ -48,7 +60,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [otpSuccess, setOtpSuccess] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  // Validación de formato RFC de email
   const isValidEmail = (email: string): boolean => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   };
@@ -58,7 +69,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     let targetRole: UserRole = 'cliente';
     const clientProfiles: Record<string, { id: number; nombre: string; dni?: string; inasistencias?: number; estado_cuenta?: string; suspension_hasta?: string | null }> = {
       'lucas@gmail.com': { id: 4, nombre: 'Lucas Díaz (Cliente / Capitán)', dni: '40.123.456', inasistencias: 0, estado_cuenta: 'Activa' },
-      'mateo@gmail.com': { id: 5, nombre: 'Mateo Fernández', inasistencias: 1, estado_cuenta: 'Activa' },
+      'mateo@gmail.com': { id: 5, nombre: 'Mateo Fernández (Cliente)', dni: '41.890.123', inasistencias: 1, estado_cuenta: 'Activa' },
       'juan@gmail.com': { id: 6, nombre: 'Juan Paiva', inasistencias: 0, estado_cuenta: 'Activa' },
       'diego@gmail.com': { id: 7, nombre: 'Diego López', inasistencias: 0, estado_cuenta: 'Activa' },
       'gonzalo@gmail.com': { id: 8, nombre: 'Gonzalo Higuaín', inasistencias: 0, estado_cuenta: 'Activa' },
@@ -155,7 +166,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         setCurrentUser(res.user);
         localStorage.setItem('complejo_user', JSON.stringify(res.user));
 
-        // Determinar rol frontend correspondiente
         let targetRole: UserRole = 'cliente';
         if (res.user.rol === 'Superadministrador') targetRole = 'superadmin';
         else if (res.user.rol === 'Administrador') targetRole = 'admin';
@@ -182,7 +192,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         setBackendOffline(true);
         setLoginError(
           'No se pudo conectar con el servidor backend en http://localhost:4000. ' +
-          'Asegúrate de ejecutar "npm run dev" en la carpeta Backend-ComplejoUB o ingresa en Modo Demo a continuación.'
+          'Ejecuta "npm run dev" en Backend-ComplejoUB o utiliza el Modo Demo a continuación.'
         );
       } else if (isAccountUnverified) {
         setOtpEmail(emailTrimmed);
@@ -245,7 +255,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         setOtpEmail(emailTrimmed);
         setOtpCode('');
         setOtpError(null);
-        setOtpSuccess(res.message || '¡Código enviado con éxito! Revisa tu casilla de correo.');
+        setOtpSuccess(res.message || 'Código enviado con éxito. Revisa tu casilla de correo.');
         setIsOtpModalOpen(true);
         setResendCooldown(60);
         const timer = setInterval(() => {
@@ -323,578 +333,567 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="bg-[#141b13] flex flex-col items-center justify-center min-h-screen p-4 text-white font-['Inter',sans-serif] relative overflow-hidden">
-      {/* Decorative ambient lighting */}
-      <div className="absolute top-0 left-1/4 size-[500px] bg-[#65c556]/10 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 size-[500px] bg-[#22c55e]/10 rounded-full blur-[140px] pointer-events-none" />
+    <div className="bg-[#0b120d] flex items-center justify-center min-h-[calc(100vh-61px)] p-4 sm:p-8 text-white font-['Inter',sans-serif] relative overflow-hidden">
+      {/* Subtle architectural background grid & glow */}
+      <div
+        className="absolute inset-0 opacity-[0.04] pointer-events-none"
+        style={{
+          backgroundImage: 'linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)',
+          backgroundSize: '48px 48px',
+        }}
+      />
+      <div className="absolute -top-32 -left-32 size-[480px] bg-emerald-500/10 rounded-full blur-[130px] pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 size-[480px] bg-[#199e1b]/10 rounded-full blur-[130px] pointer-events-none" />
 
-      {/* Main Container */}
-      <div className="bg-[#1e281d] border border-[#5a7056] rounded-3xl p-6 sm:p-10 w-full max-w-xl shadow-2xl relative z-10 flex flex-col gap-6">
-        {/* Brand header */}
-        <div className="flex flex-col items-center text-center gap-2">
-          <div className="size-14 rounded-2xl bg-[rgba(101,197,86,0.15)] border-2 border-[#65c556] flex items-center justify-center text-[#65c556] shadow-lg shadow-[rgba(101,197,86,0.2)]">
-            <IconStadium size={30} />
+      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 bg-[#121c15] border border-white/10 rounded-3xl shadow-2xl overflow-hidden relative z-10">
+        {/* Left Showcase Panel */}
+        <div className="hidden lg:flex lg:col-span-5 bg-gradient-to-br from-[#15251a] via-[#101c13] to-[#0b130d] p-10 border-r border-white/[0.08] flex-col justify-between relative overflow-hidden">
+          <div className="flex flex-col gap-6 relative z-10">
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 w-fit">
+              <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[11px] font-semibold text-emerald-300 tracking-wide uppercase">
+                Sede Central Belgrano
+              </span>
+            </div>
+
+            <div>
+              <h1 className="text-3xl font-extrabold text-white tracking-tight leading-tight">
+                Gestión Deportiva <span className="text-emerald-400">Complejo UB</span>
+              </h1>
+              <p className="text-sm text-slate-300/80 mt-3 leading-relaxed">
+                Plataforma integral para la reserva de canchas profesionales, seguimiento de torneos universitarios, designaciones arbitrales y control operativo en tiempo real.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3.5 pt-2">
+              <div className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+                <div className="size-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
+                  <IconCalendar size={18} />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-white">Disponibilidad Sincronizada</h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                    Grilla horaria conectada en vivo con la base de datos y reserva inmediata con seña del 30%.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+                <div className="size-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
+                  <IconTrophy size={18} />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-white">Ligas Oficiales y Fixture</h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                    Inscripción de planteles por DNI, tabla de posiciones automatizada y actas arbitrales.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+                <div className="size-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
+                  <IconShield size={18} />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-white">Auditoría y Roles</h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                    Perfiles diferenciados para Clientes, Árbitros, Administradores y Superadministrador.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">
-            Complejo Deportivo <strong className="text-[#65c556]">UB</strong>
-          </h1>
-          <p className="text-xs text-[#a0a0a0]">
-            Sistema Integral de Gestión de Reservas, Torneos y Arbitraje
-          </p>
+
+          <div className="pt-6 border-t border-white/[0.08] flex items-center justify-between text-[11px] text-slate-400 relative z-10">
+            <span>Universidad de Belgrano</span>
+            <span className="text-emerald-400 font-semibold">Fútbol 5 · 8 · 11 · Pádel · Tenis</span>
+          </div>
         </div>
 
-        {/* VISTA 1: PASO 2 DE 2 - VERIFICACIÓN DE CÓDIGO OTP (Sin superposiciones) */}
-        {isOtpModalOpen ? (
-          <div className="flex flex-col gap-5 animate-fadeIn">
-            <div className="flex items-center gap-3 pb-3 border-b border-[#5a7056]">
-              <div className="size-12 rounded-2xl bg-[rgba(101,197,86,0.15)] text-[#65c556] flex items-center justify-center border border-[#65c556] shrink-0">
-                <IconMail size={24} />
-              </div>
-              <div>
-                <span className="text-[11px] font-bold text-[#65c556] uppercase tracking-wider">Paso 2 de 2</span>
-                <h3 className="text-lg font-bold text-white tracking-tight">Verificación de Correo</h3>
-                <p className="text-xs text-[#a0a0a0]">Ingresa el código OTP de 6 dígitos</p>
-              </div>
+        {/* Right Form Panel */}
+        <div className="lg:col-span-7 p-6 sm:p-10 flex flex-col justify-center gap-6">
+          {/* Mobile Brand Header */}
+          <div className="flex lg:hidden items-center gap-3 pb-2 border-b border-white/10">
+            <div className="size-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+              <IconStadium size={22} />
             </div>
-
-            <p className="text-xs text-[#c0c0c0] leading-relaxed">
-              Hemos enviado un código de activación a <strong className="text-white font-mono bg-[#293827] px-2 py-0.5 rounded border border-[#5a7056]">{otpEmail}</strong>. Ingrésalo a continuación para activar tu cuenta.
-            </p>
-
-            {otpSuccess && (
-              <div className="bg-[#14532d]/80 border border-[#22c55e] p-3 rounded-xl flex items-center gap-2 text-xs text-[#bbf7d0]">
-                <IconCheck size={14} className="text-[#22c55e] shrink-0" />
-                <span>{otpSuccess}</span>
-              </div>
-            )}
-
-            {otpError && (
-              <div className="bg-[#7f1d1d]/80 border border-[#ef4444] p-3 rounded-xl flex items-center gap-2 text-xs text-[#fecaca]">
-                <IconAlert size={14} className="text-[#ef4444] shrink-0" />
-                <span>{otpError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
-              <div className="flex flex-col items-center gap-2 my-2">
-                <label className="text-xs font-semibold text-[#a0a0a0]">Código de 6 Dígitos</label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  autoFocus
-                  required
-                  placeholder="••••••"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                  className="bg-[#293827] border-2 border-[#65c556] rounded-2xl text-center text-3xl font-mono font-bold tracking-[12px] py-3 px-4 text-white focus:outline-none shadow-lg w-full max-w-[280px]"
-                />
-                <span className="text-[11px] text-[#a0a0a0]">Válido durante 15 minutos</span>
-              </div>
-
-              {/* Tips de demo */}
-              <div className="bg-[#293827] p-3 rounded-xl border border-[#5a7056]/60 text-[11px] text-[#a0a0a0] leading-relaxed">
-                💡 <strong className="text-[#65c556]">Verificación de prueba:</strong> Para entornos de prueba o demostración, también puedes ingresar el código universal <strong>123456</strong>.
-              </div>
-
-              <div className="flex items-center justify-between text-xs pt-2">
-                <button
-                  type="button"
-                  onClick={handleResendOtp}
-                  disabled={resendCooldown > 0}
-                  className="text-[#65c556] hover:underline font-semibold disabled:text-[#a0a0a0] cursor-pointer disabled:cursor-not-allowed"
-                >
-                  {resendCooldown > 0 ? `Reenviar en ${resendCooldown}s` : '¿No recibiste el código? Reenviar'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsOtpModalOpen(false);
-                    setActiveTab('register');
-                  }}
-                  className="text-[#a0a0a0] hover:text-white transition cursor-pointer"
-                >
-                  ← Modificar datos
-                </button>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loadingOtp || otpCode.length !== 6}
-                className="w-full py-3 rounded-xl bg-[#65c556] hover:bg-[#54b045] text-[#293827] font-black text-sm shadow-lg shadow-[rgba(101,197,86,0.25)] transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 mt-1"
-              >
-                {loadingOtp ? (
-                  <>
-                    <div className="size-4 border-2 border-[#293827] border-t-transparent rounded-full animate-spin" />
-                    <span>Verificando...</span>
-                  </>
-                ) : (
-                  <>
-                    <IconCheck size={18} />
-                    <span>Verificar y Acceder</span>
-                  </>
-                )}
-              </button>
-            </form>
+            <div>
+              <h1 className="text-lg font-bold text-white tracking-tight">
+                Complejo Deportivo <span className="text-emerald-400">UB</span>
+              </h1>
+              <p className="text-xs text-slate-400">Reservas, Torneos y Panel Operativo</p>
+            </div>
           </div>
-        ) : (
-          <>
-            {/* Tab Switcher: Iniciar Sesión / Registrarse */}
-            <div className="grid grid-cols-2 p-1.5 bg-[#293827] rounded-2xl border border-[#5a7056]">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('login');
-                  setLoginError(null);
-                }}
-                className={`py-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
-                  activeTab === 'login'
-                    ? 'bg-[#65c556] text-[#293827] shadow-md shadow-[rgba(101,197,86,0.25)]'
-                    : 'text-[#a0a0a0] hover:text-white'
-                }`}
-              >
-                <IconLock size={15} />
-                <span>Iniciar Sesión</span>
-              </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('register');
-                  setRegisterError(null);
-                }}
-                className={`py-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
-                  activeTab === 'register'
-                    ? 'bg-[#65c556] text-[#293827] shadow-md shadow-[rgba(101,197,86,0.25)]'
-                    : 'text-[#a0a0a0] hover:text-white'
-                }`}
-              >
-                <IconMail size={15} />
-                <span>Registrarse</span>
-              </button>
+          {isOtpModalOpen ? (
+            <div className="flex flex-col gap-5 animate-in">
+              <div className="flex items-center gap-3.5 pb-4 border-b border-white/10">
+                <div className="size-11 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
+                  <IconMail size={22} />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Paso 2 de 2</span>
+                  <h3 className="text-lg font-bold text-white tracking-tight">Verificación de Correo</h3>
+                  <p className="text-xs text-slate-400">Ingresa el código de seguridad de 6 dígitos</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Enviamos un código de activación a{' '}
+                <strong className="text-white font-mono bg-white/[0.06] px-2 py-0.5 rounded border border-white/10">
+                  {otpEmail}
+                </strong>
+                . Ingrésalo a continuación para habilitar tu cuenta.
+              </p>
+
+              {otpSuccess && (
+                <div className="bg-emerald-950/60 border border-emerald-500/40 p-3.5 rounded-xl flex items-center gap-2.5 text-xs text-emerald-200">
+                  <IconCheck size={16} className="text-emerald-400 shrink-0" />
+                  <span>{otpSuccess}</span>
+                </div>
+              )}
+
+              {otpError && (
+                <div className="bg-red-950/60 border border-red-500/40 p-3.5 rounded-xl flex items-center gap-2.5 text-xs text-red-200">
+                  <IconAlert size={16} className="text-red-400 shrink-0" />
+                  <span>{otpError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
+                <div className="flex flex-col items-center gap-2 my-2">
+                  <label className="text-xs font-semibold text-slate-400">Código numérico de 6 dígitos</label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    autoFocus
+                    required
+                    placeholder="••••••"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                    className="bg-[#0b120d] border-2 border-emerald-500/60 focus:border-emerald-400 rounded-2xl text-center text-3xl font-mono font-bold tracking-[12px] py-3.5 px-4 text-white focus:outline-none shadow-inner w-full max-w-[260px]"
+                  />
+                  <span className="text-[11px] text-slate-400">Válido durante 15 minutos</span>
+                </div>
+
+                <div className="bg-white/[0.03] p-3.5 rounded-xl border border-white/10 flex items-start gap-2.5 text-[11px] text-slate-300 leading-relaxed">
+                  <IconInfo size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-emerald-400">Verificación de prueba:</strong> Para evaluación académica o entornos locales, también puedes utilizar el código universal <strong>123456</strong>.
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={resendCooldown > 0}
+                    className="text-emerald-400 hover:text-emerald-300 font-semibold disabled:text-slate-500 cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    {resendCooldown > 0 ? `Reenviar en ${resendCooldown}s` : '¿No recibiste el código? Reenviar'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOtpModalOpen(false);
+                      setActiveTab('register');
+                    }}
+                    className="text-slate-400 hover:text-white transition cursor-pointer flex items-center gap-1"
+                  >
+                    <IconArrowLeft size={14} />
+                    <span>Modificar datos</span>
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loadingOtp || otpCode.length !== 6}
+                  className="w-full py-3.5 rounded-xl bg-[#199e1b] hover:bg-[#158417] text-white font-bold text-sm shadow-lg shadow-[#199e1b]/20 transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 mt-1"
+                >
+                  {loadingOtp ? (
+                    <>
+                      <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Verificando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <IconCheck size={18} />
+                      <span>Verificar y Acceder</span>
+                    </>
+                  )}
+                </button>
+              </form>
             </div>
+          ) : (
+            <>
+              {/* Header & Tab Switcher */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-tight">
+                    {activeTab === 'login' ? 'Acceso a tu cuenta' : 'Registro de nuevo usuario'}
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {activeTab === 'login'
+                      ? 'Ingresa tus credenciales o selecciona un perfil de prueba'
+                      : 'Completa tus datos personales para reservar e inscribirte'}
+                  </p>
+                </div>
 
-            {/* TAB 1: Iniciar Sesión */}
-            {activeTab === 'login' && (
-              <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
-                {backendOffline && (
-                  <div className="bg-[#241717] border border-[#ef4444] rounded-2xl p-4 flex flex-col gap-3 text-xs text-white shadow-xl animate-fadeIn">
-                    <div className="flex items-start gap-3">
-                      <div className="size-8 rounded-lg bg-red-950/80 border border-red-500/50 flex items-center justify-center shrink-0 text-red-400">
-                        <IconAlert size={18} />
+                <div className="grid grid-cols-2 p-1 bg-[#0b120d] rounded-xl border border-white/10 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('login');
+                      setLoginError(null);
+                    }}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      activeTab === 'login'
+                        ? 'bg-[#199e1b] text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <IconLock size={14} />
+                    <span>Ingresar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('register');
+                      setRegisterError(null);
+                    }}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      activeTab === 'register'
+                        ? 'bg-[#199e1b] text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <IconMail size={14} />
+                    <span>Registrarse</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* TAB 1: Iniciar Sesión */}
+              {activeTab === 'login' && (
+                <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
+                  {backendOffline && (
+                    <div className="bg-red-950/40 border border-red-500/40 rounded-2xl p-4 flex flex-col gap-3 text-xs text-white shadow-xl animate-in">
+                      <div className="flex items-start gap-3">
+                        <div className="size-8 rounded-lg bg-red-500/15 border border-red-500/30 flex items-center justify-center shrink-0 text-red-400">
+                          <IconAlert size={17} />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-bold text-xs text-red-300">Servidor backend desconectado</h4>
+                          <p className="text-slate-300 text-[11px] mt-1 leading-relaxed">
+                            Para conectar con MySQL real, inicia el servidor en <code className="text-emerald-300">Backend-ComplejoUB</code>, o accede directamente en Modo Demo:
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-sm text-[#fca5a5]">El servidor backend no está respondiendo</h4>
-                        <p className="text-[#d1d5db] text-xs mt-1 leading-relaxed">
-                          El frontend se ejecuta en un proceso independiente. Para conectar con MySQL real, abre una terminal y ejecuta:
-                        </p>
-                        <code className="block bg-[#120a0a] border border-[#ef4444]/40 rounded-lg px-3 py-1.5 font-mono text-[11px] text-[#4ade80] my-2 select-all">
-                          cd Backend-ComplejoUB ; npm run dev
-                        </code>
-                      </div>
-                    </div>
-                    <div className="pt-2 border-t border-red-500/20 flex flex-col gap-2">
                       <button
                         type="button"
                         onClick={() => handleOfflineLogin(loginEmail)}
-                        className="w-full py-2.5 px-4 rounded-xl bg-[#65c556] hover:bg-[#54b045] text-[#1e281d] font-black text-xs transition cursor-pointer flex items-center justify-center gap-2 shadow-lg"
+                        className="w-full py-2.5 px-4 rounded-xl bg-[#199e1b] hover:bg-[#158417] text-white font-bold text-xs transition cursor-pointer flex items-center justify-center gap-2 shadow-md"
                       >
-                        <span>⚡ Continuar en Modo Demo Local (Sin Backend)</span>
+                        <IconBolt size={15} />
+                        <span>Continuar en Modo Demo Local</span>
                       </button>
                     </div>
-                  </div>
-                )}
-
-                {/* Campo Correo Electrónico con Icono a la izquierda perfectamente espaciado */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-[#c0c0c0]">Correo Electrónico Registrado</label>
-                  <div
-                    className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
-                    style={{
-                      backgroundColor: '#293827',
-                      padding: '14px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a0a0a0', flexShrink: 0 }}>
-                      <IconMail size={18} />
-                    </div>
-                    <input
-                      type="email"
-                      required
-                      placeholder="ejemplo@correo.com"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      style={{
-                        width: '100%',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        color: '#ffffff',
-                        fontSize: '14px',
-                        padding: 0
-                      }}
-                      className="placeholder-[#71856d]"
-                    />
-                  </div>
-                </div>
-
-                {/* Campo Contraseña con Icono a la izquierda perfectamente espaciado */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-[#c0c0c0]">Contraseña</label>
-                    <span className="text-[11px] text-[#65c556]">Mínimo 6 caracteres</span>
-                  </div>
-                  <div
-                    className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
-                    style={{
-                      backgroundColor: '#293827',
-                      padding: '14px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a0a0a0', flexShrink: 0 }}>
-                      <IconLock size={18} />
-                    </div>
-                    <input
-                      type={showLoginPassword ? 'text' : 'password'}
-                      required
-                      placeholder="Ingresa tu contraseña"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      style={{
-                        width: '100%',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        color: '#ffffff',
-                        fontSize: '14px',
-                        padding: 0
-                      }}
-                      className="placeholder-[#71856d]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowLoginPassword((prev) => !prev)}
-                      className="text-[#a0a0a0] hover:text-[#65c556] transition cursor-pointer shrink-0 p-1 flex items-center justify-center"
-                      title={showLoginPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
-                    >
-                      {showLoginPassword ? <IconEyeOff size={18} /> : <IconEye size={18} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Mensaje de Error en Rojo abajo de los campos */}
-                {loginError && (
-                  <div className="bg-[#7f1d1d]/90 border border-[#ef4444] p-3 rounded-xl flex items-start gap-2.5 text-xs text-[#fecaca] animate-fadeIn shadow-lg">
-                    <IconAlert size={16} className="shrink-0 text-[#ef4444] mt-0.5" />
-                    <span className="leading-relaxed font-semibold">{loginError}</span>
-                  </div>
-                )}
-
-                {/* Cuentas de Acceso Rápido / Demo */}
-                <div className="bg-[#293827] border border-[#5a7056]/60 rounded-2xl p-3.5 flex flex-col gap-2 mt-1">
-                  <span className="text-[11px] font-bold text-[#65c556] uppercase tracking-wider flex items-center gap-1.5">
-                    <IconCheck size={14} />
-                    Cuentas de Acceso Rápido
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleQuickFill('lucas@gmail.com')}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[11px] font-semibold text-white transition text-center cursor-pointer truncate"
-                      title="Lucas Díaz (Cliente / Capitán)"
-                    >
-                      ⚽ Lucas (Cliente)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickFill('complejoub.soporte@gmail.com')}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[11px] font-semibold text-white transition text-center cursor-pointer truncate"
-                      title="Superadministrador Titular"
-                    >
-                      👑 Superadmin
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickFill('operador@complejoub.com')}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[11px] font-semibold text-white transition text-center cursor-pointer truncate"
-                      title="Administrador de Sede"
-                    >
-                      🛡️ Admin
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickFill('arbitro@complejoub.com')}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[11px] font-semibold text-white transition text-center cursor-pointer truncate"
-                      title="Sebastián Norjean (Árbitro)"
-                    >
-                      🟨 Árbitro
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickFill('sancionado@gmail.com')}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#2b1818] hover:bg-[#3f2121] border border-[#ef4444]/60 text-[11px] font-semibold text-red-300 transition text-center cursor-pointer truncate"
-                      title="Usuario Sancionado Test (3 inasistencias consecutivas)"
-                    >
-                      🚫 Sancionado
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loadingLogin}
-                  className="mt-2 w-full py-3 rounded-xl bg-[#65c556] hover:bg-[#54b045] text-[#293827] font-black text-sm shadow-lg shadow-[rgba(101,197,86,0.25)] transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {loadingLogin ? (
-                    <>
-                      <div className="size-4 border-2 border-[#293827] border-t-transparent rounded-full animate-spin" />
-                      <span>Validando credenciales en base de datos...</span>
-                    </>
-                  ) : (
-                    <>
-                      <IconCheck size={18} />
-                      <span>Ingresar a la Plataforma</span>
-                    </>
                   )}
-                </button>
-              </form>
-            )}
 
-            {/* TAB 2: Registrarse */}
-            {activeTab === 'register' && (
-              <form onSubmit={handleRegisterSubmit} className="flex flex-col gap-4">
-                {registerError && (
-                  <div className="bg-[#7f1d1d]/80 border border-[#ef4444] p-3.5 rounded-xl flex items-start gap-2.5 text-xs text-[#fecaca] animate-fadeIn">
-                    <IconAlert size={16} className="shrink-0 text-[#ef4444] mt-0.5" />
-                    <span className="leading-relaxed">{registerError}</span>
-                  </div>
-                )}
-
-                {/* Campo Nombre */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-[#c0c0c0]">Nombre y Apellido</label>
-                  <div
-                    className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
-                    style={{
-                      backgroundColor: '#293827',
-                      padding: '14px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a0a0a0', flexShrink: 0 }}>
-                      <IconUsers size={18} />
+                  {/* Campo Correo Electrónico */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-slate-300">Correo electrónico</label>
+                    <div className="rounded-xl border border-white/10 bg-[#0b120d] focus-within:border-emerald-500 transition px-3.5 py-3 flex items-center gap-3">
+                      <IconMail size={17} className="text-slate-400 shrink-0" />
+                      <input
+                        type="email"
+                        required
+                        placeholder="usuario@dominio.com"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        className="w-full bg-transparent border-none outline-none text-white text-sm placeholder-slate-500"
+                      />
                     </div>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ej: Nicolás Paiva"
-                      value={regName}
-                      onChange={(e) => setRegName(e.target.value)}
-                      style={{
-                        width: '100%',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        color: '#ffffff',
-                        fontSize: '14px',
-                        padding: 0
-                      }}
-                      className="placeholder-[#71856d]"
-                    />
                   </div>
-                </div>
 
-                {/* Campo DNI / Documento de Identidad */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-[#c0c0c0]">DNI / Documento de Identidad</label>
-                    <span className="text-[11px] text-[#65c556]">7 u 8 dígitos numéricos</span>
-                  </div>
-                  <div
-                    className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
-                    style={{
-                      backgroundColor: '#293827',
-                      padding: '14px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a0a0a0', flexShrink: 0 }}>
-                      <IconCheck size={18} />
-                    </div>
-                    <input
-                      type="text"
-                      required
-                      inputMode="numeric"
-                      maxLength={8}
-                      placeholder="Ej: 38456123 (sin puntos ni espacios)"
-                      value={regDni}
-                      onChange={(e) => setRegDni(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                      style={{
-                        width: '100%',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        color: '#ffffff',
-                        fontSize: '14px',
-                        padding: 0
-                      }}
-                      className="placeholder-[#71856d] font-mono"
-                    />
-                  </div>
-                  <span className="text-[11px] text-[#a0a0a0]">
-                    Requerido para ser identificado en nóminas de torneos y equipos oficiales.
-                  </span>
-                </div>
-
-                {/* Campo Email */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-[#c0c0c0]">Correo Electrónico (Válido con dominio)</label>
-                  <div
-                    className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
-                    style={{
-                      backgroundColor: '#293827',
-                      padding: '14px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a0a0a0', flexShrink: 0 }}>
-                      <IconMail size={18} />
-                    </div>
-                    <input
-                      type="email"
-                      required
-                      placeholder="nombre@ejemplo.com"
-                      value={regEmail}
-                      onChange={(e) => setRegEmail(e.target.value)}
-                      style={{
-                        width: '100%',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        color: '#ffffff',
-                        fontSize: '14px',
-                        padding: 0
-                      }}
-                      className="placeholder-[#71856d]"
-                    />
-                  </div>
-                  <span className="text-[11px] text-[#a0a0a0]">
-                    Te enviaremos un código de seguridad de 6 dígitos para verificar tu cuenta.
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Campo Contraseña */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-[#c0c0c0]">Contraseña</label>
-                    <div
-                      className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
-                      style={{
-                        backgroundColor: '#293827',
-                        padding: '14px 20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '16px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a0a0a0', flexShrink: 0 }}>
-                        <IconLock size={18} />
-                      </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-300">Contraseña</label>
+                      <span className="text-[11px] text-slate-400">Mínimo 6 caracteres</span>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-[#0b120d] focus-within:border-emerald-500 transition px-3.5 py-3 flex items-center gap-3">
+                      <IconLock size={17} className="text-slate-400 shrink-0" />
                       <input
-                        type={showRegPassword ? 'text' : 'password'}
+                        type={showLoginPassword ? 'text' : 'password'}
                         required
-                        minLength={6}
-                        placeholder="Mínimo 6 caracteres"
-                        value={regPassword}
-                        onChange={(e) => setRegPassword(e.target.value)}
-                        style={{
-                          width: '100%',
-                          backgroundColor: 'transparent',
-                          border: 'none',
-                          outline: 'none',
-                          color: '#ffffff',
-                          fontSize: '14px',
-                          padding: 0
-                        }}
-                        className="placeholder-[#71856d]"
+                        placeholder="Ingresa tu contraseña"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        className="w-full bg-transparent border-none outline-none text-white text-sm placeholder-slate-500"
                       />
                       <button
                         type="button"
-                        onClick={() => setShowRegPassword((prev) => !prev)}
-                        className="text-[#a0a0a0] hover:text-[#65c556] transition cursor-pointer shrink-0 p-1 flex items-center justify-center"
-                        title={showRegPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                        onClick={() => setShowLoginPassword((prev) => !prev)}
+                        className="text-slate-400 hover:text-emerald-400 transition cursor-pointer shrink-0 p-0.5 flex items-center justify-center"
+                        title={showLoginPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
                       >
-                        {showRegPassword ? <IconEyeOff size={18} /> : <IconEye size={18} />}
+                        {showLoginPassword ? <IconEyeOff size={17} /> : <IconEye size={17} />}
                       </button>
                     </div>
                   </div>
 
-                  {/* Campo Teléfono */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-[#c0c0c0]">Teléfono Móvil (Opcional)</label>
-                    <div
-                      className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
-                      style={{
-                        backgroundColor: '#293827',
-                        padding: '14px 20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '16px'
-                      }}
-                    >
-                      <input
-                        type="tel"
-                        placeholder="+54 11 ..."
-                        value={regPhone}
-                        onChange={(e) => setRegPhone(e.target.value)}
-                        style={{
-                          width: '100%',
-                          backgroundColor: 'transparent',
-                          border: 'none',
-                          outline: 'none',
-                          color: '#ffffff',
-                          fontSize: '14px',
-                          padding: 0
-                        }}
-                        className="placeholder-[#71856d]"
-                      />
+                  {loginError && (
+                    <div className="bg-red-950/60 border border-red-500/40 p-3 rounded-xl flex items-start gap-2.5 text-xs text-red-200 animate-in">
+                      <IconAlert size={16} className="shrink-0 text-red-400 mt-0.5" />
+                      <span className="leading-relaxed font-medium">{loginError}</span>
+                    </div>
+                  )}
+
+                  {/* Cuentas de Acceso Rápido */}
+                  <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-3.5 flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <IconCheck size={13} />
+                        <span>Perfiles de Acceso Rápido</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400">Autocompletar correo</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleQuickFill('lucas@gmail.com')}
+                        className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition flex items-center gap-2 cursor-pointer truncate ${
+                          loginEmail === 'lucas@gmail.com'
+                            ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
+                            : 'bg-[#0b120d] hover:bg-white/[0.06] border-white/10 text-slate-200'
+                        }`}
+                        title="Lucas Díaz (Cliente / Capitán)"
+                      >
+                        <IconBall size={14} className="text-emerald-400 shrink-0" />
+                        <span className="truncate">Lucas (Cliente 1)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleQuickFill('mateo@gmail.com')}
+                        className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition flex items-center gap-2 cursor-pointer truncate ${
+                          loginEmail === 'mateo@gmail.com'
+                            ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
+                            : 'bg-[#0b120d] hover:bg-white/[0.06] border-white/10 text-slate-200'
+                        }`}
+                        title="Mateo Fernández (Segundo Cliente para verificar reservas cruzadas)"
+                      >
+                        <IconUsers size={14} className="text-sky-400 shrink-0" />
+                        <span className="truncate">Mateo (Cliente 2)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleQuickFill('complejoub.soporte@gmail.com')}
+                        className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition flex items-center gap-2 cursor-pointer truncate ${
+                          loginEmail === 'complejoub.soporte@gmail.com'
+                            ? 'bg-amber-500/15 border-amber-500/50 text-amber-300'
+                            : 'bg-[#0b120d] hover:bg-white/[0.06] border-white/10 text-slate-200'
+                        }`}
+                        title="Superadministrador General"
+                      >
+                        <IconCrown size={14} className="text-amber-400 shrink-0" />
+                        <span className="truncate">Superadmin</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleQuickFill('operador@complejoub.com')}
+                        className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition flex items-center gap-2 cursor-pointer truncate ${
+                          loginEmail === 'operador@complejoub.com'
+                            ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
+                            : 'bg-[#0b120d] hover:bg-white/[0.06] border-white/10 text-slate-200'
+                        }`}
+                        title="Administrador de Sede"
+                      >
+                        <IconShield size={14} className="text-emerald-400 shrink-0" />
+                        <span className="truncate">Administrador</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleQuickFill('arbitro@complejoub.com')}
+                        className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition flex items-center gap-2 cursor-pointer truncate ${
+                          loginEmail === 'arbitro@complejoub.com'
+                            ? 'bg-amber-500/15 border-amber-500/50 text-amber-300'
+                            : 'bg-[#0b120d] hover:bg-white/[0.06] border-white/10 text-slate-200'
+                        }`}
+                        title="Sebastián Norjean (Árbitro Oficial)"
+                      >
+                        <IconWhistle size={14} className="text-amber-400 shrink-0" />
+                        <span className="truncate">Árbitro</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleQuickFill('sancionado@gmail.com')}
+                        className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition flex items-center gap-2 cursor-pointer truncate ${
+                          loginEmail === 'sancionado@gmail.com'
+                            ? 'bg-red-500/20 border-red-500/50 text-red-200'
+                            : 'bg-red-950/25 hover:bg-red-950/40 border-red-500/25 text-red-300'
+                        }`}
+                        title="Usuario Sancionado Test (3 inasistencias)"
+                      >
+                        <IconBan size={14} className="text-red-400 shrink-0" />
+                        <span className="truncate">Sancionado</span>
+                      </button>
                     </div>
                   </div>
-                </div>
 
-                <button
-                  type="submit"
-                  disabled={loadingRegister}
-                  className="mt-2 w-full py-3 rounded-xl bg-[#65c556] hover:bg-[#54b045] text-[#293827] font-black text-sm shadow-lg shadow-[rgba(101,197,86,0.25)] transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {loadingRegister ? (
-                    <>
-                      <div className="size-4 border-2 border-[#293827] border-t-transparent rounded-full animate-spin" />
-                      <span>Registrando y enviando código...</span>
-                    </>
-                  ) : (
-                    <>
-                      <IconMail size={18} />
-                      <span>Crear Cuenta y Recibir Código</span>
-                    </>
+                  <button
+                    type="submit"
+                    disabled={loadingLogin}
+                    className="mt-1 w-full py-3.5 rounded-xl bg-[#199e1b] hover:bg-[#158417] text-white font-bold text-sm shadow-lg shadow-[#199e1b]/20 transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {loadingLogin ? (
+                      <>
+                        <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Validando credenciales...</span>
+                      </>
+                    ) : (
+                      <>
+                        <IconCheck size={18} />
+                        <span>Ingresar a la Plataforma</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+
+              {/* TAB 2: Registrarse */}
+              {activeTab === 'register' && (
+                <form onSubmit={handleRegisterSubmit} className="flex flex-col gap-3.5">
+                  {registerError && (
+                    <div className="bg-red-950/60 border border-red-500/40 p-3 rounded-xl flex items-start gap-2.5 text-xs text-red-200 animate-in">
+                      <IconAlert size={16} className="shrink-0 text-red-400 mt-0.5" />
+                      <span className="leading-relaxed">{registerError}</span>
+                    </div>
                   )}
-                </button>
-              </form>
-            )}
-          </>
-        )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-300">Nombre y Apellido</label>
+                      <div className="rounded-xl border border-white/10 bg-[#0b120d] focus-within:border-emerald-500 transition px-3.5 py-2.5 flex items-center gap-2.5">
+                        <IconUsers size={16} className="text-slate-400 shrink-0" />
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ej: Nicolás Paiva"
+                          value={regName}
+                          onChange={(e) => setRegName(e.target.value)}
+                          className="w-full bg-transparent border-none outline-none text-white text-sm placeholder-slate-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-slate-300">DNI</label>
+                        <span className="text-[10px] text-emerald-400">7 u 8 dígitos</span>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-[#0b120d] focus-within:border-emerald-500 transition px-3.5 py-2.5 flex items-center gap-2.5">
+                        <IconIdCard size={16} className="text-slate-400 shrink-0" />
+                        <input
+                          type="text"
+                          required
+                          inputMode="numeric"
+                          maxLength={8}
+                          placeholder="Sin puntos (ej: 40123456)"
+                          value={regDni}
+                          onChange={(e) => setRegDni(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                          className="w-full bg-transparent border-none outline-none text-white text-sm font-mono placeholder-slate-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-slate-300">Correo electrónico</label>
+                    <div className="rounded-xl border border-white/10 bg-[#0b120d] focus-within:border-emerald-500 transition px-3.5 py-2.5 flex items-center gap-2.5">
+                      <IconMail size={16} className="text-slate-400 shrink-0" />
+                      <input
+                        type="email"
+                        required
+                        placeholder="nombre@ejemplo.com"
+                        value={regEmail}
+                        onChange={(e) => setRegEmail(e.target.value)}
+                        className="w-full bg-transparent border-none outline-none text-white text-sm placeholder-slate-500"
+                      />
+                    </div>
+                    <span className="text-[11px] text-slate-400">
+                      Recibirás un código de seguridad de 6 dígitos para activar tu cuenta.
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-300">Contraseña</label>
+                      <div className="rounded-xl border border-white/10 bg-[#0b120d] focus-within:border-emerald-500 transition px-3.5 py-2.5 flex items-center gap-2.5">
+                        <IconLock size={16} className="text-slate-400 shrink-0" />
+                        <input
+                          type={showRegPassword ? 'text' : 'password'}
+                          required
+                          minLength={6}
+                          placeholder="Mínimo 6 caracteres"
+                          value={regPassword}
+                          onChange={(e) => setRegPassword(e.target.value)}
+                          className="w-full bg-transparent border-none outline-none text-white text-sm placeholder-slate-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowRegPassword((prev) => !prev)}
+                          className="text-slate-400 hover:text-emerald-400 transition cursor-pointer shrink-0"
+                        >
+                          {showRegPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-300">Teléfono móvil (opcional)</label>
+                      <div className="rounded-xl border border-white/10 bg-[#0b120d] focus-within:border-emerald-500 transition px-3.5 py-2.5 flex items-center gap-2.5">
+                        <IconSmartphone size={16} className="text-slate-400 shrink-0" />
+                        <input
+                          type="tel"
+                          placeholder="+54 11 ..."
+                          value={regPhone}
+                          onChange={(e) => setRegPhone(e.target.value)}
+                          className="w-full bg-transparent border-none outline-none text-white text-sm placeholder-slate-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loadingRegister}
+                    className="mt-2 w-full py-3.5 rounded-xl bg-[#199e1b] hover:bg-[#158417] text-white font-bold text-sm shadow-lg shadow-[#199e1b]/20 transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {loadingRegister ? (
+                      <>
+                        <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Registrando y enviando código...</span>
+                      </>
+                    ) : (
+                      <>
+                        <IconMail size={17} />
+                        <span>Crear Cuenta y Recibir Código</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

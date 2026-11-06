@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { IconCalendar } from './Icons';
 
 export interface BookingData {
   id: string;
@@ -33,144 +34,64 @@ export const BookingCard: React.FC<BookingCardProps> = ({
 
   return (
     <div
-      className={`booking-card ${className}`}
-      style={{
-        backgroundColor: '#1E281D',
-        border: '1px solid #5A7056',
-        borderRadius: '12px', // PSP: 12px
-        padding: '20px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px',
-        boxSizing: 'border-box',
-        fontFamily: "'Inter', sans-serif",
-        textAlign: 'left',
-        position: 'relative'
-      }}
+      className={`bg-white border border-slate-200 rounded-2xl p-5 flex flex-col gap-4 shadow-xs relative font-['Inter',sans-serif] text-left ${className}`}
     >
-      {/* Header con Cancha y Badge */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
-          {booking.courtName} - {booking.sport}
+      <div className="flex justify-between items-center">
+        <h3 className="text-base font-bold text-slate-900 m-0">
+          {booking.courtName} — {booking.sport}
         </h3>
-        <span
-          style={{
-            padding: '4px 10px',
-            borderRadius: '6px',
-            fontSize: '11px',
-            fontWeight: 600,
-            backgroundColor: 'rgba(101, 197, 86, 0.15)',
-            border: '1px solid #65C556',
-            color: '#65C556'
-          }}
-        >
+        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700">
           {booking.status}
         </span>
       </div>
 
-      {/* Información intermedia */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        <div style={{ fontSize: '13px', fontWeight: 500, color: '#A3B8A1' }}>
-          📅 {booking.dateStr} • {booking.timeSlot}
+      <div className="flex flex-col gap-1.5">
+        <div className="text-xs font-medium text-slate-600 flex items-center gap-1.5">
+          <IconCalendar size={14} className="text-emerald-600" />
+          <span>{booking.dateStr} · {booking.timeSlot}</span>
         </div>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', fontSize: '12px' }}>
-          <span style={{ color: '#8EA68B' }}>{booking.surface}</span>
-          <span style={{ color: '#57EF40', fontWeight: 700 }}>
+        <div className="flex gap-4 items-center text-xs">
+          <span className="text-slate-500">{booking.surface}</span>
+          <span className="text-emerald-700 font-bold">
             Total: {booking.price}
           </span>
         </div>
       </div>
 
-      {/* Barra de acción inferior */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingTop: '12px',
-          borderTop: '1px solid #5A7056'
-        }}
-      >
-        <span style={{ fontSize: '11px', color: '#7A8F76' }}>
-          Cancelación gratuita hasta 24 hs antes
+      <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+        <span className="text-[11px] text-slate-400">
+          Cancelación con reintegro hasta 24 hs antes
         </span>
 
-        {/* Botón rojo de acción "Cancelar turno" */}
         <button
           type="button"
           onClick={() => setShowConfirm(true)}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#E53E3E',
-            color: '#FFFFFF',
-            fontSize: '12px',
-            fontWeight: 600,
-            borderRadius: '8px', // PSP: 8px
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-            fontFamily: "'Inter', sans-serif"
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#C53030')}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#E53E3E')}
+          className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-xl transition cursor-pointer"
         >
           Cancelar turno
         </button>
       </div>
 
-      {/* Modal de confirmación de cancelación */}
       {showConfirm && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundColor: 'rgba(26, 34, 25, 0.95)',
-            borderRadius: '12px',
-            padding: '20px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: '12px',
-            zIndex: 10,
-            textAlign: 'center'
-          }}
-        >
-          <span style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF' }}>
+        <div className="absolute inset-0 bg-white/95 backdrop-blur-xs rounded-2xl p-5 flex flex-col justify-center items-center gap-3 z-10 text-center">
+          <span className="text-sm font-bold text-slate-900">
             ¿Seguro que deseas cancelar este turno?
           </span>
-          <span style={{ fontSize: '11px', color: '#A3B8A1' }}>
-            Esta acción liberará la cancha inmediatamente en la agenda.
+          <span className="text-xs text-slate-500">
+            Esta acción liberará la cancha inmediatamente en la agenda general.
           </span>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+          <div className="flex gap-2.5 mt-1">
             <button
               type="button"
               onClick={() => setShowConfirm(false)}
-              style={{
-                padding: '6px 14px',
-                borderRadius: '8px',
-                border: '1px solid #5A7056',
-                backgroundColor: '#293827',
-                color: '#A3B8A1',
-                fontSize: '12px',
-                cursor: 'pointer'
-              }}
+              className="px-4 py-1.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-semibold cursor-pointer"
             >
               Volver
             </button>
             <button
               type="button"
               onClick={handleConfirmCancel}
-              style={{
-                padding: '6px 14px',
-                borderRadius: '8px',
-                border: 'none',
-                backgroundColor: '#E53E3E',
-                color: '#FFFFFF',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="px-4 py-1.5 rounded-xl bg-red-600 text-white text-xs font-bold cursor-pointer"
             >
               Sí, Cancelar
             </button>
@@ -182,4 +103,3 @@ export const BookingCard: React.FC<BookingCardProps> = ({
 };
 
 export default BookingCard;
-

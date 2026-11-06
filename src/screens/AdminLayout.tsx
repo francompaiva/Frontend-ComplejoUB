@@ -19,9 +19,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   children
 }) => {
   return (
-    <div className="w-full flex-1 flex flex-col bg-[#293827] text-white font-['Inter',sans-serif]">
-      {/* Main Admin Content (Full Width) */}
-      <main className="w-full flex-1 flex flex-col min-w-0">
+    <div className="w-full flex-1 flex flex-col bg-[#f4f6f4] text-slate-900 font-['Inter',sans-serif]">
+      <main className="w-full flex-1 flex flex-col min-w-0 max-w-7xl mx-auto">
         {children}
       </main>
     </div>

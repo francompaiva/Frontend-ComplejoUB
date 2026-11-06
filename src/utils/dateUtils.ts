@@ -152,3 +152,5 @@ export function formatDateSpanish(dateStr: string): string {
   }
 }
 
+
+export const getTodayISO = getTodayBuenosAires;

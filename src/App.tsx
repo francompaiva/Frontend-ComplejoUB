@@ -18,6 +18,7 @@ import ConfirmacionPagoModal, { type BookingSlotInfo } from './components/Confir
 import InscripcionTorneoModal from './components/InscripcionTorneoModal';
 import MisTorneos from './screens/MisTorneos';
 import ErrorBoundary from './components/ErrorBoundary';
+import NotificationDropdown from './components/NotificationDropdown';
 import {
   IconStadium,
   IconBall,
@@ -28,7 +29,8 @@ import {
   IconShield,
   IconCrown,
   IconWhistle,
-  IconLogout
+  IconLogout,
+  IconLock
 } from './components/Icons';
 
 export type ScreenId =
@@ -58,13 +60,13 @@ interface AccountConfig {
   permissions: string[];
 }
 
-const ACCOUNTS: Record<UserRole, AccountConfig> = {
+export const ROLE_ACCOUNTS: Record<UserRole, AccountConfig> = {
   cliente: {
     role: 'cliente',
     name: 'Cliente',
     title: 'Cliente / Capitán',
     badge: 'Cliente',
-    iconNode: <IconBall size={18} className="text-[#65c556]" />,
+    iconNode: <IconBall size={16} className="text-emerald-400" />,
     primaryScreen: 'landing',
     allowedScreens: ['landing', 'mis-reservas', 'mis-torneos'],
     description: 'Gestión personal de reservas, pago de señas, cancelaciones y nómina de torneos.',
@@ -80,7 +82,7 @@ const ACCOUNTS: Record<UserRole, AccountConfig> = {
     name: 'Árbitro',
     title: 'Árbitro Oficial AFA/UB',
     badge: 'Árbitro',
-    iconNode: <IconWhistle size={18} className="text-yellow-400" />,
+    iconNode: <IconWhistle size={16} className="text-amber-400" />,
     primaryScreen: 'arbitro',
     allowedScreens: ['arbitro', 'mis-torneos'],
     description: 'Planilla digital oficial de partidos asignados, tarjetas y actas de disciplina.',
@@ -96,7 +98,7 @@ const ACCOUNTS: Record<UserRole, AccountConfig> = {
     name: 'Administración General',
     title: 'Administrador Complejo UB',
     badge: 'Admin',
-    iconNode: <IconShield size={18} className="text-[#65c556]" />,
+    iconNode: <IconShield size={16} className="text-emerald-400" />,
     primaryScreen: 'admin-agenda',
     allowedScreens: [
       'admin-agenda',
@@ -123,7 +125,7 @@ const ACCOUNTS: Record<UserRole, AccountConfig> = {
     name: 'Superadministrador',
     title: 'Superadmin Cátedra UB',
     badge: 'Superadmin',
-    iconNode: <IconCrown size={18} className="text-yellow-400" />,
+    iconNode: <IconCrown size={16} className="text-amber-400" />,
     primaryScreen: 'admin-agenda',
     allowedScreens: [
       'admin-agenda',
@@ -157,12 +159,11 @@ const AppContent: React.FC = () => {
   const [isPagoOpen, setIsPagoOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<BookingSlotInfo | null>(null);
 
-  // Control de accesos por cuenta: Si la pantalla actual no está permitida para el rol activo, redirigir
   useEffect(() => {
     if (currentScreen === 'login') return;
-    const allowed = ACCOUNTS[userRole].allowedScreens;
+    const allowed = ROLE_ACCOUNTS[userRole].allowedScreens;
     if (!allowed.includes(currentScreen)) {
-      setCurrentScreen(ACCOUNTS[userRole].primaryScreen);
+      setCurrentScreen(ROLE_ACCOUNTS[userRole].primaryScreen);
     }
   }, [userRole, currentScreen]);
 
@@ -171,7 +172,6 @@ const AppContent: React.FC = () => {
     setIsInscripcionOpen(true);
   };
 
-  // Login handler
   const handleLogin = async (role: UserRole) => {
     let userObj: CurrentUser | null = currentUser;
     if (!userObj) {
@@ -195,7 +195,7 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // Cierre de sesión y retorno a pantalla de login con purga atómica de tokens
+  // Cierre de sesión preservando disponibilidad compartida de reservas
   const handleLogout = () => {
     apiClient.setToken(null);
     setCurrentUser(null);
@@ -206,7 +206,6 @@ const AppContent: React.FC = () => {
     setCurrentScreen('login');
   };
 
-  // Admin section switcher
   const handleAdminNavigate = (section: string) => {
     setAdminSection(section);
     if (section === 'agenda') setCurrentScreen('admin-agenda');
@@ -243,50 +242,47 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const currentAccount = ACCOUNTS[userRole] || ACCOUNTS.cliente;
+  const currentAccount = ROLE_ACCOUNTS[userRole] || ROLE_ACCOUNTS.cliente;
   const isAdminOrSuper = userRole === 'admin' || userRole === 'superadmin';
 
   return (
-    <div className="size-full min-h-screen bg-[#293827] flex flex-col font-['Inter',sans-serif]">
-      {/* Top Header Bar: Solid opaque background, high z-index */}
-      <header
-        className="border-b border-[#3b4d38] px-5 py-3 flex items-center justify-between gap-4 text-xs shadow-2xl"
-        style={{
-          position: 'sticky',
-          top: 0,
-          backgroundColor: '#141b13',
-          zIndex: 999,
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6)'
-        }}
-      >
+    <div className="size-full min-h-screen bg-[#f4f6f4] flex flex-col font-['Inter',sans-serif]">
+      {/* Institutional Top Navigation Bar */}
+      <header className="sticky top-0 z-50 bg-[#0d1510]/95 backdrop-blur-md border-b border-white/[0.08] px-4 sm:px-6 py-3 flex items-center justify-between gap-4 text-xs shadow-lg">
         {/* Left: Brand & Active Account Badge */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3.5 shrink-0">
           <div
             onClick={() => {
+              if (currentScreen === 'login') return;
               if (isAdminOrSuper) setCurrentScreen('admin-agenda');
               else if (userRole === 'arbitro') setCurrentScreen('arbitro');
               else setCurrentScreen('landing');
             }}
             className="flex items-center gap-2.5 cursor-pointer select-none group"
-            title="Complejo Deportivo UB - Ir al inicio"
+            title="Complejo Deportivo UB"
           >
-            <div className="size-9 rounded-xl bg-[rgba(101,197,86,0.15)] border border-[#65c556] flex items-center justify-center text-[#65c556] shadow-sm group-hover:scale-105 transition-transform">
-              <IconStadium size={20} />
+            <div className="size-9 rounded-xl bg-[#199e1b]/15 border border-[#199e1b]/40 flex items-center justify-center text-emerald-400 shadow-sm group-hover:border-emerald-400 transition-colors">
+              <IconStadium size={19} />
             </div>
-            <span className="font-extrabold text-sm sm:text-base text-white tracking-tight">
-              Complejo Deportivo <strong className="text-[#65c556]">UB</strong>
-            </span>
+            <div className="flex flex-col">
+              <span className="font-bold text-sm text-white tracking-tight leading-none">
+                Complejo <span className="text-emerald-400">UB</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium tracking-wide mt-0.5 hidden sm:inline">
+                Gestión Deportiva Universitaria
+              </span>
+            </div>
           </div>
 
           {currentScreen !== 'login' && (
-            <div className="bg-[#1e281d] text-white px-3 py-1.5 rounded-xl border border-[#5a7056] flex items-center gap-2 shadow-sm">
+            <div className="hidden md:flex items-center gap-2 bg-white/[0.05] text-slate-200 px-3 py-1.5 rounded-xl border border-white/10">
               <span>{currentAccount.iconNode}</span>
-              <span className="font-semibold">{currentUser?.nombre || currentAccount.name}</span>
+              <span className="font-semibold text-xs text-white">{currentUser?.nombre || currentAccount.name}</span>
               <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase ${
+                className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
                   userRole === 'superadmin'
-                    ? 'bg-amber-400/20 text-yellow-300 border-amber-400/40'
-                    : 'bg-[#293827] text-[#65c556] border-[#65c556]/40'
+                    ? 'bg-amber-400/15 text-amber-300 border-amber-400/30'
+                    : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                 }`}
               >
                 {currentAccount.badge}
@@ -295,42 +291,42 @@ const AppContent: React.FC = () => {
           )}
         </div>
 
-        {/* Center: Action Navigation Buttons based on Role (Spacious gap-3, vector icons) */}
+        {/* Center: Navigation Pills */}
         {currentScreen === 'login' ? (
-          <div className="text-[#a0a0a0] text-xs font-medium">
-            Acceso seguro con verificación de cuenta por correo electrónico
+          <div className="hidden sm:flex items-center gap-2 text-slate-400 text-xs font-medium">
+            <IconLock size={14} className="text-emerald-400" />
+            <span>Plataforma oficial con verificación de seguridad y reservas en tiempo real</span>
           </div>
         ) : (
-          <nav className="flex items-center gap-3 flex-wrap">
-            {/* Nav Buttons for CLIENTE */}
+          <nav className="flex items-center gap-1.5 flex-wrap">
             {userRole === 'cliente' && (
               <>
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('landing')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-2 border ${
                     currentScreen === 'landing'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
-                      : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
+                      ? 'bg-[#199e1b] text-white border-[#199e1b] shadow-sm shadow-[#199e1b]/30'
+                      : 'bg-white/[0.04] text-slate-300 border-white/10 hover:bg-white/[0.08] hover:text-white'
                   }`}
                 >
-                  <IconStadium size={16} />
-                  <span>Canchas & Turnos</span>
+                  <IconStadium size={15} />
+                  <span>Canchas y Turnos</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('mis-reservas')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-2 border ${
                     currentScreen === 'mis-reservas'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
-                      : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
+                      ? 'bg-[#199e1b] text-white border-[#199e1b] shadow-sm shadow-[#199e1b]/30'
+                      : 'bg-white/[0.04] text-slate-300 border-white/10 hover:bg-white/[0.08] hover:text-white'
                   }`}
                 >
-                  <IconClipboard size={16} />
+                  <IconClipboard size={15} />
                   <span>Mis Reservas</span>
                   {unreadNotifsCount > 0 && (
-                    <span className="bg-[#e53e3e] text-white px-1.5 py-0.2 rounded-full text-[10px] font-black">
+                    <span className="bg-emerald-400 text-[#0d1510] px-1.5 py-0.2 rounded-full text-[10px] font-extrabold">
                       {unreadNotifsCount}
                     </span>
                   )}
@@ -339,62 +335,60 @@ const AppContent: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('mis-torneos')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-2 border ${
                     currentScreen === 'mis-torneos'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
-                      : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
+                      ? 'bg-[#199e1b] text-white border-[#199e1b] shadow-sm shadow-[#199e1b]/30'
+                      : 'bg-white/[0.04] text-slate-300 border-white/10 hover:bg-white/[0.08] hover:text-white'
                   }`}
                 >
-                  <IconTrophy size={16} />
-                  <span>Torneos & Fixture</span>
+                  <IconTrophy size={15} />
+                  <span>Torneos y Fixture</span>
                 </button>
               </>
             )}
 
-            {/* Nav Buttons for ARBITRO */}
             {userRole === 'arbitro' && (
               <>
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('arbitro')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-2 border ${
                     currentScreen === 'arbitro'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
-                      : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
+                      ? 'bg-[#199e1b] text-white border-[#199e1b] shadow-sm shadow-[#199e1b]/30'
+                      : 'bg-white/[0.04] text-slate-300 border-white/10 hover:bg-white/[0.08] hover:text-white'
                   }`}
                 >
-                  <IconWhistle size={16} />
+                  <IconWhistle size={15} />
                   <span>Planilla Arbitral</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('mis-torneos')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-2 border ${
                     currentScreen === 'mis-torneos'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
-                      : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
+                      ? 'bg-[#199e1b] text-white border-[#199e1b] shadow-sm shadow-[#199e1b]/30'
+                      : 'bg-white/[0.04] text-slate-300 border-white/10 hover:bg-white/[0.08] hover:text-white'
                   }`}
                 >
-                  <IconTrophy size={16} />
-                  <span>Fixture & Posiciones</span>
+                  <IconTrophy size={15} />
+                  <span>Fixture y Posiciones</span>
                 </button>
               </>
             )}
 
-            {/* Nav Buttons for ADMIN / SUPERADMIN with generous spacing (gap-3) */}
             {isAdminOrSuper && (
-              <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <button
                   type="button"
                   onClick={() => handleAdminNavigate('agenda')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                     currentScreen === 'admin-agenda'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
-                      : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
+                      ? 'bg-[#199e1b] text-white border-[#199e1b] shadow-sm'
+                      : 'bg-white/[0.04] text-slate-300 border-white/10 hover:bg-white/[0.08] hover:text-white'
                   }`}
                 >
-                  <IconCalendar size={15} />
+                  <IconCalendar size={14} />
                   <span>Agenda</span>
                 </button>
 
@@ -403,11 +397,11 @@ const AppContent: React.FC = () => {
                   onClick={() => handleAdminNavigate('overview')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                     currentScreen === 'admin-overview'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
-                      : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
+                      ? 'bg-[#199e1b] text-white border-[#199e1b] shadow-sm'
+                      : 'bg-white/[0.04] text-slate-300 border-white/10 hover:bg-white/[0.08] hover:text-white'
                   }`}
                 >
-                  <IconChartBar size={15} />
+                  <IconChartBar size={14} />
                   <span>Dashboard</span>
                 </button>
 
@@ -416,11 +410,11 @@ const AppContent: React.FC = () => {
                   onClick={() => handleAdminNavigate('canchas')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                     currentScreen === 'admin-canchas'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
-                      : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
+                      ? 'bg-[#199e1b] text-white border-[#199e1b] shadow-sm'
+                      : 'bg-white/[0.04] text-slate-300 border-white/10 hover:bg-white/[0.08] hover:text-white'
                   }`}
                 >
-                  <IconBall size={15} />
+                  <IconBall size={14} />
                   <span>Canchas</span>
                 </button>
 
@@ -429,11 +423,11 @@ const AppContent: React.FC = () => {
                   onClick={() => handleAdminNavigate('torneo')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                     currentScreen === 'admin-torneo'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
-                      : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
+                      ? 'bg-[#199e1b] text-white border-[#199e1b] shadow-sm'
+                      : 'bg-white/[0.04] text-slate-300 border-white/10 hover:bg-white/[0.08] hover:text-white'
                   }`}
                 >
-                  <IconTrophy size={15} />
+                  <IconTrophy size={14} />
                   <span>Torneos</span>
                 </button>
 
@@ -442,11 +436,11 @@ const AppContent: React.FC = () => {
                   onClick={() => handleAdminNavigate('resultados')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                     currentScreen === 'admin-resultados'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
-                      : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
+                      ? 'bg-[#199e1b] text-white border-[#199e1b] shadow-sm'
+                      : 'bg-white/[0.04] text-slate-300 border-white/10 hover:bg-white/[0.08] hover:text-white'
                   }`}
                 >
-                  <IconClipboard size={15} />
+                  <IconClipboard size={14} />
                   <span>Resultados</span>
                 </button>
 
@@ -455,11 +449,11 @@ const AppContent: React.FC = () => {
                   onClick={() => handleAdminNavigate('reportes')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                     currentScreen === 'admin-reportes'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
-                      : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
+                      ? 'bg-[#199e1b] text-white border-[#199e1b] shadow-sm'
+                      : 'bg-white/[0.04] text-slate-300 border-white/10 hover:bg-white/[0.08] hover:text-white'
                   }`}
                 >
-                  <IconChartBar size={15} />
+                  <IconChartBar size={14} />
                   <span>Reportes</span>
                 </button>
 
@@ -468,26 +462,25 @@ const AppContent: React.FC = () => {
                   onClick={() => handleAdminNavigate('auditoria')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                     currentScreen === 'admin-auditoria'
-                      ? 'bg-[#65c556] text-[#293827] border-[#65c556] font-bold shadow-md shadow-[rgba(101,197,86,0.2)]'
-                      : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
+                      ? 'bg-[#199e1b] text-white border-[#199e1b] shadow-sm'
+                      : 'bg-white/[0.04] text-slate-300 border-white/10 hover:bg-white/[0.08] hover:text-white'
                   }`}
                 >
-                  <IconShield size={15} />
+                  <IconShield size={14} />
                   <span>Auditoría</span>
                 </button>
 
-                {/* Exclusive Button for Superadmin: Gestión de Administradores */}
                 {userRole === 'superadmin' && (
                   <button
                     type="button"
                     onClick={() => handleAdminNavigate('usuarios')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border ${
                       currentScreen === 'admin-usuarios'
-                        ? 'bg-amber-400 text-[#141b13] border-amber-400 font-extrabold shadow-md shadow-amber-400/25'
-                        : 'bg-amber-500/15 text-amber-300 border-amber-500/40 hover:bg-amber-500/25 hover:text-white'
+                        ? 'bg-amber-400 text-slate-950 border-amber-400 font-bold shadow-sm'
+                        : 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20 hover:text-white'
                     }`}
                   >
-                    <IconCrown size={15} />
+                    <IconCrown size={14} />
                     <span>Gestión Admins</span>
                   </button>
                 )}
@@ -495,10 +488,10 @@ const AppContent: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('landing')}
-                  className="px-3 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer flex items-center gap-1.5 border border-[#5a7056] bg-[#293827] text-[#65c556] hover:bg-[#3b4d38] hover:text-white"
-                  title="Ver portal como cliente"
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 hover:text-white"
+                  title="Ver portal público de reservas"
                 >
-                  <IconStadium size={15} />
+                  <IconStadium size={14} />
                   <span>Vista Portal</span>
                 </button>
               </div>
@@ -506,19 +499,21 @@ const AppContent: React.FC = () => {
           </nav>
         )}
 
-        {/* Right: Global Actions */}
-        {/* Right: Global Actions */}
+        {/* Right: Notifications & Logout */}
         <div className="flex items-center gap-2.5 shrink-0">
           {currentScreen !== 'login' && (
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="bg-[#3d2424] hover:bg-[#c53030] text-[#ff8080] hover:text-white px-4 py-2 min-h-[36px] rounded-xl font-semibold transition border border-[rgba(229,62,62,0.3)] cursor-pointer text-xs flex items-center gap-2 shadow-sm"
-              title="Cerrar sesión"
-            >
-              <IconLogout size={14} />
-              <span className="hidden sm:inline">Cerrar Sesión</span>
-            </button>
+            <>
+              <NotificationDropdown />
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="bg-red-500/10 hover:bg-red-600 text-red-300 hover:text-white px-3.5 py-2 rounded-xl font-semibold transition border border-red-500/25 cursor-pointer text-xs flex items-center gap-1.5"
+                title="Cerrar sesión"
+              >
+                <IconLogout size={14} />
+                <span className="hidden sm:inline">Salir</span>
+              </button>
+            </>
           )}
         </div>
       </header>

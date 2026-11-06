@@ -1,4 +1,5 @@
 import React from 'react';
+import { IconUndo, IconAlert, IconCheck } from './Icons';
 
 export interface CancelacionConfirmModalProps {
   isOpen: boolean;
@@ -23,89 +24,88 @@ export const CancelacionConfirmModal: React.FC<CancelacionConfirmModalProps> = (
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(17, 26, 16, 0.8)' }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div
-        className="bg-[#1e281d] rounded-[16px] border border-[#5a7056] w-full max-w-[440px] shadow-[0px_20px_25px_rgba(0,0,0,0.5)] overflow-hidden text-white font-['Inter',sans-serif]"
-        style={{ animation: 'modalIn 0.25s ease-out' }}
-      >
-        <div className="px-[28px] pt-[28px] pb-[20px] flex flex-col gap-[14px]">
-          {/* Header icon badge */}
-          <div className="flex items-center gap-[12px]">
+      <div className="bg-white rounded-2xl border border-slate-200 w-full max-w-[440px] shadow-2xl overflow-hidden text-slate-900 font-['Inter',sans-serif]">
+        <div className="p-6 flex flex-col gap-4">
+          <div className="flex items-center gap-3.5">
             <div
-              className={`size-[48px] rounded-full flex items-center justify-center text-[24px] border ${
+              className={`size-11 rounded-2xl flex items-center justify-center border shrink-0 ${
                 isRefundable
-                  ? 'bg-[rgba(101,197,86,0.15)] border-[rgba(101,197,86,0.3)] text-[#65c556]'
-                  : 'bg-[rgba(229,62,62,0.15)] border-[rgba(229,62,62,0.3)] text-[#e53e3e]'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                  : 'bg-red-50 border-red-200 text-red-600'
               }`}
             >
-              {isRefundable ? '↩️' : '⚠️'}
+              {isRefundable ? <IconUndo size={22} /> : <IconAlert size={22} />}
             </div>
             <div>
-              <h3 className="font-bold text-[18px] text-white">¿Confirmar Cancelación?</h3>
-              <p className="text-[12px] text-[#a0a0a0]">Política de Cancelaciones</p>
+              <h3 className="font-bold text-base text-slate-900 tracking-tight">¿Confirmar cancelación del turno?</h3>
+              <p className="text-xs text-slate-500">Política oficial de cancelaciones y señas</p>
             </div>
           </div>
 
           {bookingName && (
-            <div className="bg-[#293827] rounded-[8px] p-[12px] border border-[#5a7056]">
-              <span className="text-[11px] text-[#a0a0a0] block uppercase font-medium">Turno seleccionado</span>
-              <p className="font-bold text-[14px] text-white mt-0.5">{bookingName}</p>
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+              <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">Turno seleccionado</span>
+              <p className="font-bold text-sm text-slate-900 mt-0.5">{bookingName}</p>
             </div>
           )}
 
-          {/* Bloque de verificación determinado centralizadamente por el backend */}
           {isRefundable ? (
-            <div className="bg-[rgba(101,197,86,0.12)] border border-[#65c556] rounded-[10px] p-[14px] flex flex-col gap-1.5">
-              <div className="flex items-center gap-1.5 text-[#65c556] font-bold text-[13px]">
-                <span>✓ Reintegro total de seña {hoursUntilMatch !== undefined ? `(Anticipación: ${Math.round(hoursUntilMatch)} hs restantes)` : ''}</span>
+            <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3.5 flex flex-col gap-1.5">
+              <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs">
+                <IconCheck size={15} className="text-emerald-600 shrink-0" />
+                <span>
+                  Reintegro total de seña {hoursUntilMatch !== undefined ? `(${Math.round(hoursUntilMatch)} hs de anticipación)` : ''}
+                </span>
               </div>
-              <p className="text-[12px] text-[#c0c0c0] leading-relaxed">
+              <p className="text-xs text-emerald-900/80 leading-relaxed">
                 Corresponde la <strong>devolución íntegra de la seña abonada</strong> según la política del complejo (&gt;24 hs). Se acreditará a tu medio de pago original.
               </p>
-              <div className="flex justify-between items-center text-[13px] pt-1 border-t border-[rgba(101,197,86,0.2)]">
-                <span className="text-[#a0a0a0]">Monto a reintegrar:</span>
-                <span className="font-extrabold text-[15px] text-[#65c556]">
+              <div className="flex justify-between items-center text-xs pt-2 border-t border-emerald-200/70">
+                <span className="text-emerald-800 font-medium">Monto a reintegrar:</span>
+                <span className="font-extrabold text-sm text-emerald-700">
                   ${depositAmount.toLocaleString('es-AR')}
                 </span>
               </div>
             </div>
           ) : (
-            <div className="bg-[rgba(229,62,62,0.12)] border border-[#e53e3e] rounded-[10px] p-[14px] flex flex-col gap-1.5">
-              <div className="flex items-center gap-1.5 text-[#e53e3e] font-bold text-[13px]">
-                <span>⚠️ Retención de seña {hoursUntilMatch !== undefined ? `(Anticipación: ${Math.max(0, Math.round(hoursUntilMatch))} hs restantes)` : ''}</span>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 flex flex-col gap-1.5">
+              <div className="flex items-center gap-1.5 text-red-700 font-bold text-xs">
+                <IconAlert size={15} className="text-red-600 shrink-0" />
+                <span>
+                  Retención de seña {hoursUntilMatch !== undefined ? `(${Math.max(0, Math.round(hoursUntilMatch))} hs restantes)` : ''}
+                </span>
               </div>
-              <p className="text-[12px] text-[#c0c0c0] leading-relaxed">
-                Por cancelarse con menos de 24 horas de antelación, <strong>la seña de ${depositAmount.toLocaleString('es-AR')} no será devuelta (devolución: $0)</strong> y queda retenida como compensación por el turno no ocupado.
+              <p className="text-xs text-red-800/90 leading-relaxed">
+                Por cancelarse con menos de 24 horas de antelación, <strong>la seña de ${depositAmount.toLocaleString('es-AR')} no será reintegrada</strong> y queda retenida como compensación por el turno.
               </p>
             </div>
           )}
 
-          <p className="text-[11px] text-[#a0a0a0]">
-            Al confirmar, el turno se liberará de inmediato para los usuarios en lista de espera y el público general.
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            Al confirmar, la cancha volverá a figurar como disponible inmediatamente para todos los usuarios.
           </p>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-[10px] px-[28px] pb-[24px]">
+        <div className="flex items-center gap-3 px-6 pb-6">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-[8px] border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold text-xs transition-colors cursor-pointer"
+            className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold text-xs transition-colors cursor-pointer"
           >
-            No, mantener turno
+            Mantener turno
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className={`flex-1 py-2.5 rounded-[8px] font-bold text-xs transition-colors cursor-pointer ${
+            className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-colors cursor-pointer text-white ${
               isRefundable
-                ? 'bg-[#65c556] hover:bg-[#57ef40] text-[#293827]'
-                : 'bg-[#e53e3e] hover:bg-[#c53030] text-white'
+                ? 'bg-[#199e1b] hover:bg-[#158417]'
+                : 'bg-red-600 hover:bg-red-700'
             }`}
           >
             Sí, cancelar turno

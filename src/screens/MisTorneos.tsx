@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import type { StandingRow, FixtureMatch, Tournament } from '../data/mockData';
-import { IconPlus } from '../components/Icons';
+import { IconPlus, IconCalendar, IconUsers, IconArrowLeft, IconArrowRight, IconStadium } from '../components/Icons';
 import TorneoDetalleModal from '../components/TorneoDetalleModal';
 
 interface MisTorneosProps {
@@ -46,42 +46,44 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#293827] text-white font-['Inter',sans-serif]">
-
-      {/* Main Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 lg:px-12 py-10">
+    <div className="flex flex-col min-h-screen bg-[#f4f6f4] text-slate-900 font-['Inter',sans-serif]">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-black text-white">Torneos del Complejo</h1>
-            <p className="text-[#a3b89e] mt-1 text-sm">
-              Competencias oficiales modalidad liga. Consulta tablas de posiciones, fixtures e inscribe a tu equipo.
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Competencias Universitarias</span>
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mt-0.5">Torneos del Complejo</h1>
+            <p className="text-slate-500 mt-1 text-xs sm:text-sm">
+              Competencias oficiales modalidad liga. Consultá tablas de posiciones, fixtures e inscribí a tu plantel.
             </p>
           </div>
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => onNavigate('landing')}
-              className="inline-flex items-center justify-center gap-2 bg-[#1e281d] hover:bg-[#3b4d38] border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold px-5 py-3 rounded-xl transition cursor-pointer text-xs min-h-[44px]"
+              className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold px-4 py-2.5 rounded-xl transition cursor-pointer text-xs"
             >
-              ← Volver a Canchas
+              <IconArrowLeft size={14} />
+              <span>Volver a Canchas</span>
             </button>
             {userRole !== 'arbitro' && (
               <button
+                type="button"
                 onClick={() => {
                   const openTorneo = tournaments.find(t => t.status === 'Inscripciones abiertas');
                   const targetId = selectedTorneo?.status === 'Inscripciones abiertas' ? selectedTorneo.id : (openTorneo?.id || selectedTorneo?.id);
                   onOpenInscripcion(targetId);
                 }}
-                className="inline-flex items-center justify-center gap-2 bg-[#65c556] hover:bg-[#54b045] text-[#141b13] font-black px-6 py-3 rounded-xl shadow-lg shadow-[#65c556]/20 transition cursor-pointer text-sm min-h-[44px]"
+                className="inline-flex items-center justify-center gap-2 bg-[#199e1b] hover:bg-[#158417] text-white font-bold px-5 py-2.5 rounded-xl shadow-md shadow-[#199e1b]/20 transition cursor-pointer text-xs"
               >
-                <IconPlus size={18} className="shrink-0" />
-                Inscribir Mi Equipo
+                <IconPlus size={16} className="shrink-0" />
+                <span>Inscribir Mi Equipo</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Torneos Grid Cards (Figma 242:1726) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        {/* Torneos Grid Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
           {tournaments.map((torneo) => {
             const isSelected = torneo.id === selectedTorneoId;
             return (
@@ -91,36 +93,43 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
                   setSelectedTorneoId(torneo.id);
                   document.getElementById('torneo-activo-detalle')?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className={`bg-[#344732] rounded-xl border p-5 flex flex-col justify-between transition cursor-pointer hover:border-[#65c556] ${
-                  isSelected ? 'border-[#65c556] ring-1 ring-[#65c556] shadow-lg' : 'border-[#445941]'
+                className={`bg-white rounded-2xl border p-5 flex flex-col justify-between transition cursor-pointer hover:border-emerald-400 shadow-xs ${
+                  isSelected ? 'border-[#199e1b] ring-2 ring-[#199e1b]/20' : 'border-slate-200'
                 }`}
               >
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-bold px-2.5 py-1 rounded bg-[#3c503a] text-[#65c556]">
+                  <div className="flex items-center justify-between mb-3 gap-2">
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                       {torneo.sport}
                     </span>
                     <span
-                      className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
                         torneo.status === 'En curso'
-                          ? 'bg-[#65c556]/20 text-[#65c556]'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                           : torneo.status === 'Inscripciones abiertas'
-                          ? 'bg-blue-400/20 text-blue-300'
-                          : 'bg-gray-500/20 text-gray-300'
+                          ? 'bg-sky-50 text-sky-700 border-sky-200'
+                          : 'bg-slate-100 text-slate-600 border-slate-200'
                       }`}
                     >
                       {torneo.status}
                     </span>
                   </div>
 
-                  <h3 className="font-extrabold text-lg text-white mb-1 line-clamp-1">{torneo.name}</h3>
-                  <p className="text-xs text-[#a3b89e] mb-4">
-                    📅 {torneo.dates} | 👥 {(torneo.registeredTeams || []).length}/{torneo.maxTeams || 8} Equipos
-                  </p>
+                  <h3 className="font-bold text-base text-slate-900 mb-2 line-clamp-1">{torneo.name}</h3>
+                  <div className="flex flex-col gap-1 text-xs text-slate-500 mb-4">
+                    <span className="inline-flex items-center gap-1.5">
+                      <IconCalendar size={13} className="text-slate-400" />
+                      <span>{torneo.dates}</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <IconUsers size={13} className="text-slate-400" />
+                      <span>{(torneo.registeredTeams || []).length}/{torneo.maxTeams || 8} Equipos</span>
+                    </span>
+                  </div>
                 </div>
 
-                <div className="pt-4 border-t border-[#445941] flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#a3b89e]">Modalidad Liga</span>
+                <div className="pt-3.5 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-400">Modalidad Liga</span>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -128,10 +137,10 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
                       setSelectedTorneoId(torneo.id);
                       setDetailModalTorneo(torneo);
                     }}
-                    className="text-xs font-bold text-[#65c556] hover:text-[#54b045] underline flex items-center gap-1 cursor-pointer py-1"
+                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer bg-transparent border-none"
                   >
                     <span>Ver Detalles</span>
-                    <span>→</span>
+                    <IconArrowRight size={13} />
                   </button>
                 </div>
               </div>
@@ -140,28 +149,28 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
         </div>
 
         {/* Torneo Activo: Pestañas de Posiciones y Fixture */}
-        <div id="torneo-activo-detalle" className="bg-[#344732] rounded-xl border border-[#445941] overflow-hidden shadow-xl">
-          <div className="p-6 border-b border-[#445941] flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div id="torneo-activo-detalle" className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+          <div className="p-6 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/60">
             <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-2xl font-black text-white">{selectedTorneo.name}</h2>
-                <span className="text-xs font-bold px-2.5 py-1 rounded bg-[#293827] text-[#65c556] border border-[#445941]">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">{selectedTorneo.name}</h2>
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                   {selectedTorneo.sport}
                 </span>
               </div>
-              <p className="text-xs text-[#a3b89e] mt-1">
-                Fechas: {selectedTorneo.dates} — Sistema de puntos: Victoria 3 pts, Empate 1 pt, Derrota 0 pts.
+              <p className="text-xs text-slate-500 mt-1">
+                Fechas: {selectedTorneo.dates} · Sistema de puntos: Victoria 3 pts, Empate 1 pt, Derrota 0 pts.
               </p>
             </div>
 
-            <div className="flex bg-[#293827] p-1.5 rounded-xl border border-[#445941] gap-1">
+            <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1">
               <button
                 type="button"
                 onClick={() => setActiveTab('posiciones')}
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
                   activeTab === 'posiciones'
-                    ? 'bg-[#65c556] text-[#141b13] font-black shadow-sm'
-                    : 'text-[#a3b89e] hover:text-white hover:bg-[#344732]'
+                    ? 'bg-[#199e1b] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Tabla de Posiciones
@@ -171,11 +180,11 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
                 onClick={() => setActiveTab('fixture')}
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
                   activeTab === 'fixture'
-                    ? 'bg-[#65c556] text-[#141b13] font-black shadow-sm'
-                    : 'text-[#a3b89e] hover:text-white hover:bg-[#344732]'
+                    ? 'bg-[#199e1b] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Fixture & Partidos
+                Fixture y Partidos
               </button>
             </div>
           </div>
@@ -183,12 +192,12 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
           {/* TAB 1: Tabla de Posiciones */}
           {activeTab === 'posiciones' && (
             <div className="p-6 overflow-x-auto">
-              <table className="w-full text-left text-sm">
+              <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-[#445941] text-[#a3b89e] text-xs uppercase tracking-wider">
+                  <tr className="border-b border-slate-200 text-slate-500 text-[11px] uppercase tracking-wider bg-slate-50">
                     <th className="py-3 px-4">#</th>
                     <th className="py-3 px-4">Equipo</th>
-                    <th className="py-3 px-4 text-center">PTS</th>
+                    <th className="py-3 px-4 text-center font-extrabold text-emerald-700">PTS</th>
                     <th className="py-3 px-4 text-center">PJ</th>
                     <th className="py-3 px-4 text-center">PG</th>
                     <th className="py-3 px-4 text-center">PE</th>
@@ -198,53 +207,53 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
                     <th className="py-3 px-4 text-center">DG</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#445941]">
+                <tbody className="divide-y divide-slate-100">
                   {standings.map((team: StandingRow, idx: number) => {
                     const diffGoles = team.gf - team.gc;
                     return (
                       <tr
                         key={team.team}
-                        className={`hover:bg-[#3c503a]/50 transition ${
-                          idx === 0 ? 'bg-[#65c556]/5' : ''
+                        className={`hover:bg-slate-50/80 transition ${
+                          idx === 0 ? 'bg-emerald-50/40' : ''
                         }`}
                       >
-                        <td className="py-3 px-4 font-black">
+                        <td className="py-3 px-4 font-bold">
                           <span
                             className={`size-6 rounded-full inline-flex items-center justify-center text-xs ${
                               idx === 0
-                                ? 'bg-[#65c556] text-[#141b13] font-black'
+                                ? 'bg-[#199e1b] text-white font-bold'
                                 : idx === 1
-                                ? 'bg-amber-400 text-[#141b13] font-black'
-                                : 'text-[#a3b89e]'
+                                ? 'bg-amber-400 text-slate-950 font-bold'
+                                : 'text-slate-600'
                             }`}
                           >
                             {team.pos}
                           </span>
                         </td>
-                        <td className="py-3 px-4 font-bold text-white flex items-center gap-2">
+                        <td className="py-3 px-4 font-bold text-slate-900 flex items-center gap-2">
                           {team.team}
                           {idx === 0 && (
-                            <span className="text-[10px] bg-[#65c556]/20 text-[#65c556] px-1.5 py-0.5 rounded font-extrabold">
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
                               Líder
                             </span>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-center font-black text-[#65c556] text-base">
+                        <td className="py-3 px-4 text-center font-extrabold text-emerald-700 text-sm">
                           {team.pts}
                         </td>
-                        <td className="py-3 px-4 text-center text-[#a3b89e] font-medium">{team.pj}</td>
-                        <td className="py-3 px-4 text-center font-medium">{team.pg}</td>
-                        <td className="py-3 px-4 text-center font-medium">{team.pe}</td>
-                        <td className="py-3 px-4 text-center font-medium">{team.pp}</td>
-                        <td className="py-3 px-4 text-center text-[#a3b89e] font-medium">{team.gf}</td>
-                        <td className="py-3 px-4 text-center text-[#a3b89e] font-medium">{team.gc}</td>
+                        <td className="py-3 px-4 text-center text-slate-600 font-mono">{team.pj}</td>
+                        <td className="py-3 px-4 text-center font-mono">{team.pg}</td>
+                        <td className="py-3 px-4 text-center font-mono">{team.pe}</td>
+                        <td className="py-3 px-4 text-center font-mono">{team.pp}</td>
+                        <td className="py-3 px-4 text-center text-slate-600 font-mono">{team.gf}</td>
+                        <td className="py-3 px-4 text-center text-slate-600 font-mono">{team.gc}</td>
                         <td
-                          className={`py-3 px-4 text-center font-bold ${
+                          className={`py-3 px-4 text-center font-mono font-bold ${
                             diffGoles > 0
-                              ? 'text-[#65c556]'
+                              ? 'text-emerald-700'
                               : diffGoles < 0
-                              ? 'text-red-400'
-                              : 'text-white'
+                              ? 'text-red-600'
+                              : 'text-slate-600'
                           }`}
                         >
                           {diffGoles > 0 ? `+${diffGoles}` : diffGoles}
@@ -259,55 +268,55 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
 
           {/* TAB 2: Fixture */}
           {activeTab === 'fixture' && (
-            <div className="p-6 space-y-6">
+            <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filteredFixtures.map((match: FixtureMatch) => (
                   <div
                     key={match.id}
-                    className="bg-[#293827] rounded-xl border border-[#445941] p-5 flex flex-col justify-between"
+                    className="bg-slate-50 rounded-xl border border-slate-200 p-5 flex flex-col justify-between"
                   >
-                    <div className="flex items-center justify-between text-xs text-[#a3b89e] mb-3">
-                      <span className="font-bold text-[#65c556]">{match.round} - {match.date} {match.time}</span>
-                      <span className="bg-[#344732] px-2 py-0.5 rounded border border-[#445941]">
+                    <div className="flex items-center justify-between text-xs text-slate-500 mb-3">
+                      <span className="font-bold text-emerald-700">{match.round} · {match.date} {match.time}</span>
+                      <span className="bg-white px-2.5 py-0.5 rounded-md border border-slate-200 text-slate-700 font-medium">
                         {match.court}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between py-3">
                       <div className="flex-1 text-right">
-                        <span className="font-extrabold text-base text-white">{match.homeTeam}</span>
+                        <span className="font-bold text-sm text-slate-900">{match.homeTeam}</span>
                       </div>
 
-                      <div className="px-5 text-center">
+                      <div className="px-4 text-center">
                         {match.status === 'Disputado' ? (
-                          <div className="bg-[#344732] px-3 py-1 rounded border border-[#445941] font-black text-lg text-[#65c556]">
+                          <div className="bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200 font-extrabold text-base text-emerald-700">
                             {match.homeScore} - {match.awayScore}
                           </div>
                         ) : match.isFreeDate ? (
-                          <div className="text-xs font-bold text-amber-400 bg-[#344732] px-3 py-1 rounded">
+                          <div className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-lg">
                             Fecha Libre
                           </div>
                         ) : (
-                          <div className="text-xs font-bold text-[#a3b89e] bg-[#344732] px-3 py-1 rounded">
+                          <div className="text-xs font-bold text-slate-500 bg-white border border-slate-200 px-3 py-1 rounded-lg">
                             VS
                           </div>
                         )}
                       </div>
 
                       <div className="flex-1 text-left">
-                        <span className="font-extrabold text-base text-white">
+                        <span className="font-bold text-sm text-slate-900">
                           {match.isFreeDate ? '(Descanso)' : match.awayTeam}
                         </span>
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-[#445941] flex items-center justify-between text-xs">
-                      <span className="text-[#a3b89e]">Árbitro: {match.refereeName || 'Designado por el complejo'}</span>
+                    <div className="pt-3 border-t border-slate-200/70 flex items-center justify-between text-xs">
+                      <span className="text-slate-500">Árbitro: <strong className="text-slate-700">{match.refereeName || 'Designado por el complejo'}</strong></span>
                       <span
-                        className={`font-bold px-2 py-0.5 rounded text-[11px] ${
+                        className={`font-bold px-2.5 py-0.5 rounded-full text-[10px] border ${
                           match.status === 'Disputado'
-                            ? 'bg-[#65c556]/20 text-[#65c556]'
-                            : 'bg-amber-400/20 text-amber-400'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
                         }`}
                       >
                         {match.status}
@@ -321,45 +330,19 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
         </div>
       </main>
 
-      {/* Footer (Figma 242:1726) */}
-      <footer className="bg-[#293827] border-t border-[#445941] py-12 px-6 lg:px-12 mt-12 text-[#a3b89e] text-xs">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-          <div>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="size-8 bg-[#65c556] rounded flex items-center justify-center font-black text-[#141b13]">
-                UB
-              </div>
-              <span className="font-extrabold text-white text-base">Complejo Deportivo UB</span>
+      {/* Footer */}
+      <footer className="bg-[#0d1510] border-t border-white/10 py-8 px-6 lg:px-12 mt-12 text-slate-400 text-xs">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="size-8 bg-emerald-500/15 border border-emerald-500/30 rounded-lg flex items-center justify-center text-emerald-400">
+              <IconStadium size={16} />
             </div>
-            <p className="leading-relaxed">
-              La mejor infraestructura deportiva de la región. Canchas de fútbol, tenis y pádel de última generación.
-            </p>
+            <span className="font-bold text-white text-sm">Complejo Deportivo UB</span>
           </div>
-
-          <div>
-            <h4 className="font-bold text-white text-sm mb-3">Contacto</h4>
-            <p className="mb-1">Tel: (555) 123-4567</p>
-            <p className="mb-1">info@complejoub.com</p>
-            <p>Av. Deporte 432, Mendoza</p>
-          </div>
-
-          <div>
-            <h4 className="font-bold text-white text-sm mb-3">Horarios del Predio</h4>
-            <p className="mb-1">Lunes a Sábados: 08:00 a 00:00 hs</p>
-            <p>Domingos: 09:00 a 22:00 hs</p>
-          </div>
-        </div>
-
-        <div className="max-w-7xl mx-auto pt-6 border-t border-[#445941] flex flex-col md:flex-row items-center justify-between gap-4">
           <p>© 2026 Complejo Deportivo UB. Todos los derechos reservados.</p>
-          <div className="flex gap-6">
-            <a href="#" className="hover:text-white transition">Términos de servicio</a>
-            <a href="#" className="hover:text-white transition">Políticas de privacidad</a>
-          </div>
         </div>
       </footer>
 
-      {/* Modal de Detalle de Torneo */}
       <TorneoDetalleModal
         isOpen={!!detailModalTorneo}
         torneo={detailModalTorneo}

@@ -30,7 +30,7 @@ import {
   adminApi
 } from '../api/endpoints';
 import { apiClient } from '../api/client';
-import { formatTimeAgo, normalizeBookingDate } from '../utils/dateUtils';
+import { formatTimeAgo, getTodayISO, normalizeBookingDate } from '../utils/dateUtils';
 
 export type {
   Court,
@@ -61,6 +61,11 @@ export interface CurrentUser {
   suspension_hasta?: string | null;
 }
 
+export interface SlotAvailabilityInfo {
+  estado: 'Libre' | 'Ocupado' | 'DeshabilitadoTorneo' | 'Mantenimiento';
+  motivo: string;
+}
+
 export const DEMO_EMAILS: Record<UserRole, string> = {
   cliente: 'lucas@gmail.com',
   admin: 'operador@complejoub.com',
@@ -75,6 +80,8 @@ export interface ComplejoContextType {
   setCurrentUser: (user: CurrentUser | null) => void;
   courts: Court[];
   bookings: BookingItem[];
+  sharedBookings: BookingItem[];
+  courtAvailability: Record<string, Record<string, SlotAvailabilityInfo>>;
   tournaments: Tournament[];
   fixtures: FixtureMatch[];
   standings: StandingRow[];
@@ -90,6 +97,7 @@ export interface ComplejoContextType {
 
   // Acciones y sincronización con API
   fetchTorneoData: (torneoId: string | number) => Promise<void>;
+  fetchAvailabilityForDate: (date: string, courtsToQuery?: Court[]) => Promise<void>;
   refreshAllData: (currentRole?: UserRole) => Promise<void>;
   bookCourt: (courtId: string, courtName: string, sport: SportType, date: string, time: string) => Promise<BookingItem>;
   cancelBooking: (bookingId: string) => Promise<{ refunded: boolean; depositAmount: number; message: string }>;
@@ -113,6 +121,7 @@ export interface ComplejoContextType {
 const ComplejoContext = createContext<ComplejoContextType | undefined>(undefined);
 
 const STORAGE_PREFIX = 'complejo_ub_';
+const SHARED_BOOKINGS_KEY = 'complejo_ub_shared_bookings';
 
 function loadOr<T>(key: string, fallback: T): T {
   try {
@@ -127,6 +136,27 @@ function loadOr<T>(key: string, fallback: T): T {
 function saveTo<T>(key: string, val: T) {
   try {
     localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(val));
+  } catch {
+    // ignore
+  }
+}
+
+function loadSharedBookings(): BookingItem[] {
+  try {
+    const raw = localStorage.getItem(SHARED_BOOKINGS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
+function saveSharedBookings(items: BookingItem[]) {
+  try {
+    localStorage.setItem(SHARED_BOOKINGS_KEY, JSON.stringify(items));
   } catch {
     // ignore
   }
@@ -198,8 +228,8 @@ function mapPartidoFromApi(p: any, torneoNombre = ''): FixtureMatch {
     'REPROGRAMADO': 'Reprogramado',
   };
 
-  let formattedDate = p.fecha ? String(p.fecha).split('T')[0] : '';
-  let formattedTime = p.hora ? String(p.hora).slice(0, 5) + ' hs' : '';
+  const formattedDate = p.fecha ? String(p.fecha).split('T')[0] : '';
+  const formattedTime = p.hora ? String(p.hora).slice(0, 5) + ' hs' : '';
 
   return {
     id: Number(p.id),
@@ -250,7 +280,7 @@ function mapReservaFromApi(r: any): BookingItem {
     courtId: String(r.fk_cancha_id),
     courtName: r.cancha_nombre || `Cancha #${r.fk_cancha_id}`,
     sport: mapSportFromApi(r.cancha_deporte || 'Futbol 5'),
-    date: r.fecha ? String(r.fecha).split('T')[0] : 'Hoy',
+    date: r.fecha ? String(r.fecha).split('T')[0] : getTodayISO(),
     time: r.hora ? String(r.hora).slice(0, 5) + ' hs' : '19:00 hs',
     totalPrice: total,
     depositPaid: sena,
@@ -282,6 +312,8 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
   const [courts, setCourts] = useState<Court[]>(INITIAL_COURTS);
   const [bookings, setBookings] = useState<BookingItem[]>([]);
+  const [sharedBookings, setSharedBookings] = useState<BookingItem[]>(() => loadSharedBookings());
+  const [courtAvailability, setCourtAvailability] = useState<Record<string, Record<string, SlotAvailabilityInfo>>>({});
   const [tournaments, setTournaments] = useState<Tournament[]>(INITIAL_TOURNAMENTS);
   const [fixtures, setFixtures] = useState<FixtureMatch[]>([]);
   const [standings, setStandings] = useState<StandingRow[]>([]);
@@ -292,6 +324,48 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [userAbsences, setUserAbsences] = useState<number>(0);
   const [invitations, setInvitations] = useState<TeamInvitation[]>([]);
   const [userParticipations, setUserParticipations] = useState<UserTeamParticipation[]>([]);
+
+  // Sincronización de disponibilidad real por fecha para TODAS las canchas (endpoint público /canchas/:id/disponibilidad)
+  const fetchAvailabilityForDate = useCallback(async (date: string, courtsToQuery?: Court[]) => {
+    const cleanDate = normalizeBookingDate(date);
+    const targetCourts = courtsToQuery && courtsToQuery.length > 0 ? courtsToQuery : courts;
+    if (!targetCourts || targetCourts.length === 0) return;
+
+    try {
+      const results = await Promise.all(
+        targetCourts.map(async (c, idx) => {
+          const numericId = parseInt(String(c.id).replace(/\D/g, ''), 10) || (idx + 1);
+          try {
+            const disp: any = await canchasApi.getDisponibilidad(numericId, cleanDate);
+            return { courtId: String(c.id), numericId: String(numericId), courtName: c.name, disp };
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      setCourtAvailability((prev) => {
+        const next = { ...prev };
+        for (const item of results) {
+          if (!item || !item.disp || !Array.isArray(item.disp.slots)) continue;
+          const slotMap: Record<string, SlotAvailabilityInfo> = {};
+          for (const s of item.disp.slots) {
+            const hKey = String(s.hora).slice(0, 5);
+            slotMap[hKey] = {
+              estado: s.estado,
+              motivo: s.motivo || '',
+            };
+          }
+          next[`${item.courtId}_${cleanDate}`] = slotMap;
+          next[`${item.numericId}_${cleanDate}`] = slotMap;
+          next[`${item.courtName.toLowerCase()}_${cleanDate}`] = slotMap;
+        }
+        return next;
+      });
+    } catch (err: any) {
+      console.warn('[ComplejoContext] Error al sincronizar disponibilidad por fecha:', err?.message);
+    }
+  }, [courts]);
 
   // Helper para autenticar automáticamente según el rol activo SOLO si no hay usuario en sesión
   const authenticateRole = useCallback(async (role: UserRole) => {
@@ -369,12 +443,16 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         (isRoleAdmin ? adminApi.getAdministradores() : Promise.resolve([])).catch(() => []),
       ]);
 
+      let activeCourtsList = courts;
       if (Array.isArray(canchas) && canchas.length > 0) {
-        setCourts(canchas.map(mapCanchaFromApi));
+        activeCourtsList = canchas.map(mapCanchaFromApi);
+        setCourts(activeCourtsList);
       }
 
+      // Sincronizar disponibilidad real de todas las canchas para el día actual
+      await fetchAvailabilityForDate(getTodayISO(), activeCourtsList);
+
       if (Array.isArray(torneos) && torneos.length > 0) {
-        // Enriquecer torneos con sus equipos inscriptos reales desde MySQL
         const mappedTorneos = await Promise.all(
           torneos.map(async (t: any) => {
             const base = mapTorneoFromApi(t);
@@ -399,7 +477,6 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         setTournaments(mappedTorneos);
 
-        // Seleccionar por defecto el torneo en curso (ej. Copa Verano) para mostrar fixtures y posiciones reales
         const defaultActive = mappedTorneos.find((t) => t.status === 'En curso') || mappedTorneos[0];
         if (defaultActive) {
           await fetchTorneoData(defaultActive.id);
@@ -407,7 +484,24 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
 
       if (Array.isArray(resReservas)) {
-        setBookings(resReservas.map(mapReservaFromApi));
+        const mappedBookings = resReservas.map(mapReservaFromApi);
+        setBookings(mappedBookings);
+
+        // Actualizar registro compartido de reservas confirmadas para mantener visibilidad entre sesiones
+        setSharedBookings((prevShared) => {
+          const byKey = new Map<string, BookingItem>();
+          for (const b of prevShared) {
+            const key = `${b.courtName.toLowerCase()}_${normalizeBookingDate(b.date)}_${b.time.slice(0, 5)}`;
+            byKey.set(key, b);
+          }
+          for (const b of mappedBookings) {
+            const key = `${b.courtName.toLowerCase()}_${normalizeBookingDate(b.date)}_${b.time.slice(0, 5)}`;
+            byKey.set(key, b);
+          }
+          const merged = Array.from(byKey.values());
+          saveSharedBookings(merged);
+          return merged;
+        });
       }
 
       if (Array.isArray(notifs)) {
@@ -493,7 +587,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (err: any) {
       console.warn('[ComplejoContext] Error en sincronización general con API:', err?.message);
     }
-  }, [fetchTorneoData, userRole]);
+  }, [courts, fetchAvailabilityForDate, fetchTorneoData, userRole]);
 
   // Cambio de rol con autenticación instantánea en backend
   const setUserRole = useCallback(async (newRole: UserRole, userToSet?: CurrentUser | null) => {
@@ -505,17 +599,19 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } else {
       await authenticateRole(newRole);
     }
-    // Purgar estado específico de usuario anterior para evitar mezcla de perfiles
+    // Purgar estado específico de usuario anterior para evitar mezcla de perfiles,
+    // pero mantener sharedBookings y courtAvailability para reflejar las canchas ocupadas
+    setBookings([]);
     setUserParticipations([]);
     setInvitations([]);
+    setSharedBookings(loadSharedBookings());
     await refreshAllData(newRole);
   }, [authenticateRole, refreshAllData]);
 
-  // Inicialización en montaje: si hay usuario previo en localStorage, restaurarlo; si no, esperar login
+  // Inicialización en montaje
   useEffect(() => {
     let isMounted = true;
     const init = async () => {
-      // Purgar claves legacy que contenían participaciones acumuladas de todos los usuarios
       try {
         localStorage.removeItem('complejo_userParticipations');
         localStorage.removeItem('complejo_invitations');
@@ -564,7 +660,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const newLog: AuditLogItem = {
       id: 'aud-' + Date.now(),
       timestamp: 'Hoy, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' hs',
-      adminName: userRole === 'admin' ? 'Administrador General' : 'Sistema Automático',
+      adminName: userRole === 'admin' || userRole === 'superadmin' ? 'Administrador General' : 'Sistema Automático',
       action,
       detail,
       type
@@ -586,7 +682,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setNotifications((prev) => [newNotif, ...prev]);
   };
 
-  // Reserva de turnos con seña del 30% en MySQL
+  // Reserva de turnos con seña del 30% en MySQL y sincronización inmediata de disponibilidad
   const bookCourt = async (courtId: string, courtName: string, sport: SportType, date: string, time: string): Promise<BookingItem> => {
     if (isUserBanned) {
       const msg = 'Tu cuenta se encuentra suspendida temporalmente por acumulación de inasistencias. No puedes realizar nuevas reservas.';
@@ -600,11 +696,11 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const numCanchaId = parseInt(courtId.replace(/\D/g, ''), 10) || 1;
 
     const cleanDate = normalizeBookingDate(date);
-    const cleanHour = time.replace(' hs', '').trim() + (time.includes(':') ? (time.split(':').length === 2 ? ':00' : '') : ':00:00');
+    const hourShort = time.replace(' hs', '').trim().slice(0, 5);
+    const cleanHour = `${hourShort}:00`;
 
     // Validación Docente: No permitir turnos en fechas u horarios concluidos
-    const cleanTimeFormatted = cleanHour.length === 5 ? `${cleanHour}:00` : cleanHour;
-    const targetTurnoDate = new Date(`${cleanDate}T${cleanTimeFormatted}-03:00`);
+    const targetTurnoDate = new Date(`${cleanDate}T${cleanHour}-03:00`);
     const toleranciaGraciaMs = 5 * 60 * 1000;
 
     if (targetTurnoDate.getTime() + toleranciaGraciaMs <= Date.now()) {
@@ -621,11 +717,18 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
       if (apiRes && apiRes.id) {
         createdId = String(apiRes.id);
-        await refreshAllData();
       }
     } catch (err: any) {
-      console.warn('[bookCourt] Error al guardar en MySQL:', err?.message);
-      throw new Error(err?.message || 'Error al persistir turno en la base de datos.');
+      const isNetworkError =
+        err?.message?.includes('Failed to fetch') ||
+        err?.message?.includes('NetworkError') ||
+        err?.statusCode === undefined;
+
+      if (!isNetworkError) {
+        console.warn('[bookCourt] Error de validación en MySQL:', err?.message);
+        throw new Error(err?.message || 'Error al persistir turno en la base de datos.');
+      }
+      console.warn('[bookCourt] Modo Demo sin conexión al backend, registrando reserva localmente.');
     }
 
     const newBooking: BookingItem = {
@@ -634,7 +737,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       courtName,
       sport,
       date: cleanDate,
-      time,
+      time: `${hourShort} hs`,
       totalPrice,
       depositPaid,
       remainingBalance,
@@ -646,21 +749,56 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     setBookings((prev) => [newBooking, ...prev.filter(b => b.id !== createdId)]);
+
+    // Persistir en el registro compartido entre sesiones de usuarios
+    setSharedBookings((prev) => {
+      const filtered = prev.filter(
+        (b) =>
+          !(
+            (b.courtId === courtId || b.courtName.toLowerCase() === courtName.toLowerCase()) &&
+            normalizeBookingDate(b.date) === cleanDate &&
+            b.time.slice(0, 5) === hourShort
+          )
+      );
+      const updated = [newBooking, ...filtered];
+      saveSharedBookings(updated);
+      return updated;
+    });
+
+    // Actualizar disponibilidad en memoria inmediatamente y sincronizar con el backend
+    setCourtAvailability((prev) => {
+      const next = { ...prev };
+      const keys = [
+        `${courtId}_${cleanDate}`,
+        `${numCanchaId}_${cleanDate}`,
+        `${courtName.toLowerCase()}_${cleanDate}`,
+      ];
+      for (const k of keys) {
+        next[k] = {
+          ...(next[k] || {}),
+          [hourShort]: { estado: 'Ocupado', motivo: 'Turno reservado' },
+        };
+      }
+      return next;
+    });
+
+    await refreshAllData();
+    await fetchAvailabilityForDate(cleanDate);
+
     addNotification(
-      '¡Turno Reservado con Éxito!',
-      `Cancha ${courtName} para el ${cleanDate} a las ${time}. Seña abonada: $${depositPaid.toLocaleString()}. Saldo en complejo: $${remainingBalance.toLocaleString()}.`,
+      'Turno Reservado con Éxito',
+      `Cancha ${courtName} para el ${cleanDate} a las ${hourShort} hs. Seña abonada: $${depositPaid.toLocaleString()}. Saldo en complejo: $${remainingBalance.toLocaleString()}.`,
       'reserva'
     );
-    logAudit('Nueva Reserva de Cancha', `Cliente reservó ${courtName} (${sport}) para el ${cleanDate} a las ${time}. Seña 30%: $${depositPaid}.`, 'reserva');
+    logAudit('Nueva Reserva de Cancha', `Cliente reservó ${courtName} (${sport}) para el ${cleanDate} a las ${hourShort} hs. Seña 30%: $${depositPaid}.`, 'reserva');
     return newBooking;
   };
 
   // Cancelación de reservas centralizada en la API del backend
   const cancelBooking = async (bookingId: string) => {
-    const target = bookings.find((b) => b.id === bookingId);
+    const target = bookings.find((b) => b.id === bookingId) || sharedBookings.find((b) => b.id === bookingId);
     const numId = parseInt(bookingId.replace(/\D/g, ''), 10);
 
-    // Estado inicial de reembolso determinado por el backend en la reserva
     let isRefundable = target?.aplicaDevolucion ?? false;
     let deposit = target ? target.depositPaid : 5400;
     let serverMessage = '';
@@ -669,11 +807,9 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       try {
         const res: any = await reservasApi.cancelar(numId, 'Cancelado por solicitud del cliente');
         if (res) {
-          // El backend es la única fuente de verdad para el estado y los términos de cancelación
           isRefundable = Boolean(res.aplicaDevolucion);
           if (res.montoSenaDevuelto !== undefined) deposit = Number(res.montoSenaDevuelto);
           if (res.mensaje) serverMessage = res.mensaje;
-          await refreshAllData();
         }
       } catch (err: any) {
         console.warn('[cancelBooking] Error al cancelar en backend:', err?.message);
@@ -683,6 +819,38 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Cancelada', aplicaDevolucion: isRefundable } : b))
     );
+
+    setSharedBookings((prev) => {
+      const updated = prev.map((b) => (b.id === bookingId ? { ...b, status: 'Cancelada' as const, aplicaDevolucion: isRefundable } : b));
+      saveSharedBookings(updated);
+      return updated;
+    });
+
+    if (target) {
+      const cleanDate = normalizeBookingDate(target.date);
+      const hourShort = target.time.replace(' hs', '').trim().slice(0, 5);
+      const numCanchaId = parseInt(String(target.courtId).replace(/\D/g, ''), 10) || 1;
+      setCourtAvailability((prev) => {
+        const next = { ...prev };
+        const keys = [
+          `${target.courtId}_${cleanDate}`,
+          `${numCanchaId}_${cleanDate}`,
+          `${target.courtName.toLowerCase()}_${cleanDate}`,
+        ];
+        for (const k of keys) {
+          if (next[k]) {
+            next[k] = {
+              ...next[k],
+              [hourShort]: { estado: 'Libre', motivo: '' },
+            };
+          }
+        }
+        return next;
+      });
+      await fetchAvailabilityForDate(cleanDate);
+    }
+
+    await refreshAllData();
 
     let msg = '';
     const depositToReturn = isRefundable ? deposit : 0;
@@ -703,11 +871,11 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const joinWaitlist = async (courtName: string, date: string, time: string, userName: string, userPhone: string): Promise<number> => {
     const position = waitlist.length + 1;
     const cleanHour = time.replace(' hs', '').trim() + ':00';
-    let cleanDate = date === 'Hoy' ? new Date().toISOString().split('T')[0] : date;
+    const cleanDate = date === 'Hoy' ? getTodayISO() : normalizeBookingDate(date);
 
     try {
       const canchaTarget = courts.find(c => c.name.toLowerCase() === courtName.toLowerCase());
-      const cId = canchaTarget ? parseInt(canchaTarget.id, 10) : 1;
+      const cId = canchaTarget ? parseInt(canchaTarget.id.replace(/\D/g, ''), 10) || 1 : 1;
       await listaEsperaApi.unirse({ canchaId: cId, fecha: cleanDate, hora: cleanHour });
     } catch (err: any) {
       console.warn('[joinWaitlist] API error:', err?.message);
@@ -860,7 +1028,6 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           addNotification('Equipo Inscripto', `Tu equipo "${teamName}" fue admitido en el torneo.`, 'torneo');
           return { success: true };
         } catch (apiErr: any) {
-          // Si el backend retornó un error de validación de negocio (ej: 400 o 409)
           if (apiErr?.statusCode && apiErr.statusCode >= 400 && apiErr.statusCode < 500) {
             return {
               success: false,
@@ -871,7 +1038,6 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       }
 
-      // Fallback local: verificar nombre único y que ningún jugador pertenezca ya a otro equipo del mismo torneo
       const targetTourneyLocal = tournaments.find(t => t.id === tournamentId || t.id === `t${numTorneoId}`);
       if (targetTourneyLocal && Array.isArray(targetTourneyLocal.registeredTeams)) {
         for (const existingTeam of targetTourneyLocal.registeredTeams) {
@@ -891,7 +1057,6 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       }
 
-      // Registrar equipo en el estado local de React
       setTournaments((prev) =>
         prev.map((t) => {
           if (t.id === tournamentId) {
@@ -955,7 +1120,6 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       try {
         await equiposApi.responderInvitacion(targetEquipoId, respuesta);
       } catch (err: any) {
-        // Si el backend retornó un error de validación de negocio (ej: 400, 404, 409), propagar para que no se sume al historial
         if (err?.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
           throw new Error(err.message || 'Error de validación al responder la invitación');
         }
@@ -963,10 +1127,8 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     }
 
-    // Actualización reactiva instantánea del estado global de invitaciones
     setInvitations((prev) => prev.filter((i) => i.id !== String(id) && i.equipoId !== targetEquipoId));
 
-    // Si la invitación fue ACEPTADA, agregar inmediatamente a las participaciones del historial
     if (respuesta === 'ACEPTADA' && invItem) {
       setUserParticipations((prev) => {
         const alreadyExists = prev.some(
@@ -994,7 +1156,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const teamName = invItem?.team || 'Equipo';
     const msg =
       respuesta === 'ACEPTADA'
-        ? `¡Aceptaste la invitación para sumarte a "${teamName}"!`
+        ? `Aceptaste la invitación para sumarte a "${teamName}".`
         : `Rechazaste la invitación para sumarte a "${teamName}".`;
 
     logAudit('Invitación a Equipo', msg, 'torneo');
@@ -1027,7 +1189,6 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         observaciones: finalObs
       });
 
-      // Recargar fixture y tabla de posiciones actualizadas en MySQL vía trigger
       const targetMatch = fixtures.find(f => f.id === matchId);
       if (targetMatch && targetMatch.tournamentId) {
         await fetchTorneoData(targetMatch.tournamentId);
@@ -1043,7 +1204,6 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (err: any) {
       console.warn('[saveMatchResult] API error:', err?.message);
       alert(`Error al registrar resultado en MySQL: ${err?.message || 'Permiso denegado'}`);
-      // Fallback local visual
       setFixtures((prev) =>
         prev.map((m) =>
           m.id === matchId
@@ -1097,6 +1257,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           await fetchTorneoData(targetMatch.tournamentId);
         }
         await refreshAllData();
+        await fetchAvailabilityForDate(date);
       } catch (apiErr: any) {
         if (apiErr?.statusCode && apiErr.statusCode >= 400 && apiErr.statusCode < 500) {
           return { success: false, error: apiErr.message || 'Error de asignación de cancha y horario' };
@@ -1171,11 +1332,11 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const next = prev + 1;
       if (next >= 3) {
         addNotification(
-          '⚠️ SANCIÓN APLICADA: Suspensión por Inasistencias',
+          'Sanción Aplicada: Suspensión por Inasistencias',
           `El usuario ${clientName} ha acumulado 3 inasistencias consecutivas. Cuenta suspendida por 2 semanas en MySQL.`,
           'sancion'
         );
-        return 0; // Se resetea el contador tras aplicar la suspensión (corrección docente)
+        return 0;
       } else {
         addNotification(
           'Inasistencia Registrada',
@@ -1198,7 +1359,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         throw new Error(err?.message || 'Error al persistir confirmación de asistencia en el servidor.');
       }
     }
-    setUserAbsences(0); // Resetea contador consecutivo de inasistencias al asistir
+    setUserAbsences(0);
     setBookings((prev) =>
       prev.map((b) => (b.id === bookingId ? { ...b, status: 'Completada', asistencia_confirmada: true, rawStatus: 'FINALIZADA' } : b))
     );
@@ -1220,6 +1381,8 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const resetDemoData = () => {
     localStorage.clear();
+    setSharedBookings([]);
+    setCourtAvailability({});
     refreshAllData();
     addNotification('Datos Sincronizados', 'Se recargaron los registros de la base de datos MySQL.', 'info');
   };
@@ -1235,6 +1398,8 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setCurrentUser,
         courts,
         bookings,
+        sharedBookings,
+        courtAvailability,
         tournaments,
         fixtures,
         standings,
@@ -1248,6 +1413,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         invitations,
         userParticipations,
         fetchTorneoData,
+        fetchAvailabilityForDate,
         refreshAllData,
         bookCourt,
         cancelBooking,

@@ -18,16 +18,13 @@ export const AdminGestionUsuarios: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Pestaña activa: 'admin' o 'arbitro'
   const [activeTab, setActiveTab] = useState<'admin' | 'arbitro'>('admin');
 
-  // Modal Promover
   const [isPromoteModalOpen, setIsPromoteModalOpen] = useState(false);
   const [promoteEmail, setPromoteEmail] = useState('');
   const [promoteRole, setPromoteRole] = useState<'Administrador' | 'Arbitro'>('Administrador');
   const [isPromoting, setIsPromoting] = useState(false);
 
-  // Modal Crear
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newUser, setNewUser] = useState({
     nombre: '',
@@ -144,44 +141,38 @@ export const AdminGestionUsuarios: React.FC = () => {
   const displayedList = activeTab === 'admin' ? adminsList : arbitrosList;
 
   return (
-    <div className="p-6 md:p-10 w-full max-w-7xl mx-auto flex flex-col gap-8 font-['Inter',sans-serif]">
+    <div className="p-6 lg:p-8 w-full max-w-7xl mx-auto flex flex-col gap-6 bg-slate-50 min-h-full text-slate-900 font-['Inter',sans-serif]">
       {/* Header Banner */}
-      <div
-        className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 md:p-8 rounded-3xl border shadow-xl"
-        style={{ backgroundColor: '#1e281d', borderColor: '#445941' }}
-      >
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl bg-white border border-slate-200 shadow-xs">
         <div className="flex items-center gap-4">
-          <div
-            className="size-14 rounded-2xl flex items-center justify-center text-[#65c556] shadow-lg shrink-0 border"
-            style={{ backgroundColor: 'rgba(101,197,86,0.15)', borderColor: '#65c556' }}
-          >
-            <IconCrown size={32} />
+          <div className="size-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
+            <IconCrown size={24} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-white tracking-tight">
-                Gestión de Personal Oficial & Autoridades
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                Gestión de Personal Oficial y Autoridades
               </h1>
-              <span className="bg-[#65c556] text-[#293827] text-xs font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                 Exclusivo Superadmin
               </span>
             </div>
-            <p className="text-xs text-[#a0a0a0] mt-1 max-w-2xl leading-relaxed">
+            <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
               Los árbitros y administradores no se registran en el portal público. Son dados de alta y asignados exclusivamente por la dirección del complejo deportivo.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
+        <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
           <button
             type="button"
             onClick={() => {
               setPromoteRole(activeTab === 'arbitro' ? 'Arbitro' : 'Administrador');
               setIsPromoteModalOpen(true);
             }}
-            className="flex items-center gap-2 bg-[#293827] hover:bg-[#344732] border border-[#5a7056] text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow cursor-pointer"
+            className="flex items-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
           >
-            <IconMail size={16} />
+            <IconMail size={15} />
             <span>Habilitar por Email</span>
           </button>
 
@@ -191,9 +182,9 @@ export const AdminGestionUsuarios: React.FC = () => {
               setNewUser((prev) => ({ ...prev, rol: activeTab === 'arbitro' ? 'Arbitro' : 'Administrador' }));
               setIsCreateModalOpen(true);
             }}
-            className="flex items-center gap-2 bg-[#65c556] hover:bg-[#54b045] text-[#293827] px-4 py-2.5 rounded-xl text-xs font-black transition shadow-lg shadow-[rgba(101,197,86,0.25)] cursor-pointer"
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer border-none"
           >
-            <IconUserPlus size={16} />
+            <IconUserPlus size={15} />
             <span>+ Crear {activeTab === 'arbitro' ? 'Árbitro Oficial' : 'Administrador'}</span>
           </button>
         </div>
@@ -201,102 +192,102 @@ export const AdminGestionUsuarios: React.FC = () => {
 
       {/* Notifications / Alerts */}
       {successMsg && (
-        <div className="bg-[#14532d]/80 border border-[#22c55e] p-4 rounded-2xl flex items-center gap-3 text-sm text-[#bbf7d0] animate-fadeIn">
-          <IconCheck className="size-5 shrink-0 text-[#22c55e]" />
+        <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-center gap-3 text-xs text-emerald-800 font-medium">
+          <IconCheck className="size-4 shrink-0 text-emerald-600" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {errorMsg && (
-        <div className="bg-[#7f1d1d]/80 border border-[#ef4444] p-4 rounded-2xl flex items-center gap-3 text-sm text-[#fecaca] animate-fadeIn">
-          <IconAlert className="size-5 shrink-0 text-[#ef4444]" />
+        <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-xs text-red-700 font-medium">
+          <IconAlert className="size-4 shrink-0 text-red-600" />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {/* Role Navigation Tabs */}
-      <div className="flex items-center gap-3 border-b border-[#3b4d38] pb-1">
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
         <button
           type="button"
           onClick={() => setActiveTab('admin')}
-          className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-xs font-bold transition cursor-pointer border-b-2 ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
             activeTab === 'admin'
-              ? 'border-[#65c556] text-[#65c556] bg-[#1e281d]'
-              : 'border-transparent text-[#a0a0a0] hover:text-white hover:bg-[#1e281d]/50'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white'
           }`}
         >
-          <IconShield size={16} />
+          <IconShield size={15} />
           <span>Administradores de Sede ({adminsList.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('arbitro')}
-          className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-xs font-bold transition cursor-pointer border-b-2 ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
             activeTab === 'arbitro'
-              ? 'border-yellow-400 text-yellow-400 bg-[#1e281d]'
-              : 'border-transparent text-[#a0a0a0] hover:text-white hover:bg-[#1e281d]/50'
+              ? 'bg-amber-500 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white'
           }`}
         >
-          <IconWhistle size={16} />
+          <IconWhistle size={15} />
           <span>Árbitros Oficiales AFA/UB ({arbitrosList.length})</span>
         </button>
       </div>
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[#1e281d] border border-[#5a7056] p-5 rounded-2xl flex items-center gap-4">
-          <div className="size-11 rounded-xl bg-[#293827] flex items-center justify-center text-[#65c556] border border-[#5a7056]">
-            <IconCrown size={22} />
+        <div className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center gap-4 shadow-xs">
+          <div className="size-11 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-700 border border-emerald-200">
+            <IconCrown size={20} />
           </div>
           <div>
-            <p className="text-xs text-[#a0a0a0]">Superadministrador Titular</p>
-            <p className="text-sm font-bold text-white">admin@complejoub.com</p>
+            <p className="text-xs text-slate-500">Superadministrador Titular</p>
+            <p className="text-sm font-bold text-slate-900">admin@complejoub.com</p>
           </div>
         </div>
 
-        <div className="bg-[#1e281d] border border-[#5a7056] p-5 rounded-2xl flex items-center gap-4">
-          <div className="size-11 rounded-xl bg-[#293827] flex items-center justify-center text-[#65c556] border border-[#5a7056]">
-            {activeTab === 'admin' ? <IconShield size={22} /> : <IconWhistle size={22} className="text-yellow-400" />}
+        <div className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center gap-4 shadow-xs">
+          <div className="size-11 rounded-xl bg-slate-50 flex items-center justify-center text-emerald-700 border border-slate-200">
+            {activeTab === 'admin' ? <IconShield size={20} /> : <IconWhistle size={20} className="text-amber-500" />}
           </div>
           <div>
-            <p className="text-xs text-[#a0a0a0]">
+            <p className="text-xs text-slate-500">
               {activeTab === 'admin' ? 'Administradores Activos' : 'Árbitros Oficiales Registrados'}
             </p>
-            <p className="text-xl font-black text-white">
+            <p className="text-lg font-black text-slate-900">
               {displayedList.length} Personal Activo
             </p>
           </div>
         </div>
 
-        <div className="bg-[#1e281d] border border-[#5a7056] p-5 rounded-2xl flex items-center gap-4">
-          <div className="size-11 rounded-xl bg-[#293827] flex items-center justify-center text-[#65c556] border border-[#5a7056]">
-            <IconCheck size={22} />
+        <div className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center gap-4 shadow-xs">
+          <div className="size-11 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-700 border border-emerald-200">
+            <IconCheck size={20} />
           </div>
           <div>
-            <p className="text-xs text-[#a0a0a0]">Validación de Correo</p>
-            <p className="text-sm font-bold text-[#65c556]">100% Cuentas Verificadas</p>
+            <p className="text-xs text-slate-500">Validación de Correo</p>
+            <p className="text-sm font-bold text-emerald-700">100% Cuentas Verificadas</p>
           </div>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-[#1e281d] border border-[#5a7056] rounded-3xl overflow-hidden shadow-2xl">
-        <div className="px-6 py-5 border-b border-[#5a7056] flex items-center justify-between">
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             {activeTab === 'admin' ? (
               <>
-                <IconShield size={18} className="text-[#65c556]" />
+                <IconShield size={16} className="text-emerald-600" />
                 Nómina de Cuentas Administrativas
               </>
             ) : (
               <>
-                <IconWhistle size={18} className="text-yellow-400" />
+                <IconWhistle size={16} className="text-amber-500" />
                 Cuerpo Arbitral Oficial AFA / Complejo UB
               </>
             )}
           </h2>
-          <span className="text-xs text-[#a0a0a0]">
+          <span className="text-xs text-slate-500">
             Total: {displayedList.length} cuentas con credenciales
           </span>
         </div>
@@ -304,7 +295,7 @@ export const AdminGestionUsuarios: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-[#5a7056] bg-[#293827]/70 text-[#a0a0a0] uppercase font-semibold text-[11px] tracking-wider">
+              <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 uppercase font-semibold text-[11px] tracking-wider">
                 <th className="py-3.5 px-6">Usuario / Nombre</th>
                 <th className="py-3.5 px-6">Correo Electrónico</th>
                 <th className="py-3.5 px-6">Rol Jerárquico</th>
@@ -313,16 +304,16 @@ export const AdminGestionUsuarios: React.FC = () => {
                 <th className="py-3.5 px-6 text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#5a7056]/40">
+            <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-[#a0a0a0]">
+                  <td colSpan={6} className="py-8 text-center text-slate-500">
                     Cargando cuentas...
                   </td>
                 </tr>
               ) : displayedList.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-[#a0a0a0]">
+                  <td colSpan={6} className="py-8 text-center text-slate-500">
                     No se encontraron cuentas registradas en esta categoría.
                   </td>
                 </tr>
@@ -331,15 +322,15 @@ export const AdminGestionUsuarios: React.FC = () => {
                   const isSuper = user.rol === 'Superadministrador';
                   const isArbitro = user.rol === 'Arbitro';
                   return (
-                    <tr key={user.id} className="hover:bg-[#293827]/40 transition">
-                      <td className="py-4 px-6 font-bold text-white flex items-center gap-3">
+                    <tr key={user.id} className="hover:bg-slate-50 transition">
+                      <td className="py-4 px-6 font-bold text-slate-900 flex items-center gap-3">
                         <div
                           className={`size-8 rounded-full flex items-center justify-center font-black text-xs ${
                             isSuper
-                              ? 'bg-[#65c556] text-[#293827]'
+                              ? 'bg-emerald-600 text-white'
                               : isArbitro
-                              ? 'bg-yellow-400 text-black'
-                              : 'bg-[#3b4d38] text-white'
+                              ? 'bg-amber-500 text-white'
+                              : 'bg-slate-200 text-slate-700'
                           }`}
                         >
                           {isSuper ? 'SA' : isArbitro ? 'ARB' : 'AD'}
@@ -347,51 +338,51 @@ export const AdminGestionUsuarios: React.FC = () => {
                         <div>
                           <span>{user.nombre}</span>
                           {isSuper && (
-                            <span className="block text-[10px] text-[#65c556] font-normal">
+                            <span className="block text-[10px] text-emerald-700 font-normal">
                               Titular Máximo
                             </span>
                           )}
                           {isArbitro && (
-                            <span className="block text-[10px] text-yellow-400 font-normal">
+                            <span className="block text-[10px] text-amber-600 font-normal">
                               Planilla Digital
                             </span>
                           )}
                           {user.dni && (
-                            <span className="block text-[10px] text-[#a0a0a0] font-mono">
+                            <span className="block text-[10px] text-slate-400 font-mono">
                               DNI: {user.dni}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="py-4 px-6 text-[#c0c0c0] font-mono">{user.email}</td>
+                      <td className="py-4 px-6 text-slate-600 font-mono">{user.email}</td>
                       <td className="py-4 px-6">
                         {isSuper ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[#65c556]/15 border border-[#65c556] text-[#65c556]">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700">
                             <IconCrown size={12} />
                             Superadministrador
                           </span>
                         ) : isArbitro ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-yellow-400/15 border border-yellow-400 text-yellow-300">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-50 border border-amber-200 text-amber-700">
                             <IconWhistle size={12} />
                             Árbitro Oficial
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-500/15 border border-blue-400 text-blue-300">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 border border-blue-200 text-blue-700">
                             <IconShield size={12} />
                             Administrador
                           </span>
                         )}
                       </td>
-                      <td className="py-4 px-6 text-[#a0a0a0]">{user.telefono || '—'}</td>
+                      <td className="py-4 px-6 text-slate-500">{user.telefono || '—'}</td>
                       <td className="py-4 px-6">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#65c556]">
-                          <span className="size-1.5 rounded-full bg-[#65c556]" />
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
+                          <span className="size-1.5 rounded-full bg-emerald-600" />
                           Activa
                         </span>
                       </td>
                       <td className="py-4 px-6 text-right">
                         {isSuper ? (
-                          <span className="text-[11px] text-[#a0a0a0] italic">
+                          <span className="text-[11px] text-slate-400 italic">
                             Inmutable
                           </span>
                         ) : (
@@ -399,7 +390,7 @@ export const AdminGestionUsuarios: React.FC = () => {
                             type="button"
                             disabled={revokingId === user.id}
                             onClick={() => handleRevoke(user.id, user.nombre, user.rol)}
-                            className="bg-red-500/15 hover:bg-red-500/30 text-red-300 border border-red-500/40 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+                            className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer disabled:opacity-50"
                           >
                             {revokingId === user.id ? 'Revocando...' : 'Revocar a Cliente'}
                           </button>
@@ -416,29 +407,29 @@ export const AdminGestionUsuarios: React.FC = () => {
 
       {/* Modal: Promover Usuario Existente por Email */}
       {isPromoteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-[#1e281d] border border-[#5a7056] rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 w-full max-w-md shadow-2xl relative">
             <div className="flex items-center gap-3 mb-4">
-              <div className="size-10 rounded-xl bg-[rgba(101,197,86,0.15)] text-[#65c556] flex items-center justify-center border border-[#65c556]">
+              <div className="size-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200">
                 <IconMail size={20} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">Habilitar Rol por Email</h3>
-                <p className="text-xs text-[#a0a0a0]">Promover un usuario registrado a personal oficial</p>
+                <h3 className="text-lg font-bold text-slate-900">Habilitar Rol por Email</h3>
+                <p className="text-xs text-slate-500">Promover un usuario registrado a personal oficial</p>
               </div>
             </div>
 
             <form onSubmit={handlePromote} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#c0c0c0]">Rol a Asignar</label>
+                <label className="text-xs font-semibold text-slate-600">Rol a Asignar</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setPromoteRole('Administrador')}
                     className={`p-2.5 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5 ${
                       promoteRole === 'Administrador'
-                        ? 'bg-[#65c556] text-[#293827] border-[#65c556]'
-                        : 'bg-[#293827] text-[#a0a0a0] border-[#445941]'
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-slate-50 text-slate-600 border-slate-200'
                     }`}
                   >
                     <IconShield size={14} />
@@ -449,8 +440,8 @@ export const AdminGestionUsuarios: React.FC = () => {
                     onClick={() => setPromoteRole('Arbitro')}
                     className={`p-2.5 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5 ${
                       promoteRole === 'Arbitro'
-                        ? 'bg-yellow-400 text-black border-yellow-400'
-                        : 'bg-[#293827] text-[#a0a0a0] border-[#445941]'
+                        ? 'bg-amber-500 text-white border-amber-500'
+                        : 'bg-slate-50 text-slate-600 border-slate-200'
                     }`}
                   >
                     <IconWhistle size={14} />
@@ -460,14 +451,14 @@ export const AdminGestionUsuarios: React.FC = () => {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#c0c0c0]">Correo Electrónico Registrado</label>
+                <label className="text-xs font-semibold text-slate-600">Correo Electrónico Registrado</label>
                 <input
                   type="email"
                   required
                   placeholder="usuario@ejemplo.com"
                   value={promoteEmail}
                   onChange={(e) => setPromoteEmail(e.target.value)}
-                  className="bg-[#293827] border border-[#5a7056] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#65c556]"
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
                 />
               </div>
 
@@ -475,14 +466,14 @@ export const AdminGestionUsuarios: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsPromoteModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-[#a0a0a0] hover:text-white bg-[#293827] border border-[#5a7056] cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 border border-slate-200 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isPromoting || !promoteEmail.trim()}
-                  className="px-5 py-2 rounded-xl text-xs font-black bg-[#65c556] hover:bg-[#54b045] text-[#293827] shadow cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer disabled:opacity-50 border-none"
                 >
                   {isPromoting ? 'Promoviendo...' : `Habilitar como ${promoteRole}`}
                 </button>
@@ -494,29 +485,29 @@ export const AdminGestionUsuarios: React.FC = () => {
 
       {/* Modal: Crear Nuevo Personal Oficial */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-[#1e281d] border border-[#5a7056] rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 w-full max-w-lg shadow-2xl relative">
             <div className="flex items-center gap-3 mb-4">
-              <div className="size-10 rounded-xl bg-[rgba(101,197,86,0.15)] text-[#65c556] flex items-center justify-center border border-[#65c556]">
+              <div className="size-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200">
                 <IconUserPlus size={20} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">Alta de Personal Oficial</h3>
-                <p className="text-xs text-[#a0a0a0]">Generar credenciales para un nuevo miembro del complejo</p>
+                <h3 className="text-lg font-bold text-slate-900">Alta de Personal Oficial</h3>
+                <p className="text-xs text-slate-500">Generar credenciales para un nuevo miembro del complejo</p>
               </div>
             </div>
 
             <form onSubmit={handleCreateUser} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#c0c0c0]">Rol a Crear</label>
+                <label className="text-xs font-semibold text-slate-600">Rol a Crear</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setNewUser({ ...newUser, rol: 'Administrador' })}
                     className={`p-2.5 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5 ${
                       newUser.rol === 'Administrador'
-                        ? 'bg-[#65c556] text-[#293827] border-[#65c556]'
-                        : 'bg-[#293827] text-[#a0a0a0] border-[#445941]'
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-slate-50 text-slate-600 border-slate-200'
                     }`}
                   >
                     <IconShield size={14} />
@@ -527,8 +518,8 @@ export const AdminGestionUsuarios: React.FC = () => {
                     onClick={() => setNewUser({ ...newUser, rol: 'Arbitro' })}
                     className={`p-2.5 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5 ${
                       newUser.rol === 'Arbitro'
-                        ? 'bg-yellow-400 text-black border-yellow-400'
-                        : 'bg-[#293827] text-[#a0a0a0] border-[#445941]'
+                        ? 'bg-amber-500 text-white border-amber-500'
+                        : 'bg-slate-50 text-slate-600 border-slate-200'
                     }`}
                   >
                     <IconWhistle size={14} />
@@ -538,19 +529,19 @@ export const AdminGestionUsuarios: React.FC = () => {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#c0c0c0]">Nombre y Apellido</label>
+                <label className="text-xs font-semibold text-slate-600">Nombre y Apellido</label>
                 <input
                   type="text"
                   required
                   placeholder="Ej: Sebastián Norjean"
                   value={newUser.nombre}
                   onChange={(e) => setNewUser({ ...newUser, nombre: e.target.value })}
-                  className="bg-[#293827] border border-[#5a7056] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#65c556]"
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#c0c0c0]">DNI / Documento de Identidad (7 u 8 dígitos)</label>
+                <label className="text-xs font-semibold text-slate-600">DNI / Documento de Identidad (7 u 8 dígitos)</label>
                 <input
                   type="text"
                   required
@@ -558,26 +549,26 @@ export const AdminGestionUsuarios: React.FC = () => {
                   placeholder="Ej: 38456123"
                   value={newUser.dni}
                   onChange={(e) => setNewUser({ ...newUser, dni: e.target.value.replace(/\D/g, '').slice(0, 8) })}
-                  className="bg-[#293827] border border-[#5a7056] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#65c556] font-mono"
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white font-mono"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-[#c0c0c0]">Correo Electrónico Oficial</label>
+                <label className="text-xs font-semibold text-slate-600">Correo Electrónico Oficial</label>
                 <input
                   type="email"
                   required
                   placeholder="arbitro@complejoub.com"
                   value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  className="bg-[#293827] border border-[#5a7056] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#65c556]"
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-[#c0c0c0]">Contraseña Inicial</label>
-                  <div className="flex items-center bg-[#293827] border border-[#5a7056] rounded-xl px-3.5 py-2 focus-within:border-[#65c556]">
+                  <label className="text-xs font-semibold text-slate-600">Contraseña Inicial</label>
+                  <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 focus-within:border-emerald-600 focus-within:bg-white">
                     <input
                       type={showNewUserPassword ? 'text' : 'password'}
                       required
@@ -585,12 +576,12 @@ export const AdminGestionUsuarios: React.FC = () => {
                       placeholder="Mínimo 6 caracteres"
                       value={newUser.contrasena}
                       onChange={(e) => setNewUser({ ...newUser, contrasena: e.target.value })}
-                      className="w-full bg-transparent text-sm text-white focus:outline-none border-none p-0"
+                      className="w-full bg-transparent text-sm text-slate-900 focus:outline-none border-none p-0"
                     />
                     <button
                       type="button"
                       onClick={() => setShowNewUserPassword((prev) => !prev)}
-                      className="text-[#a0a0a0] hover:text-[#65c556] transition cursor-pointer shrink-0 p-1 flex items-center justify-center ml-2"
+                      className="text-slate-400 hover:text-emerald-600 transition cursor-pointer shrink-0 p-1 flex items-center justify-center ml-2"
                       title={showNewUserPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
                     >
                       {showNewUserPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
@@ -599,13 +590,13 @@ export const AdminGestionUsuarios: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-[#c0c0c0]">Teléfono de Contacto (Opcional)</label>
+                  <label className="text-xs font-semibold text-slate-600">Teléfono de Contacto (Opcional)</label>
                   <input
                     type="tel"
                     placeholder="+54 11 ..."
                     value={newUser.telefono}
                     onChange={(e) => setNewUser({ ...newUser, telefono: e.target.value })}
-                    className="bg-[#293827] border border-[#5a7056] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#65c556]"
+                    className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
                   />
                 </div>
               </div>
@@ -614,14 +605,14 @@ export const AdminGestionUsuarios: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-[#a0a0a0] hover:text-white bg-[#293827] border border-[#5a7056] cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 border border-slate-200 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isCreating}
-                  className="px-5 py-2.5 rounded-xl text-xs font-black bg-[#65c556] hover:bg-[#54b045] text-[#293827] shadow cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer disabled:opacity-50 border-none"
                 >
                   {isCreating ? 'Guardando...' : `Crear ${newUser.rol}`}
                 </button>

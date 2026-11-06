@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Tournament } from '../data/mockData';
-import { IconCalendar, IconCheck } from './Icons';
+import { IconCalendar, IconCheck, IconTrophy, IconClose, IconArrowRight } from './Icons';
 import { useComplejo } from '../context/ComplejoContext';
 
 interface TorneoDetalleModalProps {
@@ -30,94 +30,95 @@ export const TorneoDetalleModal: React.FC<TorneoDetalleModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl bg-[#1e281d] border border-[#5a7056] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] text-slate-900 font-['Inter',sans-serif]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-[#293827] px-6 py-5 border-b border-[#5a7056] flex items-start justify-between gap-4">
+        <div className="bg-slate-50 px-6 py-5 border-b border-slate-200 flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#65c556]/20 text-[#65c556] border border-[#65c556]/30 uppercase">
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase">
                 {torneo.sport}
               </span>
               <span
                 className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
                   torneo.status === 'En curso'
-                    ? 'bg-[#65c556]/15 text-[#65c556] border-[#65c556]/40'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     : torneo.status === 'Inscripciones abiertas'
-                    ? 'bg-blue-500/15 text-blue-300 border-blue-500/40'
-                    : 'bg-gray-500/20 text-gray-300 border-gray-500/40'
+                    ? 'bg-sky-50 text-sky-700 border-sky-200'
+                    : 'bg-slate-100 text-slate-600 border-slate-200'
                 }`}
               >
                 {torneo.status}
               </span>
             </div>
-            <h2 className="text-2xl font-black text-white tracking-tight">{torneo.name}</h2>
-            <p className="text-xs text-[#a0a0a0] flex items-center gap-1.5 mt-1 font-medium">
-              <IconCalendar size={14} className="text-[#65c556]" />
-              <span>Fechas de competencia: <strong>{torneo.dates}</strong></span>
+            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">{torneo.name}</h2>
+            <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1 font-medium">
+              <IconCalendar size={14} className="text-emerald-600" />
+              <span>Cronograma: <strong className="text-slate-800">{torneo.dates}</strong></span>
             </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="text-[#a0a0a0] hover:text-white p-1 rounded-lg hover:bg-[#344732] transition cursor-pointer text-lg font-bold"
+            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-200/60 transition cursor-pointer"
             title="Cerrar"
           >
-            ✕
+            <IconClose size={18} />
           </button>
         </div>
 
         {/* Scrollable Content */}
-        <div className="p-6 overflow-y-auto space-y-6">
+        <div className="p-6 overflow-y-auto space-y-5">
           {/* Key Metrics Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-[#293827] p-3.5 rounded-xl border border-[#5a7056]">
-              <span className="text-[10px] text-[#a0a0a0] uppercase block font-semibold">Premio Oficial</span>
-              <span className="text-sm font-black text-[#65c556] mt-0.5 block truncate" title={torneo.prize}>
-                🏆 {torneo.prize}
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <span className="text-[10px] text-slate-400 uppercase block font-bold">Premio Oficial</span>
+              <span className="text-xs font-bold text-emerald-700 mt-1 flex items-center gap-1 truncate" title={torneo.prize}>
+                <IconTrophy size={13} className="text-amber-500 shrink-0" />
+                <span className="truncate">{torneo.prize}</span>
               </span>
             </div>
 
-            <div className="bg-[#293827] p-3.5 rounded-xl border border-[#5a7056]">
-              <span className="text-[10px] text-[#a0a0a0] uppercase block font-semibold">Inscripción Equipo</span>
-              <span className="text-sm font-bold text-white mt-0.5 block">
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <span className="text-[10px] text-slate-400 uppercase block font-bold">Inscripción Equipo</span>
+              <span className="text-sm font-extrabold text-slate-900 mt-0.5 block">
                 ${torneo.entryFee.toLocaleString('es-AR')}
               </span>
             </div>
 
-            <div className="bg-[#293827] p-3.5 rounded-xl border border-[#5a7056]">
-              <span className="text-[10px] text-[#a0a0a0] uppercase block font-semibold">Arancel / Arbitraje</span>
-              <span className="text-sm font-bold text-white mt-0.5 block">
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <span className="text-[10px] text-slate-400 uppercase block font-bold">Arancel / Arbitraje</span>
+              <span className="text-sm font-extrabold text-slate-900 mt-0.5 block">
                 ${torneo.matchFee.toLocaleString('es-AR')}
               </span>
             </div>
 
-            <div className="bg-[#293827] p-3.5 rounded-xl border border-[#5a7056]">
-              <span className="text-[10px] text-[#a0a0a0] uppercase block font-semibold">Modalidad</span>
-              <span className="text-xs font-bold text-[#c0c0c0] mt-1 block">
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <span className="text-[10px] text-slate-400 uppercase block font-bold">Modalidad</span>
+              <span className="text-xs font-bold text-slate-700 mt-1 block">
                 Liga (Todos contra todos)
               </span>
             </div>
           </div>
 
           {/* Cupo de Equipos & Barra de Progreso */}
-          <div className="bg-[#293827] p-4 rounded-xl border border-[#5a7056] space-y-2">
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[#c0c0c0] font-semibold">Cupo de Equipos Participantes:</span>
-              <span className="font-bold text-white">
-                <strong className="text-[#65c556]">{(torneo.registeredTeams || []).length}</strong> de {torneo.maxTeams} equipos ({cupoPercentage}%)
+              <span className="text-slate-600 font-semibold">Cupo de Equipos Participantes</span>
+              <span className="font-bold text-slate-900">
+                <strong className="text-emerald-700">{(torneo.registeredTeams || []).length}</strong> de {torneo.maxTeams} equipos ({cupoPercentage}%)
               </span>
             </div>
-            <div className="w-full bg-[#1e281d] h-2.5 rounded-full overflow-hidden border border-[#5a7056]/50">
+            <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-500 rounded-full ${
-                  isCupoLleno ? 'bg-amber-400' : 'bg-[#65c556]'
+                  isCupoLleno ? 'bg-amber-500' : 'bg-[#199e1b]'
                 }`}
                 style={{ width: `${cupoPercentage}%` }}
               />
@@ -127,16 +128,16 @@ export const TorneoDetalleModal: React.FC<TorneoDetalleModalProps> = ({
           {/* Equipos Inscriptos Confirmados */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <IconCheck size={16} className="text-[#65c556]" />
-                <span>Equipos Inscriptos ({(torneo.registeredTeams || []).length})</span>
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <IconCheck size={15} className="text-emerald-600" />
+                <span>Equipos Confirmados ({(torneo.registeredTeams || []).length})</span>
               </h3>
               {isCupoLleno ? (
-                <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/30">
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
                   Cupo Completo
                 </span>
               ) : (
-                <span className="text-[10px] font-bold text-[#65c556] bg-[#65c556]/10 px-2 py-0.5 rounded-full border border-[#65c556]/30">
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
                   {torneo.maxTeams - (torneo.registeredTeams || []).length} cupos disponibles
                 </span>
               )}
@@ -147,45 +148,44 @@ export const TorneoDetalleModal: React.FC<TorneoDetalleModalProps> = ({
                 {(torneo.registeredTeams || []).map((team, idx) => (
                   <div
                     key={team.id || idx}
-                    className="bg-[#293827] border border-[#5a7056] p-3 rounded-xl flex items-center justify-between gap-2"
+                    className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex items-center justify-between gap-2"
                   >
                     <div>
-                      <h4 className="font-bold text-sm text-white">{team.name}</h4>
-                      <p className="text-[11px] text-[#a0a0a0]">
+                      <h4 className="font-bold text-xs text-slate-900">{team.name}</h4>
+                      <p className="text-[11px] text-slate-500">
                         Capitán: {team.captain || 'Designado'}
                       </p>
                     </div>
-                    <span className="text-xs bg-[#1e281d] text-[#65c556] px-2.5 py-1 rounded-lg border border-[#5a7056] font-bold whitespace-nowrap">
+                    <span className="text-[11px] bg-white text-emerald-700 px-2.5 py-1 rounded-lg border border-slate-200 font-bold whitespace-nowrap">
                       {team.playersCount || team.players?.length || 5} jug.
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="p-6 bg-[#293827]/40 rounded-xl border border-dashed border-[#5a7056] text-center text-xs text-[#a0a0a0]">
-                Aún no hay equipos confirmados en este torneo. ¡Sé el primero en anotar a tu equipo!
+              <div className="p-6 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center text-xs text-slate-500">
+                Aún no hay equipos confirmados en este torneo.
               </div>
             )}
           </div>
 
-          {/* Reglamento y Condiciones del Torneo */}
-          <div className="bg-[#293827]/60 p-4 rounded-xl border border-[#5a7056]/60 text-xs text-[#c0c0c0] space-y-1.5">
-            <h4 className="font-bold text-white uppercase text-[11px] tracking-wide mb-1">
+          {/* Reglamento */}
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-600 space-y-1.5">
+            <h4 className="font-bold text-slate-900 uppercase text-[11px] tracking-wide mb-1">
               Reglamento y Condiciones de Competencia
             </h4>
-            <p>• <strong>Sistema de Puntuación:</strong> Victoria 3 puntos, Empate 1 punto, Derrota 0 puntos.</p>
-            <p>• <strong>Arbitraje:</strong> Cada encuentro contará con terna arbitral oficial designada por el complejo.</p>
-            <p>• <strong>Canchas Oficiales:</strong> Los partidos se disputan en fines de semana en las canchas reglamentarias con césped sintético y blindex.</p>
-            <p>• <strong>Fixture y Resultados:</strong> Los resultados y la tabla de posiciones se actualizan de forma inmediata tras el pitazo final.</p>
+            <p>· <strong>Puntuación:</strong> Victoria 3 puntos, Empate 1 punto, Derrota 0 puntos.</p>
+            <p>· <strong>Arbitraje:</strong> Cada encuentro cuenta con colegiado oficial designado por el complejo.</p>
+            <p>· <strong>Actualización:</strong> Los resultados y posiciones se recalculan automáticamente al cerrarse el acta arbitral.</p>
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="bg-[#293827] px-6 py-4 border-t border-[#5a7056] flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold text-xs cursor-pointer transition text-center"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold text-xs cursor-pointer transition text-center"
           >
             Cerrar
           </button>
@@ -198,9 +198,10 @@ export const TorneoDetalleModal: React.FC<TorneoDetalleModalProps> = ({
                   onVerFixture(torneo.id);
                   onClose();
                 }}
-                className="flex-1 sm:flex-initial px-5 py-3 rounded-xl bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[#65c556] font-bold text-xs transition cursor-pointer text-center min-h-[44px] flex items-center justify-center"
+                className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5"
               >
-                Ver Tabla y Fixture →
+                <span>Ver Tabla y Fixture</span>
+                <IconArrowRight size={14} />
               </button>
             )}
 
@@ -211,7 +212,7 @@ export const TorneoDetalleModal: React.FC<TorneoDetalleModalProps> = ({
                   onInscribir(torneo.id);
                   onClose();
                 }}
-                className="flex-1 sm:flex-initial px-6 py-3 rounded-xl bg-[#65c556] hover:bg-[#54b045] text-[#293827] font-extrabold text-sm shadow-lg shadow-[#65c556]/20 transition cursor-pointer text-center min-h-[44px] flex items-center justify-center"
+                className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-[#199e1b] hover:bg-[#158417] text-white font-bold text-xs shadow-md shadow-[#199e1b]/20 transition cursor-pointer text-center"
               >
                 Inscribir Mi Equipo
               </button>
