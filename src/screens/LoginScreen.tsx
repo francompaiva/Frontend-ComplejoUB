@@ -136,7 +136,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const handleQuickFill = (email: string) => {
     setActiveTab('login');
     setLoginEmail(email);
-    setLoginPassword('');
+    setLoginPassword('password123');
     setLoginError(null);
     setBackendOffline(false);
   };

@@ -61,13 +61,22 @@ class ApiClient {
           headers,
           signal: options.signal || controller.signal,
         });
+        if (response.status === 404 && API_BASE_URL.startsWith('/')) {
+          const contentType = response.headers.get('content-type') || '';
+          if (!contentType.includes('application/json')) {
+            const directUrl = `http://127.0.0.1:4000${url}`;
+            response = await fetch(directUrl, {
+              ...options,
+              headers,
+              signal: options.signal || controller.signal,
+            });
+          }
+        }
       } catch (networkErr: any) {
-        // Si el error fue por timeout del controlador, propagar inmediatamente sin reintentar
         if (isTimedOut || controller.signal.aborted) {
           throw networkErr;
         }
 
-        // Fallback: Si falló la ruta relativa del proxy (/api/v1), intentar directo contra http://127.0.0.1:4000
         if (API_BASE_URL.startsWith('/')) {
           const directUrl = `http://127.0.0.1:4000${url}`;
           response = await fetch(directUrl, {
@@ -109,7 +118,6 @@ class ApiClient {
       return json.data as T;
     } catch (err: any) {
       clearTimeout(timeoutId);
-      // Transformar abortos de red y timeouts en mensajes comprensibles para el usuario
       if (
         isTimedOut ||
         err?.name === 'AbortError' ||
