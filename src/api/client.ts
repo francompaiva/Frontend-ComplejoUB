@@ -1,5 +1,4 @@
-const DEFAULT_URL = import.meta.env.DEV ? '/api/v1' : 'http://127.0.0.1:4000/api/v1';
-const API_BASE_URL = import.meta.env.VITE_API_URL || DEFAULT_URL;
+import { API_BASE_URL } from '../config/appConfig';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -61,32 +60,6 @@ class ApiClient {
           headers,
           signal: options.signal || controller.signal,
         });
-        if (response.status === 404 && API_BASE_URL.startsWith('/')) {
-          const contentType = response.headers.get('content-type') || '';
-          if (!contentType.includes('application/json')) {
-            const directUrl = `http://127.0.0.1:4000${url}`;
-            response = await fetch(directUrl, {
-              ...options,
-              headers,
-              signal: options.signal || controller.signal,
-            });
-          }
-        }
-      } catch (networkErr: any) {
-        if (isTimedOut || controller.signal.aborted) {
-          throw networkErr;
-        }
-
-        if (API_BASE_URL.startsWith('/')) {
-          const directUrl = `http://127.0.0.1:4000${url}`;
-          response = await fetch(directUrl, {
-            ...options,
-            headers,
-            signal: options.signal || controller.signal,
-          });
-        } else {
-          throw networkErr;
-        }
       } finally {
         clearTimeout(timeoutId);
       }
@@ -118,6 +91,7 @@ class ApiClient {
       return json.data as T;
     } catch (err: any) {
       clearTimeout(timeoutId);
+      // Transformar abortos de red y timeouts en mensajes comprensibles para el usuario
       if (
         isTimedOut ||
         err?.name === 'AbortError' ||

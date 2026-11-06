@@ -18,7 +18,6 @@ import {
   INITIAL_TOURNAMENTS
 } from '../data/mockData';
 import {
-  authApi,
   torneosApi,
   canchasApi,
   reservasApi,
@@ -65,13 +64,6 @@ export interface SlotAvailabilityInfo {
   estado: 'Libre' | 'Ocupado' | 'DeshabilitadoTorneo' | 'Mantenimiento';
   motivo: string;
 }
-
-export const DEMO_EMAILS: Record<UserRole, string> = {
-  cliente: 'lucas@gmail.com',
-  admin: 'operador@complejoub.com',
-  arbitro: 'arbitro@complejoub.com',
-  superadmin: 'admin@complejoub.com',
-};
 
 export interface ComplejoContextType {
   userRole: UserRole;
@@ -390,20 +382,6 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     }
 
-    const demoPassword = import.meta.env.VITE_DEMO_PASSWORD || '';
-    if (demoPassword) {
-      try {
-        const email = DEMO_EMAILS[role];
-        const res: any = await authApi.login(email, demoPassword);
-        if (res && res.token && res.user) {
-          apiClient.setToken(res.token);
-          localStorage.setItem('complejo_user', JSON.stringify(res.user));
-          setCurrentUser(res.user);
-        }
-      } catch (err: any) {
-        console.warn(`[ComplejoContext] Error al autenticar como ${role}:`, err?.message);
-      }
-    }
   }, []);
 
   // Carga de fixture y tabla de posiciones para un torneo desde la BD
@@ -463,7 +441,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                   id: String(eq.id),
                   name: eq.nombre,
                   captain: eq.capitan_nombre || 'Capitán',
-                  captainEmail: eq.capitan_email || 'capitan@gmail.com',
+                  captainEmail: eq.capitan_email || '',
                   playersCount: eq.jugadores?.length || 5,
                   players: eq.jugadores || []
                 }));
@@ -1064,7 +1042,7 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               id: 'eq-' + Date.now(),
               name: teamName,
               captain: players[0]?.name || 'Capitán',
-              captainEmail: 'capitan@gmail.com',
+              captainEmail: currentUser?.email || '',
               playersCount: players.length,
               players: players.map((p) => ({ name: p.name, dni: p.dni, position: p.position }))
             };

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { type UserRole, useComplejo } from '../context/ComplejoContext';
 import { authApi } from '../api/endpoints';
 import { apiClient } from '../api/client';
+import { DEMO_ACCOUNTS, findDemoAccountByEmail, type DemoAccountKey } from '../config/appConfig';
 import {
   IconStadium,
   IconMail,
@@ -17,7 +18,6 @@ import {
   IconWhistle,
   IconBan,
   IconBolt,
-  IconInfo,
   IconIdCard,
   IconSmartphone,
   IconArrowLeft,
@@ -29,12 +29,21 @@ export interface LoginScreenProps {
   onLogin: (role: UserRole) => void;
 }
 
+const QUICK_ACCESS_ICONS: Record<DemoAccountKey, React.ReactNode> = {
+  cliente1: <IconBall size={14} className="text-emerald-400 shrink-0" />,
+  cliente2: <IconUsers size={14} className="text-sky-400 shrink-0" />,
+  superadmin: <IconCrown size={14} className="text-amber-400 shrink-0" />,
+  admin: <IconShield size={14} className="text-emerald-400 shrink-0" />,
+  arbitro: <IconWhistle size={14} className="text-amber-400 shrink-0" />,
+  sancionado: <IconBan size={14} className="text-red-400 shrink-0" />,
+};
+
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const { setCurrentUser } = useComplejo();
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
 
   // Formulario Login
-  const [loginEmail, setLoginEmail] = useState(import.meta.env.VITE_DEMO_CLIENT_EMAIL || '');
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loadingLogin, setLoadingLogin] = useState(false);
@@ -65,68 +74,31 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   };
 
   const handleOfflineLogin = (emailToUse?: string) => {
-    const emailTarget = (emailToUse || loginEmail || 'lucas@gmail.com').trim().toLowerCase();
-    let targetRole: UserRole = 'cliente';
-    const clientProfiles: Record<string, { id: number; nombre: string; dni?: string; inasistencias?: number; estado_cuenta?: string; suspension_hasta?: string | null }> = {
-      'lucas@gmail.com': { id: 4, nombre: 'Lucas Díaz (Cliente / Capitán)', dni: '40.123.456', inasistencias: 0, estado_cuenta: 'Activa' },
-      'mateo@gmail.com': { id: 5, nombre: 'Mateo Fernández (Cliente)', dni: '41.890.123', inasistencias: 1, estado_cuenta: 'Activa' },
-      'juan@gmail.com': { id: 6, nombre: 'Juan Paiva', inasistencias: 0, estado_cuenta: 'Activa' },
-      'diego@gmail.com': { id: 7, nombre: 'Diego López', inasistencias: 0, estado_cuenta: 'Activa' },
-      'gonzalo@gmail.com': { id: 8, nombre: 'Gonzalo Higuaín', inasistencias: 0, estado_cuenta: 'Activa' },
-      'julian@gmail.com': { id: 9, nombre: 'Julián Álvarez', inasistencias: 0, estado_cuenta: 'Activa' },
-      'enzo@gmail.com': { id: 10, nombre: 'Enzo Fernández', inasistencias: 0, estado_cuenta: 'Activa' },
-      'rodrigo@gmail.com': { id: 11, nombre: 'Rodrigo De Paul', inasistencias: 0, estado_cuenta: 'Activa' },
-      'sancionado@gmail.com': {
-        id: 12,
-        nombre: 'Usuario Sancionado Test',
-        inasistencias: 3,
-        estado_cuenta: 'Suspendida',
-        suspension_hasta: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
-      },
-    };
-
-    const clientMatch = clientProfiles[emailTarget];
-    let userObj: any = {
-      id: clientMatch?.id || 99,
-      nombre: clientMatch?.nombre || emailTarget.split('@')[0],
-      email: emailTarget,
-      rol: 'Cliente',
-      inasistencias: clientMatch?.inasistencias ?? 0,
-      estado_cuenta: clientMatch?.estado_cuenta || 'Activa',
-      suspension_hasta: clientMatch?.suspension_hasta || null,
-    };
-
-    if (emailTarget === 'admin@complejoub.com' || emailTarget === 'complejoub.soporte@gmail.com') {
-      targetRole = 'superadmin';
-      userObj = {
-        id: 15,
-        nombre: 'Superadministrador General',
-        email: emailTarget,
-        rol: 'Superadministrador',
-        inasistencias: 0,
-        estado_cuenta: 'Activa',
-      };
-    } else if (emailTarget === 'operador@complejoub.com') {
-      targetRole = 'admin';
-      userObj = {
-        id: 13,
-        nombre: 'Administrador de Sede',
-        email: 'operador@complejoub.com',
-        rol: 'Administrador',
-        inasistencias: 0,
-        estado_cuenta: 'Activa',
-      };
-    } else if (emailTarget === 'arbitro@complejoub.com') {
-      targetRole = 'arbitro';
-      userObj = {
-        id: 2,
-        nombre: 'Sebastián Norjean (Árbitro)',
-        email: 'arbitro@complejoub.com',
-        rol: 'Arbitro',
-        inasistencias: 0,
-        estado_cuenta: 'Activa',
-      };
+    const emailTarget = (emailToUse || loginEmail).trim().toLowerCase();
+    if (!isValidEmail(emailTarget)) {
+      setLoginError('Ingresa un correo electrónico válido para continuar en Modo Demo.');
+      return;
     }
+
+    const demoAccount = findDemoAccountByEmail(emailTarget);
+    const targetRole: UserRole = demoAccount?.role || 'cliente';
+    const isSuspended = demoAccount?.key === 'sancionado';
+    const roleLabel: Record<UserRole, string> = {
+      cliente: 'Cliente',
+      admin: 'Administrador',
+      arbitro: 'Arbitro',
+      superadmin: 'Superadministrador',
+    };
+
+    const userObj: any = {
+      id: demoAccount ? DEMO_ACCOUNTS.indexOf(demoAccount) + 1 : 0,
+      nombre: demoAccount?.description || emailTarget.split('@')[0],
+      email: emailTarget,
+      rol: roleLabel[targetRole],
+      inasistencias: isSuspended ? 3 : 0,
+      estado_cuenta: isSuspended ? 'Suspendida' : 'Activa',
+      suspension_hasta: isSuspended ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : null,
+    };
 
     setCurrentUser(userObj);
     localStorage.setItem('complejo_user', JSON.stringify(userObj));
@@ -136,7 +108,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const handleQuickFill = (email: string) => {
     setActiveTab('login');
     setLoginEmail(email);
-    setLoginPassword('password123');
+    setLoginPassword('');
     setLoginError(null);
     setBackendOffline(false);
   };
@@ -191,8 +163,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       if (isConnectionError) {
         setBackendOffline(true);
         setLoginError(
-          'No se pudo conectar con el servidor backend en http://localhost:4000. ' +
-          'Ejecuta "npm run dev" en Backend-ComplejoUB o utiliza el Modo Demo a continuación.'
+          'No se pudo conectar con el servidor backend. ' +
+          'Verifica que la API esté disponible o utiliza el Modo Demo a continuación.'
         );
       } else if (isAccountUnverified) {
         setOtpEmail(emailTrimmed);
@@ -476,13 +448,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   <span className="text-[11px] text-slate-400">Válido durante 15 minutos</span>
                 </div>
 
-                <div className="bg-white/[0.03] p-3.5 rounded-xl border border-white/10 flex items-start gap-2.5 text-[11px] text-slate-300 leading-relaxed">
-                  <IconInfo size={16} className="text-emerald-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-emerald-400">Verificación de prueba:</strong> Para evaluación académica o entornos locales, también puedes utilizar el código universal <strong>123456</strong>.
-                  </div>
-                </div>
-
                 <div className="flex items-center justify-between text-xs pt-1">
                   <button
                     type="button"
@@ -652,101 +617,44 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     </div>
                   )}
 
-                  {/* Cuentas de Acceso Rápido */}
-                  <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-3.5 flex flex-col gap-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <IconCheck size={13} />
-                        <span>Perfiles de Acceso Rápido</span>
-                      </span>
-                      <span className="text-[10px] text-slate-400">Autocompletar correo</span>
+                  {/* Cuentas de Acceso Rápido (definidas por variables de entorno) */}
+                  {DEMO_ACCOUNTS.length > 0 && (
+                    <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl p-3.5 flex flex-col gap-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <IconCheck size={13} />
+                          <span>Perfiles de Acceso Rápido</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400">Completa solo el correo</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {DEMO_ACCOUNTS.map((account) => {
+                          const isSelected = loginEmail.trim().toLowerCase() === account.email;
+                          const isDanger = account.key === 'sancionado';
+                          return (
+                            <button
+                              key={account.key}
+                              type="button"
+                              onClick={() => handleQuickFill(account.email)}
+                              className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition flex items-center gap-2 cursor-pointer truncate ${
+                                isSelected
+                                  ? isDanger
+                                    ? 'bg-red-500/20 border-red-500/50 text-red-200'
+                                    : 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
+                                  : isDanger
+                                  ? 'bg-red-950/25 hover:bg-red-950/40 border-red-500/25 text-red-300'
+                                  : 'bg-[#0b120d] hover:bg-white/[0.06] border-white/10 text-slate-200'
+                              }`}
+                              title={account.description}
+                            >
+                              {QUICK_ACCESS_ICONS[account.key]}
+                              <span className="truncate">{account.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleQuickFill('lucas@gmail.com')}
-                        className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition flex items-center gap-2 cursor-pointer truncate ${
-                          loginEmail === 'lucas@gmail.com'
-                            ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
-                            : 'bg-[#0b120d] hover:bg-white/[0.06] border-white/10 text-slate-200'
-                        }`}
-                        title="Lucas Díaz (Cliente / Capitán)"
-                      >
-                        <IconBall size={14} className="text-emerald-400 shrink-0" />
-                        <span className="truncate">Lucas (Cliente 1)</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleQuickFill('mateo@gmail.com')}
-                        className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition flex items-center gap-2 cursor-pointer truncate ${
-                          loginEmail === 'mateo@gmail.com'
-                            ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
-                            : 'bg-[#0b120d] hover:bg-white/[0.06] border-white/10 text-slate-200'
-                        }`}
-                        title="Mateo Fernández (Segundo Cliente para verificar reservas cruzadas)"
-                      >
-                        <IconUsers size={14} className="text-sky-400 shrink-0" />
-                        <span className="truncate">Mateo (Cliente 2)</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleQuickFill('complejoub.soporte@gmail.com')}
-                        className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition flex items-center gap-2 cursor-pointer truncate ${
-                          loginEmail === 'complejoub.soporte@gmail.com'
-                            ? 'bg-amber-500/15 border-amber-500/50 text-amber-300'
-                            : 'bg-[#0b120d] hover:bg-white/[0.06] border-white/10 text-slate-200'
-                        }`}
-                        title="Superadministrador General"
-                      >
-                        <IconCrown size={14} className="text-amber-400 shrink-0" />
-                        <span className="truncate">Superadmin</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleQuickFill('operador@complejoub.com')}
-                        className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition flex items-center gap-2 cursor-pointer truncate ${
-                          loginEmail === 'operador@complejoub.com'
-                            ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
-                            : 'bg-[#0b120d] hover:bg-white/[0.06] border-white/10 text-slate-200'
-                        }`}
-                        title="Administrador de Sede"
-                      >
-                        <IconShield size={14} className="text-emerald-400 shrink-0" />
-                        <span className="truncate">Administrador</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleQuickFill('arbitro@complejoub.com')}
-                        className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition flex items-center gap-2 cursor-pointer truncate ${
-                          loginEmail === 'arbitro@complejoub.com'
-                            ? 'bg-amber-500/15 border-amber-500/50 text-amber-300'
-                            : 'bg-[#0b120d] hover:bg-white/[0.06] border-white/10 text-slate-200'
-                        }`}
-                        title="Sebastián Norjean (Árbitro Oficial)"
-                      >
-                        <IconWhistle size={14} className="text-amber-400 shrink-0" />
-                        <span className="truncate">Árbitro</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleQuickFill('sancionado@gmail.com')}
-                        className={`px-2.5 py-2 rounded-xl border text-[11px] font-semibold transition flex items-center gap-2 cursor-pointer truncate ${
-                          loginEmail === 'sancionado@gmail.com'
-                            ? 'bg-red-500/20 border-red-500/50 text-red-200'
-                            : 'bg-red-950/25 hover:bg-red-950/40 border-red-500/25 text-red-300'
-                        }`}
-                        title="Usuario Sancionado Test (3 inasistencias)"
-                      >
-                        <IconBan size={14} className="text-red-400 shrink-0" />
-                        <span className="truncate">Sancionado</span>
-                      </button>
-                    </div>
-                  </div>
+                  )}
 
                   <button
                     type="submit"

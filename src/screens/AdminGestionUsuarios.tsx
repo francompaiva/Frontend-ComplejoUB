@@ -242,7 +242,7 @@ export const AdminGestionUsuarios: React.FC = () => {
           </div>
           <div>
             <p className="text-xs text-slate-500">Superadministrador Titular</p>
-            <p className="text-sm font-bold text-slate-900">admin@complejoub.com</p>
+            <p className="text-sm font-bold text-slate-900">{users.find((u) => u.rol === 'Superadministrador')?.email || 'Sin datos'}</p>
           </div>
         </div>
 
@@ -558,7 +558,7 @@ export const AdminGestionUsuarios: React.FC = () => {
                 <input
                   type="email"
                   required
-                  placeholder="arbitro@complejoub.com"
+                  placeholder="nombre@dominio.com"
                   value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                   className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
