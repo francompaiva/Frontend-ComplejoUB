@@ -10,11 +10,14 @@ function getIconDimension(size?: number, className?: string): number {
   if (typeof size === 'number') return size;
   if (className) {
     if (className.includes('w-3') || className.includes('h-3') || className.includes('size-3')) return 12;
+    if (className.includes('w-3.5') || className.includes('h-3.5') || className.includes('size-3.5')) return 14;
     if (className.includes('w-4') || className.includes('h-4') || className.includes('size-4')) return 16;
     if (className.includes('w-5') || className.includes('h-5') || className.includes('size-5')) return 20;
     if (className.includes('w-6') || className.includes('h-6') || className.includes('size-6')) return 24;
     if (className.includes('w-7') || className.includes('h-7') || className.includes('size-7')) return 28;
     if (className.includes('w-8') || className.includes('h-8') || className.includes('size-8')) return 32;
+    if (className.includes('w-10') || className.includes('h-10') || className.includes('size-10')) return 40;
+    if (className.includes('w-12') || className.includes('h-12') || className.includes('size-12')) return 48;
   }
   return 20;
 }
@@ -143,6 +146,13 @@ export const IconUsers: React.FC<IconProps> = (props) => (
   </BaseIcon>
 );
 
+export const IconUser: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </BaseIcon>
+);
+
 export const IconUserPlus: React.FC<IconProps> = (props) => (
   <BaseIcon {...props}>
     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -239,3 +249,144 @@ export const IconEyeOff: React.FC<IconProps> = (props) => (
   </BaseIcon>
 );
 
+export const IconBan: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="m4.9 4.9 14.2 14.2" />
+  </BaseIcon>
+);
+
+export const IconHourglass: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M5 22h14" />
+    <path d="M5 2h14" />
+    <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" />
+    <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />
+  </BaseIcon>
+);
+
+export const IconCreditCard: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <rect width="20" height="14" x="2" y="5" rx="2" />
+    <line x1="2" x2="22" y1="10" y2="10" />
+  </BaseIcon>
+);
+
+export const IconSmartphone: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+    <path d="M12 18h.01" />
+  </BaseIcon>
+);
+
+export const IconUndo: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M3 7v6h6" />
+    <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+  </BaseIcon>
+);
+
+export const IconTrash: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M3 6h18" />
+    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+    <line x1="10" x2="10" y1="11" y2="17" />
+    <line x1="14" x2="14" y1="11" y2="17" />
+  </BaseIcon>
+);
+
+export const IconGift: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <rect x="3" y="8" width="18" height="4" rx="1" />
+    <path d="M12 8v13" />
+    <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" />
+    <path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" />
+  </BaseIcon>
+);
+
+export const IconMapPin: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+    <circle cx="12" cy="10" r="3" />
+  </BaseIcon>
+);
+
+export const IconIdCard: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <rect width="20" height="14" x="2" y="5" rx="2" />
+    <circle cx="8" cy="11" r="2" />
+    <path d="M5 16c.8-1.3 2.1-2 3-2s2.2.7 3 2" />
+    <line x1="14" x2="18" y1="10" y2="10" />
+    <line x1="14" x2="17" y1="14" y2="14" />
+  </BaseIcon>
+);
+
+export const IconInfo: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4" />
+    <path d="M12 8h.01" />
+  </BaseIcon>
+);
+
+export const IconSparkles: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+  </BaseIcon>
+);
+
+export const IconBolt: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+  </BaseIcon>
+);
+
+export const IconRefresh: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+    <path d="M21 3v5h-5" />
+    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+    <path d="M8 16H3v5" />
+  </BaseIcon>
+);
+
+export const IconArrowRight: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M5 12h14" />
+    <path d="m12 5 7 7-7 7" />
+  </BaseIcon>
+);
+
+export const IconArrowLeft: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="m12 19-7-7 7-7" />
+    <path d="M19 12H5" />
+  </BaseIcon>
+);
+
+export const IconClose: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
+  </BaseIcon>
+);
+
+export const IconSearch: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <circle cx="11" cy="11" r="8" />
+    <path d="m21 21-4.3-4.3" />
+  </BaseIcon>
+);
+
+export const IconCardYellow: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <rect x="6" y="3" width="12" height="18" rx="2" fill="#facc15" stroke="#ca8a04" />
+  </BaseIcon>
+);
+
+export const IconCardRed: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <rect x="6" y="3" width="12" height="18" rx="2" fill="#ef4444" stroke="#b91c1c" />
+  </BaseIcon>
+);

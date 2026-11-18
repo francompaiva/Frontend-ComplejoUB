@@ -1,5 +1,4 @@
-const DEFAULT_URL = import.meta.env.DEV ? '/api/v1' : 'http://127.0.0.1:4000/api/v1';
-const API_BASE_URL = import.meta.env.VITE_API_URL || DEFAULT_URL;
+import { API_BASE_URL } from '../config/appConfig';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -61,23 +60,6 @@ class ApiClient {
           headers,
           signal: options.signal || controller.signal,
         });
-      } catch (networkErr: any) {
-        // Si el error fue por timeout del controlador, propagar inmediatamente sin reintentar
-        if (isTimedOut || controller.signal.aborted) {
-          throw networkErr;
-        }
-
-        // Fallback: Si falló la ruta relativa del proxy (/api/v1), intentar directo contra http://127.0.0.1:4000
-        if (API_BASE_URL.startsWith('/')) {
-          const directUrl = `http://127.0.0.1:4000${url}`;
-          response = await fetch(directUrl, {
-            ...options,
-            headers,
-            signal: options.signal || controller.signal,
-          });
-        } else {
-          throw networkErr;
-        }
       } finally {
         clearTimeout(timeoutId);
       }

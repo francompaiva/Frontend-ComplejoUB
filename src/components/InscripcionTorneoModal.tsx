@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import { SQUAD_LIMITS } from '../data/mockData';
 import { equiposApi } from '../api/endpoints';
+import { IconCheck, IconAlert, IconInfo, IconClose, IconHourglass, IconBan, IconPlus } from './Icons';
 
 export interface TournamentPlayer {
   id: string;
@@ -62,7 +63,6 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Inicializa el plantel únicamente con los datos reales del usuario capitán autenticado
   const getInitialSquad = React.useCallback((sportName: string) => {
     const defaultPos = (POSICIONES_POR_DEPORTE[sportName] || ['Delantero'])[0];
     return [
@@ -70,12 +70,10 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     ];
   }, [currentUser]);
 
-  // Synchronize modal state on open or tournament selection
   React.useEffect(() => {
     if (!isOpen) return;
 
     let target = tournamentId ? tournaments.find(t => t.id === tournamentId) : null;
-    // If specific tournament is closed, prefer the open one
     if (!target || target.status !== 'Inscripciones abiertas') {
       const openT = tournaments.find(t => t.status === 'Inscripciones abiertas');
       if (openT) target = openT;
@@ -124,7 +122,6 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     const cleanDni = rawVal.replace(/\D/g, '').slice(0, 8);
     const isCaptain = id === 'capitan-1';
 
-    // Actualiza DNI y cambia estado a searching si tiene 7 u 8 dígitos
     setPlayers((prev) =>
       prev.map((p) => {
         if (p.id !== id) return p;
@@ -149,7 +146,6 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     if (cleanDni.length === 7 || cleanDni.length === 8) {
       try {
         const res: any = await equiposApi.buscarJugadorPorDni(cleanDni);
-        // Desestructuración robusta: apiClient devuelve json.data as T, por lo que res ya contiene los datos directos
         const data = (res && typeof res === 'object' && 'data' in res && res.data) ? res.data : res;
         const nombreEncontrado = data?.nombre || data?.name;
 
@@ -185,7 +181,6 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
             );
           }
         } else {
-          // Si el servidor devolvió 200 pero sin nombre válido, no dejar en searching
           setPlayers((prev) =>
             prev.map((p) =>
               p.id === id && p.dni === cleanDni
@@ -200,7 +195,6 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
           );
         }
       } catch (err: any) {
-        // apiClient lanza un Error con err.message directamente
         const errText = err?.message || err?.response?.data?.message || 'Usuario no registrado en el sistema';
         setPlayers((prev) =>
           prev.map((p) =>
@@ -250,7 +244,6 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
       return;
     }
 
-    // Check squad min
     if (players.length < limits.min) {
       setErrorMessage(
         `Plantel insuficiente: se requiere un mínimo de ${limits.min} jugadores para ${sport} (actualmente hay ${players.length}).`
@@ -258,7 +251,6 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
       return;
     }
 
-    // Validar que cada jugador tenga DNI válido (7 u 8 dígitos), posición correcta y usuario registrado confirmado
     const DNI_REGEX = /^\d{7,8}$/;
     for (let i = 0; i < players.length; i++) {
       const p = players[i];
@@ -270,7 +262,7 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
       }
       if (!DNI_REGEX.test(dniClean)) {
         setErrorMessage(
-          `El DNI del jugador #${i + 1} (${dniClean}) es inválido: debe contener exactamente 7 u 8 dígitos numéricos sin letras, espacios, puntos ni símbolos.`
+          `El DNI del jugador #${i + 1} (${dniClean}) es inválido: debe contener exactamente 7 u 8 dígitos numéricos.`
         );
         return;
       }
@@ -282,7 +274,7 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
       }
       if (p.statusLookup === 'notFound') {
         setErrorMessage(
-          `El jugador #${i + 1} (DNI ${dniClean}) no se encuentra registrado en el sistema. Todos los integrantes del plantel deben poseer cuenta en Complejo Deportivo UB.`
+          `El jugador #${i + 1} (DNI ${dniClean}) no se encuentra registrado en el sistema.`
         );
         return;
       }
@@ -300,13 +292,12 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
       }
       if (!p.position || !allowedPositions.includes(p.position)) {
         setErrorMessage(
-          `La posición '${p.position || 'No definida'}' del jugador #${i + 1} no es válida para ${sport}. Posiciones permitidas: ${allowedPositions.join(', ')}.`
+          `La posición '${p.position || 'No definida'}' del jugador #${i + 1} no es válida para ${sport}.`
         );
         return;
       }
     }
 
-    // Check duplicate DNIS in the squad
     const dnis = players.map(p => p.dni.trim().toLowerCase());
     if (new Set(dnis).size !== dnis.length) {
       setErrorMessage('Existen jugadores con números de DNI duplicados dentro del mismo plantel.');
@@ -315,14 +306,13 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      // Call context registerTeam which checks duplicate players in same tournament in MySQL
       const res = await registerTeam(selectedTourneyId, teamName.trim(), players);
       if (!res.success) {
         setErrorMessage(res.error || 'Error al inscribir equipo');
         return;
       }
 
-      setSuccessMessage(`¡Equipo "${teamName.trim()}" inscripto con éxito en "${currentTourney?.name || 'el torneo'}"!`);
+      setSuccessMessage(`Equipo "${teamName.trim()}" inscripto con éxito en "${currentTourney?.name || 'el torneo'}".`);
       setTimeout(() => {
         setSuccessMessage(null);
         if (onSubmit) {
@@ -337,112 +327,105 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     }
   };
 
-  // Safe early return strictly AFTER all hooks and callback declarations
   if (!isOpen) return null;
 
   const isTorneoCerrado = currentTourney && currentTourney.status !== 'Inscripciones abiertas';
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(17, 26, 16, 0.8)' }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in"
       onClick={(e) => !isSubmitting && e.target === e.currentTarget && onClose()}
     >
-      <div
-        className="bg-[#1e281d] rounded-2xl border border-[#5a7056] w-full max-w-[620px] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-white font-['Inter',sans-serif]"
-        style={{ animation: 'modalIn 0.25s ease-out' }}
-      >
+      <div className="bg-white rounded-2xl border border-slate-200 w-full max-w-[640px] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-slate-900 font-['Inter',sans-serif]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#5a7056]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-bold text-lg text-white">Inscripción de Equipo a Torneo</h2>
-            </div>
-            <p className="text-xs text-[#a0a0a0] mt-0.5">
-              Control automático de cupo por deporte y control de jugador único.
+            <h2 className="font-bold text-base text-slate-900 tracking-tight">Inscripción de Equipo a Torneo</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Control automático de cupo por deporte y validación de padrón por DNI.
             </p>
           </div>
 
           <button
+            type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="text-[#a0a0a0] hover:text-white cursor-pointer bg-transparent border-none text-base disabled:opacity-40"
+            className="text-slate-400 hover:text-slate-700 cursor-pointer bg-transparent border-none p-1.5 rounded-lg hover:bg-slate-200/60 disabled:opacity-40"
           >
-            ✕
+            <IconClose size={18} />
           </button>
         </div>
 
         {/* Content Form */}
         <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4 overflow-y-auto flex-1">
           {successMessage && (
-            <div className="bg-[rgba(101,197,86,0.15)] border border-[#65c556] rounded-xl p-3 text-xs text-[#65c556] flex items-center gap-2 font-bold">
-              <span>✅</span>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 flex items-center gap-2 font-bold">
+              <IconCheck size={16} className="text-emerald-600 shrink-0" />
               <span>{successMessage}</span>
             </div>
           )}
 
           {(userRole === 'arbitro' || currentUser?.rol === 'Arbitro') && (
-            <div className="bg-[#7f1d1d]/85 border border-[#ef4444] rounded-xl p-3 text-xs text-[#fecaca] flex items-center gap-2 font-bold shadow-lg">
-              <span>⚠️</span>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700 flex items-center gap-2 font-bold">
+              <IconAlert size={16} className="text-red-600 shrink-0" />
               <span>Los usuarios con rol Árbitro Oficial no pueden inscribir equipos ni disputar torneos como jugadores.</span>
             </div>
           )}
 
           {isTorneoCerrado && (
-            <div className="bg-amber-500/15 border border-amber-500/40 rounded-xl p-3 text-xs text-amber-300 flex items-center gap-2">
-              <span>ℹ️</span>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 flex items-center gap-2">
+              <IconInfo size={16} className="text-amber-600 shrink-0" />
               <span>
                 El torneo seleccionado se encuentra <strong>{currentTourney?.status}</strong>. Selecciona un certamen con <strong>Inscripciones abiertas</strong> para registrar tu equipo.
               </span>
             </div>
           )}
 
-          {/* Tournament selector */}
-          <div>
-            <label className="text-xs font-semibold text-[#a0a0a0] uppercase block mb-1">
-              Torneo Oficial
-            </label>
-            <select
-              value={selectedTourneyId}
-              onChange={(e) => handleTournamentSelect(e.target.value)}
-              className="w-full bg-[#293827] border border-[#5a7056] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#65c556]"
-            >
-              {tournaments.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({t.sport}) • {t.status === 'Inscripciones abiertas' ? '🟢 ABIERTO' : `🔒 ${t.status}`} • Inscripción: ${t.entryFee.toLocaleString('es-AR')}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Team Name */}
-          <div>
-            <label className="text-xs font-semibold text-[#a0a0a0] uppercase block mb-1">
-              Nombre del Equipo
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="Ej: Los Imparables FC"
-              value={teamName}
-              onChange={(e) => setTeamName(e.target.value)}
-              className="w-full bg-[#293827] border border-[#5a7056] rounded-xl px-3 py-2 text-sm text-white placeholder-[#71856d] focus:outline-none focus:border-[#65c556]"
-            />
-          </div>
-
-          {/* Sport Squad limits card */}
-          <div className="bg-[#293827] border border-[#5a7056] rounded-xl p-3 flex justify-between items-center text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <span className="text-[#a0a0a0] block text-[11px]">Límites de plantel ({currentTourney?.sport}):</span>
-              <span className="font-bold text-white">
-                Mínimo: {limits.min} | Máximo: {limits.max} integrantes
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Torneo Oficial
+              </label>
+              <select
+                value={selectedTourneyId}
+                onChange={(e) => handleTournamentSelect(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
+              >
+                {tournaments.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.sport}) · {t.status === 'Inscripciones abiertas' ? 'ABIERTO' : t.status} · ${t.entryFee.toLocaleString('es-AR')}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Nombre del Equipo
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Ej: Los Imparables FC"
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-600"
+              />
+            </div>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex justify-between items-center text-xs">
+            <div>
+              <span className="text-slate-500 block text-[11px]">Límites reglamentarios ({currentTourney?.sport})</span>
+              <span className="font-bold text-slate-900">
+                Mínimo: {limits.min} · Máximo: {limits.max} integrantes
               </span>
             </div>
             <span
-              className={`font-black text-xs px-2.5 py-1 rounded-lg ${
+              className={`font-bold text-xs px-3 py-1 rounded-full border ${
                 players.length >= limits.min && players.length <= limits.max
-                  ? 'bg-[rgba(101,197,86,0.2)] text-[#65c556]'
-                  : 'bg-[rgba(245,158,11,0.2)] text-[#f59e0b]'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
               }`}
             >
               {players.length} / {limits.max} Jugadores
@@ -450,22 +433,23 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
           </div>
 
           {/* Players Roster */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2.5">
             <div className="flex justify-between items-center">
               <div>
-                <label className="text-xs font-semibold text-[#a0a0a0] uppercase block">
-                  Plantel Oficial (DNI y Posición)
+                <label className="text-xs font-bold text-slate-800 block">
+                  Nómina de Jugadores (DNI y Posición)
                 </label>
-                <span className="text-[11px] text-[#71856d]">
-                  El nombre oficial se obtiene automáticamente de la cuenta registrada en el sistema.
+                <span className="text-[11px] text-slate-500">
+                  El nombre se valida automáticamente contra el padrón de cuentas activas.
                 </span>
               </div>
               <button
                 type="button"
                 onClick={handleAddPlayer}
-                className="text-xs text-[#65c556] font-bold hover:underline cursor-pointer bg-transparent border-none flex items-center gap-1"
+                className="text-xs text-emerald-700 hover:text-emerald-800 font-bold bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1 transition"
               >
-                + Agregar Jugador
+                <IconPlus size={13} />
+                <span>Agregar Jugador</span>
               </button>
             </div>
 
@@ -475,76 +459,71 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
                 return (
                   <div
                     key={p.id}
-                    className="bg-[#293827] p-2.5 rounded-xl border border-[#5a7056] flex flex-col sm:flex-row sm:items-center gap-2 text-xs"
+                    className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center gap-2 text-xs"
                   >
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-gray-400 font-mono w-5 text-center">{idx + 1}.</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-slate-400 font-mono w-5 text-center font-bold">{idx + 1}.</span>
                       <input
                         type="text"
                         required
-                        placeholder="DNI (7-8 dígitos)"
+                        placeholder="DNI (7-8 díg.)"
                         inputMode="numeric"
                         maxLength={8}
                         value={p.dni}
                         disabled={isCaptain && Boolean(currentUser?.dni)}
                         onChange={(e) => handleDniChange(p.id, e.target.value)}
-                        className="w-32 bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-[#65c556] disabled:opacity-75 disabled:cursor-not-allowed"
-                        title={isCaptain && currentUser?.dni ? "DNI del Capitán (asociado a la cuenta)" : "Ingresa DNI sin puntos ni espacios"}
+                        className="w-32 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-emerald-600 disabled:bg-slate-100 disabled:text-slate-500"
                       />
                     </div>
 
-                    {/* Nombre oficial verificado desde la BD (Modo solo lectura) */}
-                    <div className="flex-1 min-w-0 bg-[#1e281d] border border-[#5a7056] rounded px-3 py-1.5 flex items-center justify-between">
+                    <div className="flex-1 min-w-0 bg-white border border-slate-200 rounded-lg px-3 py-1.5 flex items-center justify-between">
                       {p.statusLookup === 'searching' && (
-                        <span className="text-amber-300 text-xs flex items-center gap-1.5 animate-pulse">
-                          <span>⏳</span> Buscando en padrón...
+                        <span className="text-amber-600 text-xs flex items-center gap-1.5">
+                          <IconHourglass size={13} />
+                          <span>Buscando en padrón...</span>
                         </span>
                       )}
                       {p.statusLookup === 'found' && (
                         <div className="flex items-center gap-1.5 truncate">
-                          <span className="text-[#65c556] text-xs font-bold">✓</span>
-                          <span className="font-semibold text-white truncate" title={p.name}>
+                          <IconCheck size={14} className="text-emerald-600 shrink-0" />
+                          <span className="font-semibold text-slate-900 truncate" title={p.name}>
                             {p.name}
                           </span>
                           {isCaptain && (
-                            <span className="text-[10px] bg-[#65c556]/20 text-[#65c556] font-bold px-1.5 py-0.5 rounded ml-1">
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded ml-1">
                               Capitán
                             </span>
                           )}
                         </div>
                       )}
                       {p.statusLookup === 'notFound' && (
-                        <div className="flex items-center gap-1.5 truncate text-[#e53e3e]">
-                          <span className="font-bold text-xs">✕</span>
+                        <div className="flex items-center gap-1.5 truncate text-red-600">
+                          <IconClose size={14} className="shrink-0" />
                           <span className="text-xs truncate font-medium">
                             No registrado en Complejo UB
                           </span>
                         </div>
                       )}
                       {p.statusLookup === 'suspended' && (
-                        <div className="flex items-center gap-1.5 truncate text-amber-400">
-                          <span className="font-bold text-xs">⛔</span>
+                        <div className="flex items-center gap-1.5 truncate text-amber-600">
+                          <IconBan size={14} className="shrink-0" />
                           <span className="text-xs truncate font-medium">
-                            Cuenta suspendida
+                            Cuenta suspendida o no elegible
                           </span>
                         </div>
                       )}
                       {(!p.statusLookup || p.statusLookup === 'idle') && (
-                        <span className="text-[#71856d] italic text-xs truncate">
+                        <span className="text-slate-400 italic text-xs truncate">
                           Ingresa DNI para verificar jugador...
                         </span>
                       )}
-
-                      <span className="text-[10px] text-[#71856d] ml-1 uppercase font-mono flex-shrink-0">
-                        Solo Lectura
-                      </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <select
                         value={p.position}
                         onChange={(e) => handlePositionChange(p.id, e.target.value)}
-                        className="w-32 bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#65c556]"
+                        className="w-32 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
                       >
                         {allowedPositions.map((pos) => (
                           <option key={pos} value={pos}>
@@ -557,10 +536,10 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleRemovePlayer(p.id)}
-                          className="text-[#e53e3e] hover:text-white px-2 py-1 bg-transparent border-none cursor-pointer rounded hover:bg-red-500/20 transition-colors"
+                          className="text-slate-400 hover:text-red-600 p-1.5 bg-transparent border-none cursor-pointer rounded-lg hover:bg-red-50 transition-colors"
                           title="Quitar jugador"
                         >
-                          ✕
+                          <IconClose size={15} />
                         </button>
                       )}
                     </div>
@@ -570,41 +549,29 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
             </div>
           </div>
 
-          <p className="text-[11px] text-[#a0a0a0] italic">
-            * Solamente se pueden inscribir jugadores que ya tengan cuenta registrada en la plataforma. El sistema verifica que ningún jugador esté inscripto en más de un equipo del mismo torneo.
-          </p>
-
-          {/* Mensaje de error posicionado inmediatamente arriba de los botones de acción */}
           {errorMessage && (
-            <div className="bg-[rgba(229,62,62,0.15)] border border-[#e53e3e] rounded-xl p-3 text-xs text-[#e53e3e] flex items-center gap-2 animate-fadeIn">
-              <span>⚠️</span>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700 flex items-center gap-2">
+              <IconAlert size={16} className="text-red-500 shrink-0" />
               <span className="font-medium">{errorMessage}</span>
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex gap-3.5 mt-2">
+          <div className="flex gap-3 mt-1 pt-2 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="flex-1 py-3 px-5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white font-bold text-xs cursor-pointer disabled:opacity-40 min-h-[44px] transition-colors"
+              className="flex-1 py-2.5 px-4 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold text-xs cursor-pointer disabled:opacity-40 transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting || userRole === 'arbitro' || currentUser?.rol === 'Arbitro'}
-              className="flex-1 py-3 px-6 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-extrabold text-sm cursor-pointer transition-all shadow-lg shadow-[#65c556]/20 disabled:opacity-50 flex items-center justify-center gap-2 min-h-[44px]"
+              className="flex-1 py-2.5 px-5 rounded-xl bg-[#199e1b] hover:bg-[#158417] text-white font-bold text-xs cursor-pointer transition-all shadow-md shadow-[#199e1b]/20 disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isSubmitting ? (
-                <>
-                  <span className="inline-block w-4 h-4 border-2 border-[#293827] border-t-transparent rounded-full animate-spin" />
-                  <span>Inscribiendo equipo...</span>
-                </>
-              ) : (
-                'Confirmar Inscripción'
-              )}
+              {isSubmitting ? 'Inscribiendo equipo...' : 'Confirmar Inscripción'}
             </button>
           </div>
         </form>
