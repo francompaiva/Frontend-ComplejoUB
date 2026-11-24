@@ -1,5 +1,8 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
+import './LandingPage.css';
 import { useComplejo } from '../context/ComplejoContext';
+import { canchasApi } from '../api/endpoints';
 import { type BookingSlotInfo } from '../components/ConfirmacionPagoModal';
 import { type SportType, type Tournament, SPORT_PRICING } from '../data/mockData';
 import ListaEsperaModal from '../components/ListaEsperaModal';
@@ -8,7 +11,7 @@ import { IconCalendar, IconClock } from '../components/Icons';
 import { getQuickDatesBuenosAires, formatDateSpanish } from '../utils/dateUtils';
 
 export interface LandingPageProps {
-  onNavigate: (screen: string) => void;
+
   onOpenInscripcion: (tournamentId?: string) => void;
   onOpenPago: (slotData: BookingSlotInfo) => void;
 }
@@ -31,8 +34,20 @@ const ALL_HOURS = [
   '23:00 hs'
 ];
 
+type AvailabilitySlot = {
+  hora: string;
+  estado: 'Libre' | 'Ocupado' | 'DeshabilitadoTorneo' | 'Mantenimiento';
+  motivo?: string;
+};
+
+type AvailabilityState = {
+  key: string;
+  byCourt: Record<string, AvailabilitySlot[]>;
+  error: boolean;
+};
+
 export const LandingPage: React.FC<LandingPageProps> = ({
-  onNavigate,
+
   onOpenInscripcion,
   onOpenPago
 }) => {
@@ -68,7 +83,58 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
   // Canchas filtradas por deporte
-  const filteredCourts = courts.filter((c) => c.sport === selectedSport);
+  const filteredCourts = useMemo(
+    () => courts.filter((c) => c.sport === selectedSport),
+    [courts, selectedSport]
+  );
+
+  // La disponibilidad pública del backend incluye reservas de TODOS los clientes.
+  // Evitamos usar 'getMisReservas()' para determinar si un turno está libre.
+  const availabilityKey = `${selectedDate}|${selectedSport}|${filteredCourts.map((c) => c.id).join(',')}`;
+  const [availabilityState, setAvailabilityState] = useState<AvailabilityState | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let latestRequest = 0;
+
+    const loadAvailability = async () => {
+      const requestId = ++latestRequest;
+      setAvailabilityState(null);
+
+      try {
+        const entries = await Promise.all(filteredCourts.map(async (court) => {
+          const data: { slots?: AvailabilitySlot[] } = await canchasApi.getDisponibilidad(Number(court.id), selectedDate);
+          if (!Array.isArray(data?.slots)) {
+            throw new Error(`Disponibilidad sin datos para la cancha ${court.id}`);
+          }
+          return [court.id, data.slots] as const;
+        }));
+
+        if (!cancelled && requestId === latestRequest) {
+          setAvailabilityState({ key: availabilityKey, byCourt: Object.fromEntries(entries), error: false });
+        }
+      } catch (error) {
+        console.warn('[LandingPage] No se pudo consultar disponibilidad:', error);
+        if (!cancelled && requestId === latestRequest) {
+          // Si la API falla, no mostrar horarios como libres por error.
+          setAvailabilityState({ key: availabilityKey, byCourt: {}, error: true });
+        }
+      }
+    };
+
+    void loadAvailability();
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') void loadAvailability();
+    };
+    window.addEventListener('focus', refreshOnFocus);
+    document.addEventListener('visibilitychange', refreshOnFocus);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refreshOnFocus);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
+  }, [availabilityKey, selectedDate, filteredCourts, bookings]);
 
   // Filtrado de franjas horarias por turno
   const displayedHours = ALL_HOURS.filter((h) => {
@@ -78,53 +144,49 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     return true;
   });
 
-  // Verificación de disponibilidad slot por slot (Cancha y Hora específica)
-  const getSlotStatus = (courtName: string, hour: string) => {
+  // Los estados Libre/Ocupado/Torneo vienen de la disponibilidad global de MySQL.
+  const getSlotStatus = (courtId: string, courtName: string, hour: string) => {
     const cleanHour = hour.replace(' hs', '').trim();
 
-    // 0. Horario concluido en el pasado (zona horaria oficial del Complejo: UTC-3)
+    // Un horario que ya pasó nunca se puede reservar.
     const hourNum = parseInt(cleanHour.split(':')[0], 10);
     const minuteNum = parseInt(cleanHour.split(':')[1] || '0', 10);
     const hourFormatted = `${hourNum.toString().padStart(2, '0')}:${minuteNum.toString().padStart(2, '0')}:00`;
     const slotDateTime = new Date(`${selectedDate}T${hourFormatted}-03:00`);
-
     if (slotDateTime.getTime() <= Date.now()) {
+      return { status: 'Pasado' as const, label: 'Horario concluido' };
+    }
+
+    if (!availabilityState || availabilityState.key !== availabilityKey) {
+      return { status: 'Consultando' as const, label: 'Consultando...' };
+    }
+    if (availabilityState.error) {
+      return { status: 'Error' as const, label: 'Sin conexión' };
+    }
+
+    const slot = availabilityState.byCourt[courtId]?.find((s) => s.hora === cleanHour);
+    if (!slot) {
+      return { status: 'Error' as const, label: 'Sin datos' };
+    }
+
+    if (slot.estado === 'DeshabilitadoTorneo') {
+      // El backend determina el bloqueo; el fixture aporta el nombre de los equipos si lo tenemos.
+      const matchOnCourt = fixtures.find(
+        (m) =>
+          !m.isFreeDate &&
+          Boolean(m.courtId === courtId || (m.court && (m.court === courtName || courtName.includes(m.court) || m.court.includes(courtName)))) &&
+          m.time?.slice(0, 5) === cleanHour &&
+          m.date === selectedDate
+      );
       return {
-        status: 'Pasado' as const,
-        label: 'Horario concluido'
+        status: 'Torneo' as const,
+        label: matchOnCourt ? `🏆 ${matchOnCourt.homeTeam} vs ${matchOnCourt.awayTeam}` : '🏆 Turno de torneo'
       };
     }
-
-    // 1. Partido de torneo en ESA cancha específica y en ESE horario exacto
-    const matchOnCourt = fixtures.find(
-      (m) =>
-        !m.isFreeDate &&
-        Boolean(m.court && courtName && (m.court === courtName || courtName.includes(m.court) || m.court.includes(courtName))) &&
-        m.time?.slice(0, 5) === cleanHour &&
-        m.date === selectedDate
-    );
-
-    if (matchOnCourt) {
-      return {
-        status: 'Torneo',
-        label: `🏆 ${matchOnCourt.homeTeam} vs ${matchOnCourt.awayTeam}`
-      };
+    if (slot.estado === 'Ocupado' || slot.estado === 'Mantenimiento') {
+      return { status: 'Ocupado' as const, label: 'Ocupado' };
     }
-
-    // 2. Reserva activa en ESA cancha específica y en ESE horario en la base de datos
-    const bookingOnCourt = bookings.find(
-      (b) =>
-        (b.courtName === courtName || courtName.includes(b.courtName) || b.courtName.includes(courtName)) &&
-        b.time?.slice(0, 5) === cleanHour &&
-        b.date === selectedDate &&
-        b.status !== 'Cancelada'
-    );
-
-    if (bookingOnCourt) {
-      return { status: 'Ocupado', label: 'Ocupado' };
-    }
-
-    return { status: 'Libre', label: 'Disponible' };
+    return { status: 'Libre' as const, label: 'Disponible' };
   };
 
   const handleOpenWaitlist = (courtName: string, hour: string) => {
@@ -140,108 +202,88 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const formattedSelectedDate = useMemo(() => formatDateSpanish(selectedDate), [selectedDate]);
 
   return (
-    <div className="bg-[#293827] min-h-full w-full font-['Inter',sans-serif] text-white flex flex-col">
+    <div className="lp-page">
       {/* Hero Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-b from-[#1a2e18] via-[#233821] to-[#293827] py-14 px-6 lg:px-12 text-center border-b border-[#5a7056]/50">
-        <span className="inline-block bg-[rgba(101,197,86,0.15)] text-[#65c556] border border-[#65c556]/40 text-xs font-extrabold uppercase px-3 py-1 rounded-full mb-3 tracking-wider">
-          Reserva Online con Seña del 30%
-        </span>
-        <h1 className="text-4xl md:text-5xl font-black text-white leading-tight mb-3">
+      <div className="lp-hero">
+        
+        <h1 className="lp-hero-title">
           ¡Reservá tu Cancha en Segundos!
         </h1>
-        <p className="text-sm md:text-base text-[#c0c0c0] max-w-xl mx-auto mb-6">
+        <p className="lp-hero-description">
           Instalaciones de primer nivel para Fútbol 5, Fútbol 8, Fútbol 11, Pádel y Tenis. Turnos de 1 hora con confirmación inmediata.
         </p>
+        
 
-        <div className="flex flex-wrap items-center justify-center gap-2">
+        
+        <span className="lp-hero-badge">
+          Reserva Online con Seña del 30%
+        </span>
+      </div>
+
+      {/* Schedule Table Section */}
+      <div className="lp-schedule-section">
+        <div className="lp-schedule-head">
+          <div>
+            <div className="lp-schedule-title-row">
+              <h2 className="lp-section-title">Disponibilidad de Turnos</h2>
+              <span className="lp-selected-date">
+                {formattedSelectedDate}
+              </span>
+            </div>
+            <p className="lp-schedule-caption">
+              Tarifa fija para {selectedSport}: <strong className="lp-price">${(SPORT_PRICING[selectedSport] || 18000).toLocaleString('es-AR')}</strong> (Seña 30%: ${Math.round((SPORT_PRICING[selectedSport] || 18000) * 0.3).toLocaleString('es-AR')})
+            </p>
+            <div className="lp-sport-list">
           {(['Fútbol 5', 'Fútbol 8', 'Fútbol 11', 'Pádel', 'Tenis'] as SportType[]).map((sport) => (
             <button
               key={sport}
               type="button"
               onClick={() => setSelectedSport(sport)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                selectedSport === sport
-                  ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-lg shadow-[rgba(101,197,86,0.25)]'
-                  : 'bg-[#1e281d] text-[#c0c0c0] border-[#5a7056] hover:text-white'
-              }`}
+              className={`lp-sport-button${selectedSport === sport ? " is-active" : ""}`}
             >
               {sport} (${(SPORT_PRICING[sport] || 18000).toLocaleString('es-AR')}/h)
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Schedule Table Section */}
-      <div className="px-6 lg:px-12 py-10 flex flex-col gap-6">
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-2xl font-bold text-white">Disponibilidad de Turnos</h2>
-              <span className="text-xs bg-[#1e281d] text-[#65c556] border border-[#5a7056] px-2.5 py-0.5 rounded-full capitalize font-semibold">
-                {formattedSelectedDate}
-              </span>
-            </div>
-            <p className="text-xs text-[#a0a0a0] mt-1">
-              Tarifa fija para {selectedSport}: <strong className="text-[#65c556]">${(SPORT_PRICING[selectedSport] || 18000).toLocaleString('es-AR')}</strong> (Seña 30%: ${Math.round((SPORT_PRICING[selectedSport] || 18000) * 0.3).toLocaleString('es-AR')})
-            </p>
           </div>
 
           {/* Interactive Date & Filter Controls */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="lp-filter-toolbar">
             {/* Quick date shortcuts */}
-            <div className="flex items-center gap-1 bg-[#1e281d] p-1.5 rounded-xl border border-[#5a7056]">
+            <div className="lp-filter-group">
               <button
                 type="button"
                 onClick={() => setSelectedDate(todayStr)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                  selectedDate === todayStr
-                    ? 'bg-[#65c556] text-[#293827] font-bold shadow'
-                    : 'text-[#a0a0a0] hover:text-white'
-                }`}
+                className={`lp-date-button${selectedDate === todayStr ? " is-active" : ""}`}
               >
                 Hoy
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedDate(tomorrowStr)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                  selectedDate === tomorrowStr
-                    ? 'bg-[#65c556] text-[#293827] font-bold shadow'
-                    : 'text-[#a0a0a0] hover:text-white'
-                }`}
+                className={`lp-date-button${selectedDate === tomorrowStr ? " is-active" : ""}`}
               >
                 Mañana
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedDate(saturdayStr)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                  selectedDate === saturdayStr
-                    ? 'bg-[#65c556] text-[#293827] font-bold shadow'
-                    : 'text-[#a0a0a0] hover:text-white'
-                }`}
+                className={`lp-date-button${selectedDate === saturdayStr ? " is-active" : ""}`}
               >
                 Sábado
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedDate(sundayStr)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                  selectedDate === sundayStr
-                    ? 'bg-[#65c556] text-[#293827] font-bold shadow'
-                    : 'text-[#a0a0a0] hover:text-white'
-                }`}
+                className={`lp-date-button${selectedDate === sundayStr ? " is-active" : ""}`}
               >
                 Domingo
               </button>
             </div>
 
             {/* Interactive Calendar Date Picker */}
-            <div
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border"
-              style={{ backgroundColor: '#1e281d', borderColor: '#5a7056' }}
-            >
-              <IconCalendar size={16} className="text-[#65c556]" />
+            <div className="lp-calendar-control">
+              <IconCalendar size={16} className="lp-calendar-icon" />
               <input
                 type="date"
                 min={todayStr}
@@ -249,44 +291,31 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 onChange={(e) => {
                   if (e.target.value) setSelectedDate(e.target.value);
                 }}
-                className="bg-transparent text-xs text-white focus:outline-none cursor-pointer font-bold"
-                style={{ colorScheme: 'dark' }}
+                className="lp-calendar-input"
                 title="Elegir cualquier fecha en el calendario"
               />
             </div>
 
             {/* Shift Filter (Turno) */}
-            <div className="flex items-center gap-1 bg-[#1e281d] p-1.5 rounded-xl border border-[#5a7056]">
+            <div className="lp-filter-group">
               <button
                 type="button"
                 onClick={() => setShiftFilter('all')}
-                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
-                  shiftFilter === 'all'
-                    ? 'bg-[#65c556] text-[#293827] font-bold shadow'
-                    : 'text-[#a0a0a0] hover:text-white'
-                }`}
+                className={`lp-shift-button${shiftFilter === "all" ? " is-active" : ""}`}
               >
                 Todos los Horarios
               </button>
               <button
                 type="button"
                 onClick={() => setShiftFilter('morning')}
-                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
-                  shiftFilter === 'morning'
-                    ? 'bg-[#65c556] text-[#293827] font-bold shadow'
-                    : 'text-[#a0a0a0] hover:text-white'
-                }`}
+                className={`lp-shift-button${shiftFilter === "morning" ? " is-active" : ""}`}
               >
                 Mañana (9-16h)
               </button>
               <button
                 type="button"
                 onClick={() => setShiftFilter('evening')}
-                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
-                  shiftFilter === 'evening'
-                    ? 'bg-[#65c556] text-[#293827] font-bold shadow'
-                    : 'text-[#a0a0a0] hover:text-white'
-                }`}
+                className={`lp-shift-button${shiftFilter === "evening" ? " is-active" : ""}`}
               >
                 Tarde/Noche (17-23h)
               </button>
@@ -296,19 +325,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
         {/* Banner de Sanción Vigente (RF-05) */}
         {isUserBanned && (
-          <div className="bg-[rgba(229,62,62,0.15)] border-2 border-[#e53e3e] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
-            <div className="flex items-start sm:items-center gap-3.5">
-              <span className="text-3xl shrink-0">🚫</span>
+          <div className="lp-ban-banner">
+            <div className="lp-ban-main">
+              <span className="lp-ban-icon">🚫</span>
               <div>
-                <h3 className="font-bold text-base text-[#e53e3e]">
+                <h3 className="lp-ban-title">
                   Cuenta Suspendida para Nuevas Reservas
                 </h3>
-                <p className="text-xs text-[#d1d5db] mt-1 leading-relaxed">
+                <p className="lp-ban-text">
                   Has acumulado <strong>3 inasistencias consecutivas</strong> a turnos reservados. De acuerdo a la normativa del complejo deportivo, tu cuenta está bloqueada {currentUser?.suspension_hasta ? `hasta el ${new Date(currentUser.suspension_hasta).toLocaleDateString('es-AR')}` : 'durante 14 días'}. Los botones de reserva permanecerán inhabilitados.
                 </p>
               </div>
             </div>
-            <span className="bg-[#e53e3e] text-white text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider self-start sm:self-center shrink-0">
+            <span className="lp-ban-pill">
               Sanción Activa
             </span>
           </div>
@@ -316,8 +345,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
         {/* Weekend notice if applicable */}
         {isWeekend && (
-          <div className="bg-[rgba(245,158,11,0.15)] border border-[#f59e0b] rounded-xl p-3 flex items-center gap-3 text-xs text-[#f59e0b]">
-            <span className="text-base">🏆</span>
+          <div className="lp-weekend-banner">
+            <span className="lp-weekend-icon">🏆</span>
             <span>
               <strong>Aviso de Torneo Oficial:</strong> Durante el fin de semana se disputan las fechas del torneo oficial en las canchas programadas. Cada partido ocupa únicamente su cancha y horario asignado; todas las demás canchas u horarios libres están 100% habilitados para reservas comunes con el 30% de seña.
             </span>
@@ -325,42 +354,46 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         )}
 
         {/* Timetable */}
-        <div className="bg-[#1e281d] rounded-2xl border border-[#5a7056] overflow-hidden shadow-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-center text-xs">
+        <div className="lp-schedule-card">
+          <div className="lp-scroll-x">
+            <table className="lp-data-table">
               <thead>
-                <tr className="border-b border-[#5a7056] bg-[#293827] text-[#a0a0a0]">
-                  <th className="py-3 px-4 text-left font-bold w-28">HORARIO</th>
+                <tr className="lp-schedule-table-head">
+                  <th className="lp-time-header">HORARIO</th>
                   {filteredCourts.map((c) => (
-                    <th key={c.id} className="py-3 px-4 font-bold text-white">
+                    <th key={c.id} className="lp-court-header">
                       {c.name}
                     </th>
                   ))}
                   {filteredCourts.length === 0 && (
-                    <th className="py-3 px-4 font-medium text-gray-400">
+                    <th className="lp-empty-header">
                       Canchas de {selectedSport}
                     </th>
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#293827]">
+              <tbody className="lp-schedule-table-body">
                 {displayedHours.map((hour) => (
-                  <tr key={hour} className="hover:bg-[#293827]/30 transition-colors">
-                    <td className="py-4 px-4 text-left font-mono font-bold text-[#65c556] flex items-center gap-1.5">
-                      <IconClock size={13} className="text-[#5a7056]" />
+                  <tr key={hour} className="lp-slot-row">
+                    <td className="lp-time-cell">
+                      <IconClock size={13} className="lp-clock-icon" />
                       <span>{hour}</span>
                     </td>
 
                     {filteredCourts.map((c) => {
-                      const { status, label } = getSlotStatus(c.name, hour);
+                      const { status, label } = getSlotStatus(c.id, c.name, hour);
                       return (
-                        <td key={c.id} className="py-3 px-3 min-w-[180px]">
+                        <td key={c.id} className="lp-slot-cell">
                           {status === 'Pasado' ? (
                             <div
-                              className="w-full py-2.5 px-2 rounded-xl bg-[#1e281d]/70 text-[#71856d] border border-[#3b4d38] font-bold text-xs select-none shadow-sm"
+                              className="lp-slot-past"
                               title="Este horario ya ha concluido"
                             >
                               Concluido
+                            </div>
+                          ) : status === 'Consultando' || status === 'Error' ? (
+                            <div className="lp-slot-past" title={status === 'Error' ? 'No se pudo verificar la disponibilidad en el servidor' : 'Consultando la disponibilidad en el servidor'}>
+                              {label}
                             </div>
                           ) : status === 'Libre' ? (
                             isUserBanned ? (
@@ -368,7 +401,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                                 type="button"
                                 disabled
                                 title="No puedes reservar: tu cuenta está suspendida por acumulación de inasistencias"
-                                className="w-full py-2.5 rounded-xl bg-red-950/20 text-red-400 border border-red-500/30 font-bold text-xs opacity-60 cursor-not-allowed shadow-sm flex items-center justify-center gap-1"
+                                className="lp-slot-suspended"
                               >
                                 <span>🚫 Suspendido</span>
                               </button>
@@ -385,32 +418,27 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                                     price: c.pricePerHour
                                   })
                                 }
-                                className="w-full py-2.5 rounded-xl bg-[rgba(101,197,86,0.15)] text-[#65c556] border border-[#65c556]/40 hover:bg-[#65c556] hover:text-[#293827] font-bold text-xs transition-all cursor-pointer shadow-sm"
+                                className="lp-slot-book"
                               >
                                 Reservar (${Math.round(c.pricePerHour * 0.3).toLocaleString('es-AR')})
                               </button>
                             )
                           ) : status === 'Torneo' ? (
                             <div
-                              className="py-2.5 px-2 rounded-xl border text-xs font-bold shadow-sm"
-                              style={{
-                                backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                                borderColor: 'rgba(245, 158, 11, 0.5)',
-                                color: '#f59e0b'
-                              }}
+                              className="lp-slot-tournament"
                               title="Cancha reservada para encuentro oficial de torneo"
                             >
                               {label}
                             </div>
                           ) : (
-                            <div className="flex flex-col gap-1">
-                              <span className="py-1.5 px-2 rounded-lg bg-[rgba(229,62,62,0.15)] text-[#e53e3e] font-bold text-xs border border-[#e53e3e]/30">
+                            <div className="lp-slot-occupied-wrapper">
+                              <span className="lp-slot-occupied">
                                 Turno Ocupado
                               </span>
                               <button
                                 type="button"
                                 onClick={() => handleOpenWaitlist(c.name, hour)}
-                                className="text-[10px] text-[#f59e0b] hover:underline cursor-pointer bg-transparent border-none font-semibold"
+                                className="lp-waitlist-btn"
                               >
                                 ⏳ Lista de Espera
                               </button>
@@ -421,7 +449,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     })}
 
                     {filteredCourts.length === 0 && (
-                      <td className="py-4 text-gray-400">
+                      <td className="lp-empty-cell">
                         Próximamente turnos disponibles en esta categoría.
                       </td>
                     )}
@@ -434,129 +462,139 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </div>
 
       {/* Tournaments Section */}
-      <div className="px-6 lg:px-12 py-8 bg-[#1e281d] border-t border-[#5a7056]/60 flex flex-col gap-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="lp-tournaments-section">
+        <div className="lp-tournaments-head">
           <div>
-            <span className="text-xs font-extrabold uppercase text-[#65c556] tracking-wider">
+            <span className="lp-eyebrow">
               Competencias Oficiales UB
             </span>
-            <h2 className="text-2xl font-bold text-white mt-0.5">Torneos de Fin de Semana</h2>
-            <p className="text-xs text-[#a0a0a0]">
+            <h2 className="lp-tournaments-title">Torneos de Fin de Semana</h2>
+            <p className="lp-tournaments-description">
               Inscripción de equipos, fixtures automáticos y tablas de posiciones actualizadas en vivo.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => onOpenInscripcion()}
-            className="px-6 py-3 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-extrabold text-sm shadow-lg shadow-[#65c556]/20 transition-all cursor-pointer min-h-[44px] flex items-center justify-center self-start md:self-auto"
-          >
-            + Inscribir mi Equipo
-          </button>
+          
+          {tournaments.some(t =>
+            t.status === 'Inscripciones abiertas' &&
+            (t.registeredTeams || []).length < t.maxTeams
+          ) && (
+            <button
+              type="button"
+              onClick={() => onOpenInscripcion()}
+              className="lp-join-team-btn"
+            >
+              + Inscribir mi Equipo
+            </button>
+          )}
+
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {tournaments.map((t) => (
+        <div className="lp-tournament-list">
+          {tournaments.filter(t => t.status !== 'Finalizado').map((t) => (
             <div
               key={t.id}
-              className="bg-[#293827] border border-[#5a7056] rounded-2xl p-5 flex flex-col justify-between gap-4 shadow-xl"
+              className="lp-tournament-card"
             >
               <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-bold text-[#65c556]">
+                <div className="lp-tournament-topline">
+                  <span className="lp-tournament-category">
                     {t.sport} • {t.format}
                   </span>
-                  <span className="bg-[rgba(101,197,86,0.15)] text-[#65c556] text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  <span className="lp-tournament-status">
                     {t.status}
                   </span>
                 </div>
-                <h3 className="text-lg font-bold text-white mt-1">{t.name}</h3>
-                <p className="text-xs text-[#a0a0a0] mt-1">📅 {t.dates}</p>
+                <h3 className="lp-tournament-name">{t.name}</h3>
+                <p className="lp-tournament-dates"> {t.dates}</p>
 
-                <div className="grid grid-cols-2 gap-2 text-xs my-3 bg-[#1e281d] p-3 rounded-xl border border-[#5a7056]/60">
+                <div className="lp-tournament-stats">
                   <div>
-                    <span className="text-[#a0a0a0] block">Inscripción:</span>
-                    <span className="text-white font-bold">${Number(t.entryFee || 0).toLocaleString('es-AR')}</span>
+                    <span className="lp-stat-label">Inscripción:</span>
+                    <span className="lp-stat-value">${Number(t.entryFee || 0).toLocaleString('es-AR')}</span>
                   </div>
                   <div>
-                    <span className="text-[#a0a0a0] block">Equipos:</span>
-                    <span className="text-[#65c556] font-bold">{(t.registeredTeams || []).length} / {t.maxTeams || 8}</span>
+                    <span className="lp-stat-label">Equipos:</span>
+                    <span className="lp-stat-value-accent">{(t.registeredTeams || []).length} / {t.maxTeams || 8}</span>
                   </div>
                 </div>
 
-                <p className="text-xs text-[#c0c0c0]">
-                  🏆 <strong>Premio:</strong> {t.prize}
+                <p className="lp-tournament-prize">
+                  <strong>Premio:</strong> {t.prize}
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="lp-tournament-actions">
                 <button
                   type="button"
                   onClick={() => setDetailModalTorneo(t)}
-                  className="flex-1 py-3 px-4 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white hover:border-[#65c556] font-bold text-xs transition-colors cursor-pointer text-center min-h-[42px] flex items-center justify-center"
+                  className="lp-tournament-details"
                 >
                   Ver Detalles
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenInscripcion(t.id)}
-                  className="flex-1 py-3 px-4 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-extrabold text-xs transition-colors cursor-pointer text-center shadow-md min-h-[42px] flex items-center justify-center"
-                >
-                  Inscribir Equipo
-                </button>
+               
+                {t.status === 'Inscripciones abiertas' &&
+                  (t.registeredTeams || []).length < t.maxTeams && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenInscripcion(t.id)}
+                    className="lp-tournament-enroll"
+                  >
+                    Inscribir Equipo
+                  </button>
+                )}
+
               </div>
             </div>
           ))}
         </div>
 
         {/* Live Standings Table */}
-        <div className="mt-4">
-          <h3 className="text-lg font-bold text-white mb-1">
+        <div className="lp-standings-section">
+          <h3 className="lp-standings-title">
             Tabla de Posiciones Oficial — Copa Apertura Fútbol 5
           </h3>
-          <p className="text-xs text-[#a0a0a0] mb-4">
+          <p className="lp-standings-description">
             Actualización inmediata tras la carga de resultados arbitrales.
           </p>
 
-          <div className="bg-[#293827] border border-[#5a7056] rounded-2xl overflow-hidden shadow-xl">
-            <div className="overflow-x-auto">
-              <table className="w-full text-center text-xs">
+          <div className="lp-standings-card">
+            <div className="lp-scroll-x">
+              <table className="lp-data-table">
                 <thead>
-                  <tr className="border-b border-[#5a7056] text-[#a0a0a0] bg-[#1e281d]">
-                    <th className="py-3 px-4 text-center">POS</th>
-                    <th className="py-3 px-4 text-left">EQUIPO</th>
-                    <th className="py-3 px-2">PJ</th>
-                    <th className="py-3 px-2">PG</th>
-                    <th className="py-3 px-2">PE</th>
-                    <th className="py-3 px-2">PP</th>
-                    <th className="py-3 px-2">GF</th>
-                    <th className="py-3 px-2">GC</th>
-                    <th className="py-3 px-2">DIF</th>
-                    <th className="py-3 px-4 text-center font-bold text-[#65c556]">PTS</th>
+                  <tr className="lp-standings-header">
+                    <th className="lp-pos-header">POS</th>
+                    <th className="lp-team-header">EQUIPO</th>
+                    <th className="lp-number-header">PJ</th>
+                    <th className="lp-number-header">PG</th>
+                    <th className="lp-number-header">PE</th>
+                    <th className="lp-number-header">PP</th>
+                    <th className="lp-number-header">GF</th>
+                    <th className="lp-number-header">GC</th>
+                    <th className="lp-number-header">DIF</th>
+                    <th className="lp-points-header">PTS</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#1e281d]">
+                <tbody className="lp-standings-body">
                   {standings.map((s, idx) => (
                     <tr
                       key={s.team}
-                      className={`hover:bg-[#1e281d]/50 transition-colors ${
-                        idx === 0 ? 'bg-[rgba(101,197,86,0.08)]' : ''
-                      }`}
+                      className={`lp-standing-row${idx === 0 ? " is-first" : ""}`}
                     >
-                      <td className="py-3 px-4 font-bold text-sm text-[#65c556]">
+                      <td className="lp-ranking-cell">
                         {s.pos}° {idx === 0 && '👑'}
                       </td>
-                      <td className="py-3 px-4 text-left font-bold text-sm text-white">{s.team}</td>
-                      <td className="py-3 px-2 text-[#c0c0c0] font-mono">{s.pj}</td>
-                      <td className="py-3 px-2 text-[#c0c0c0] font-mono">{s.pg}</td>
-                      <td className="py-3 px-2 text-[#c0c0c0] font-mono">{s.pe}</td>
-                      <td className="py-3 px-2 text-[#c0c0c0] font-mono">{s.pp}</td>
-                      <td className="py-3 px-2 text-[#c0c0c0] font-mono">{s.gf}</td>
-                      <td className="py-3 px-2 text-[#c0c0c0] font-mono">{s.gc}</td>
-                      <td className="py-3 px-2 font-mono font-bold text-[#65c556]">
+                      <td className="lp-team-cell">{s.team}</td>
+                      <td className="lp-stat-cell">{s.pj}</td>
+                      <td className="lp-stat-cell">{s.pg}</td>
+                      <td className="lp-stat-cell">{s.pe}</td>
+                      <td className="lp-stat-cell">{s.pp}</td>
+                      <td className="lp-stat-cell">{s.gf}</td>
+                      <td className="lp-stat-cell">{s.gc}</td>
+                      <td className="lp-diff-cell">
                         {s.gf - s.gc > 0 ? `+${s.gf - s.gc}` : s.gf - s.gc}
                       </td>
-                      <td className="py-3 px-4 text-center font-black text-sm text-[#65c556]">
+                      <td className="lp-points-cell">
                         {s.pts}
                       </td>
                     </tr>
@@ -568,27 +606,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-[#141b13] border-t border-[#5a7056] px-6 lg:px-12 py-8 text-xs text-[#a0a0a0] flex flex-col md:flex-row justify-between items-center gap-4">
-        <div>
-          <p className="font-bold text-white">Complejo Deportivo UB</p>
-          <p className="text-[11px] mt-0.5">Sistema Integral de Gestión Deportiva • Complejo Deportivo UB</p>
-        </div>
-        <div className="flex gap-4">
-          <button onClick={() => onNavigate('landing')} className="hover:text-white bg-transparent border-none cursor-pointer">
-            Inicio
-          </button>
-          <button onClick={() => onNavigate('mis-reservas')} className="hover:text-white bg-transparent border-none cursor-pointer">
-            Mis Reservas
-          </button>
-          <button onClick={() => onNavigate('admin-overview')} className="hover:text-white bg-transparent border-none cursor-pointer">
-            Acceso Admin
-          </button>
-          <button onClick={() => onNavigate('arbitro')} className="hover:text-white bg-transparent border-none cursor-pointer">
-            Acceso Árbitro
-          </button>
-        </div>
-      </footer>
+     
 
       {/* Modal Lista de Espera */}
       <ListaEsperaModal
@@ -597,9 +615,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         date={waitlistModal.date}
         time={waitlistModal.time}
         onClose={() => setWaitlistModal({ ...waitlistModal, isOpen: false })}
-        onConfirm={(name, phone) => {
-          joinWaitlist(waitlistModal.courtName, waitlistModal.date, waitlistModal.time, name, phone);
-        }}
+        onConfirm={(name, phone) =>
+          joinWaitlist(
+            waitlistModal.courtName,
+            waitlistModal.date,
+            waitlistModal.time,
+            name,
+            phone
+          )
+        }
       />
 
       {/* Modal Detalle de Torneo */}

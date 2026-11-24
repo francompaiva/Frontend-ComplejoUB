@@ -1,0 +1,618 @@
+
+/* ==========================================
+   COMPLEJO DEPORTIVO UB — MIS TORNEOS
+   ========================================== */
+
+/* PÁGINA PRINCIPAL */
+
+.mt-page {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #293827;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+}
+
+.mt-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+/* DISTRIBUCIÓN COMPARTIDA DE FILAS */
+
+.mt-page-header,
+.mt-page-actions,
+.mt-card-topline,
+.mt-card-footer,
+.mt-detail-header,
+.mt-detail-heading,
+.mt-match-topline,
+.mt-match-teams,
+.mt-match-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+/* ENCABEZADO */
+
+.mt-page-header {
+  margin-bottom: 32px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.mt-page-title {
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 900;
+}
+
+.mt-page-description {
+  color: #a3b89e;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.mt-page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  align-self: center;
+  margin-left: auto;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* BOTONES SUPERIORES */
+
+.mt-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background-color 150ms, color 150ms;
+}
+
+
+.mt-button--join {
+  height: 44px;
+  padding: 0 18px;
+  box-sizing: border-box;
+  background: #65c556;
+  color: #141b13;
+  font-weight: 800;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.mt-button--join:hover {
+  background: #54b045;
+}
+
+/* FILTROS DE TORNEOS */
+
+.mt-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.mt-filter {
+  height: 44px;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0 16px;
+  border: 1px solid #5a7056;
+  border-radius: 10px;
+  background: #1e281d;
+  color: #c0c0c0;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 150ms, color 150ms;
+}
+
+.mt-filter:hover {
+  color: #fff;
+  border-color: #65c556;
+}
+
+.mt-filter.is-active {
+  color: #293827;
+  background: #65c556;
+  border-color: #65c556;
+}
+
+/* MENSAJES VACÍOS */
+
+.mt-empty-list,
+.mt-empty-detail {
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px dashed #5a7056;
+  color: #a3b89e;
+  background: #344732;
+  text-align: center;
+  font-size: 14px;
+}
+
+/* GRILLA DE TORNEOS */
+
+.mt-tournament-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  margin-bottom: 48px;
+}
+
+.mt-tournament-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 20px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #445941;
+  border-radius: 12px;
+  background: #344732;
+  cursor: pointer;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.mt-tournament-card:hover,
+.mt-tournament-card:focus-visible {
+  border-color: #65c556;
+}
+
+.mt-tournament-card:focus-visible {
+  outline: 2px solid #65c556;
+  outline-offset: 2px;
+}
+
+.mt-tournament-card.is-selected {
+  border-color: #65c556;
+  box-shadow:
+    0 0 0 1px #65c556,
+    0 10px 20px rgba(0, 0, 0, .2);
+}
+
+/* ETIQUETAS Y TEXTOS DE TARJETAS */
+
+.mt-card-topline {
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.mt-sport-tag,
+.mt-status-tag,
+.mt-detail-sport,
+.mt-leader-label,
+.mt-match-court,
+.mt-match-status {
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+}
+
+.mt-sport-tag {
+  background: #3c503a;
+  color: #65c556;
+}
+
+.mt-status-tag {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.mt-status-tag.is-progress {
+  background: rgba(101, 197, 86, .2);
+  color: #65c556;
+}
+
+.mt-status-tag.is-open {
+  background: rgba(96, 165, 250, .2);
+  color: #93c5fd;
+}
+
+.mt-status-tag.is-finished {
+  background: rgba(107, 114, 128, .2);
+  color: #d1d5db;
+}
+
+.mt-card-title {
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 800;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mt-card-description {
+  color: #a3b89e;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* PARTE INFERIOR DE TARJETAS */
+
+.mt-card-footer {
+  padding-top: 16px;
+  border-top: 1px solid #445941;
+  color: #a3b89e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mt-details-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  color: #65c556;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  padding-block: 4px;
+}
+
+.mt-details-link:hover {
+  color: #54b045;
+}
+
+/* PANEL DE POSICIONES Y FIXTURE */
+
+.mt-tournament-detail {
+  overflow: hidden;
+  border: 1px solid #445941;
+  border-radius: 12px;
+  background: #344732;
+  box-shadow: 0 20px 25px rgba(0, 0, 0, .15);
+  scroll-margin-top: 90px;
+}
+
+.mt-detail-header {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  padding: 24px;
+  border-bottom: 1px solid #445941;
+}
+
+.mt-detail-heading {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.mt-detail-heading h2 {
+  color: #fff;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.mt-detail-sport {
+  border: 1px solid #445941;
+  background: #293827;
+  color: #65c556;
+}
+
+.mt-detail-dates {
+  color: #a3b89e;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* PESTAÑAS DEL PANEL */
+
+.mt-detail-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: #293827;
+  border: 1px solid #445941;
+  border-radius: 12px;
+}
+
+.mt-detail-tab {
+  padding: 8px 16px;
+  border-radius: 8px;
+  color: #a3b89e;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 150ms, color 150ms;
+}
+
+.mt-detail-tab:hover {
+  color: #fff;
+  background: #344732;
+}
+
+.mt-detail-tab.is-active {
+  color: #141b13;
+  background: #65c556;
+  font-weight: 900;
+}
+
+/* TABLA DE POSICIONES */
+
+.mt-table-scroll {
+  overflow-x: auto;
+  padding: 24px;
+}
+
+.mt-standings-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+.mt-standings-table th {
+  border-bottom: 1px solid #445941;
+  color: #a3b89e;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.mt-standings-table th,
+.mt-standings-table td {
+  padding: 12px 16px;
+}
+
+.mt-standings-table th:nth-child(n+3),
+.mt-standings-table td:nth-child(n+3) {
+  text-align: center;
+}
+
+.mt-standings-table td {
+  border-bottom: 1px solid #445941;
+  font-weight: 500;
+}
+
+.mt-standings-table tbody tr:hover {
+  background: rgba(60, 80, 58, .5);
+}
+
+.mt-standings-table tbody tr.is-leader {
+  background: rgba(101, 197, 86, .05);
+}
+
+/* POSICIONES DE EQUIPOS */
+
+.mt-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 100%;
+  color: #a3b89e;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.mt-rank.is-first {
+  background: #65c556;
+  color: #141b13;
+}
+
+.mt-rank.is-second {
+  background: #fbbf24;
+  color: #141b13;
+}
+
+.mt-team-name {
+  color: #fff;
+  font-weight: 700 !important;
+  white-space: nowrap;
+}
+
+.mt-leader-label {
+  color: #65c556;
+  background: rgba(101, 197, 86, .2);
+  margin-left: 8px;
+  font-size: 10px;
+  padding: 3px 6px;
+}
+
+.mt-points,
+.mt-positive {
+  color: #65c556;
+  font-weight: 900 !important;
+}
+
+.mt-negative {
+  color: #f87171;
+}
+
+/* FIXTURE */
+
+.mt-fixture-content {
+  padding: 24px;
+}
+
+.mt-fixture-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+/* TARJETAS DE PARTIDOS */
+
+.mt-match-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px;
+  background: #293827;
+  border: 1px solid #445941;
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.mt-match-topline {
+  color: #a3b89e;
+  font-size: 12px;
+}
+
+.mt-match-round {
+  color: #65c556;
+  font-weight: 700;
+}
+
+.mt-match-court {
+  border: 1px solid #445941;
+  background: #344732;
+}
+
+.mt-match-teams {
+  gap: 0;
+  padding-block: 12px;
+}
+
+.mt-match-home,
+.mt-match-away {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.mt-match-home {
+  text-align: right;
+}
+
+.mt-match-away {
+  text-align: left;
+}
+
+.mt-match-score {
+  padding-inline: 20px;
+  text-align: center;
+}
+
+/* RESULTADOS DE PARTIDOS */
+
+.mt-score,
+.mt-free-date,
+.mt-versus {
+  display: inline-block;
+  border-radius: 5px;
+  padding: 4px 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.mt-score {
+  background: #344732;
+  border: 1px solid #445941;
+  color: #65c556;
+  font-size: 18px;
+}
+
+.mt-free-date {
+  background: #344732;
+  color: #fbbf24;
+  font-size: 12px;
+}
+
+.mt-versus {
+  background: #344732;
+  color: #a3b89e;
+  font-size: 12px;
+}
+
+.mt-match-footer {
+  border-top: 1px solid #445941;
+  padding-top: 12px;
+  color: #a3b89e;
+  font-size: 12px;
+}
+
+.mt-match-status {
+  background: rgba(251, 191, 36, .2);
+  color: #fbbf24;
+  font-size: 11px;
+}
+
+.mt-match-status.is-played {
+  color: #65c556;
+  background: rgba(101, 197, 86, .2);
+}
+
+/* DISEÑO RESPONSIVE */
+
+@media (min-width: 768px) {
+  .mt-tournament-grid,
+  .mt-fixture-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  
+}
+
+@media (min-width: 1024px) {
+  .mt-main {
+    padding-inline: 48px;
+  }
+
+  .mt-tournament-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  
+}
+
+@media (max-width: 600px) {
+  .mt-main {
+    padding: 24px 16px;
+  }
+
+  .mt-page-title {
+    font-size: 24px;
+  }
+
+  .mt-detail-tabs {
+    width: 100%;
+  }
+
+  .mt-detail-tab {
+    flex: 1;
+    padding-inline: 8px;
+  }
+
+  .mt-match-card {
+    padding: 12px;
+  }
+
+  .mt-match-score {
+    padding-inline: 8px;
+  }
+  .mt-page-actions {
+  margin-left: 0;
+  width: 100%;
+  justify-content: flex-start;
+}
+}
+

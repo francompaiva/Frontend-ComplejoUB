@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import { type SportType, type Tournament, type FixtureMatch, SQUAD_LIMITS } from '../data/mockData';
 import { torneosApi } from '../api/endpoints';
+import { estadoVisiblePartido } from '../utils/partidos';
 
 export interface AdminTorneoProps {
   onOpenInscripcion?: () => void;
@@ -568,7 +569,7 @@ export const AdminTorneo: React.FC<AdminTorneoProps> = ({ onOpenInscripcion }) =
                         : 'bg-[#1e281d] text-[#c0c0c0]'
                     }`}
                   >
-                    {m.isFreeDate ? 'Fecha Libre' : m.status}
+                    {m.isFreeDate ? 'Fecha Libre' : estadoVisiblePartido(m)}
                   </span>
                 </div>
 

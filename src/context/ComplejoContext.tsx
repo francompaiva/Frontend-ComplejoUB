@@ -3,7 +3,7 @@ import {
   type Court,
   type BookingItem,
   type Tournament,
-  type TournamentTeam,
+ 
   type FixtureMatch,
   type StandingRow,
   type Referee,
@@ -142,6 +142,23 @@ function mapSportFromApi(s: string): SportType {
   return 'Fútbol 5';
 }
 
+function obtenerPremioTorneo(t: any): string {
+  const premio = String(t.premio ?? '').trim();
+
+  if (premio) {
+    return premio;
+  }
+
+  const valorAnterior = String(t.reglamento ?? '').trim();
+
+  // Compatibilidad con torneos creados anteriormente,
+  // cuando el premio se guardaba en "reglamento".
+  const parecePremio =
+    /\$|medallas?|trofeos?|órdenes? de compra/i.test(valorAnterior);
+
+  return parecePremio ? valorAnterior : 'A confirmar';
+}
+
 function mapTorneoFromApi(t: any): Tournament {
   const estadoMap: Record<string, Tournament['status']> = {
     'INSCRIPCION_ABIERTA': 'Inscripciones abiertas',
@@ -150,11 +167,46 @@ function mapTorneoFromApi(t: any): Tournament {
     'CANCELADO': 'Finalizado',
   };
 
+    // Determinar el estado visible según las fechas del torneo.
+  const fechaInicio = t.fecha_inicio
+    ? String(t.fecha_inicio).slice(0, 10)
+    : '';
+
+  const fechaFin = t.fecha_fin
+    ? String(t.fecha_fin).slice(0, 10)
+    : '';
+
+  const hoy = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+
+  const estadoOriginal =
+    estadoMap[t.estado] || 'Inscripciones abiertas';
+
+  const estadoVisible: Tournament['status'] =
+    estadoOriginal === 'Finalizado' || (fechaFin && hoy > fechaFin)
+      ? 'Finalizado'
+      : fechaInicio && hoy >= fechaInicio
+        ? 'En curso'
+        : estadoOriginal;
+
   let formattedDates = 'Octubre - Noviembre 2026';
   if (t.fecha_inicio && t.fecha_fin) {
     try {
-      const d1 = new Date(t.fecha_inicio).toLocaleDateString('es-AR', { month: 'short', day: 'numeric' });
-      const d2 = new Date(t.fecha_fin).toLocaleDateString('es-AR', { month: 'short', day: 'numeric' });
+      const d1 = new Date(t.fecha_inicio).toLocaleDateString('es-AR', {
+        timeZone: 'UTC',
+        month: 'short',
+        day: 'numeric'
+      });
+
+      const d2 = new Date(t.fecha_fin).toLocaleDateString('es-AR', {
+        timeZone: 'UTC',
+        month: 'short',
+        day: 'numeric'
+      });
       formattedDates = `${d1} al ${d2}`;
     } catch {
       // fallback
@@ -165,13 +217,13 @@ function mapTorneoFromApi(t: any): Tournament {
     id: String(t.id),
     name: t.nombre,
     sport: mapSportFromApi(t.deporte),
-    status: estadoMap[t.estado] || 'Inscripciones abiertas',
+    status: estadoVisible,
     entryFee: Number(t.costo_inscripcion) || 15000,
     matchFee: Number(t.valor_partido) || 4000,
     maxTeams: Number(t.max_equipos) || 8,
     registeredTeams: [],
     dates: formattedDates,
-    prize: t.reglamento || '$100.000 + Medallas y Trofeo Oficial',
+   prize: obtenerPremioTorneo(t),
     format: 'Liga (Todos contra todos)',
   };
 }
@@ -628,6 +680,9 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       throw new Error(err?.message || 'Error al persistir turno en la base de datos.');
     }
 
+    // Calcular la anticipación real de la reserva.
+    const horasHastaTurno = (targetTurnoDate.getTime() - Date.now()) / (60 * 60 * 1000);
+
     const newBooking: BookingItem = {
       id: createdId,
       courtId,
@@ -639,8 +694,8 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       depositPaid,
       remainingBalance,
       status: 'Confirmada',
-      hoursUntilMatch: 48,
-      aplicaDevolucion: true,
+      hoursUntilMatch: Math.max(0, Math.round(horasHastaTurno)),
+      aplicaDevolucion: horasHastaTurno > 24,
       clientName: currentUser?.nombre || 'Cliente',
       clientEmail: currentUser?.email || ''
     };
@@ -655,77 +710,140 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return newBooking;
   };
 
-  // Cancelación de reservas centralizada en la API del backend
+
+  // Cancelación de reservas: solo actualizar si el backend confirma.
   const cancelBooking = async (bookingId: string) => {
-    const target = bookings.find((b) => b.id === bookingId);
-    const numId = parseInt(bookingId.replace(/\D/g, ''), 10);
+    const numId = Number(bookingId);
 
-    // Estado inicial de reembolso determinado por el backend en la reserva
-    let isRefundable = target?.aplicaDevolucion ?? false;
-    let deposit = target ? target.depositPaid : 5400;
-    let serverMessage = '';
-
-    if (!isNaN(numId)) {
-      try {
-        const res: any = await reservasApi.cancelar(numId, 'Cancelado por solicitud del cliente');
-        if (res) {
-          // El backend es la única fuente de verdad para el estado y los términos de cancelación
-          isRefundable = Boolean(res.aplicaDevolucion);
-          if (res.montoSenaDevuelto !== undefined) deposit = Number(res.montoSenaDevuelto);
-          if (res.mensaje) serverMessage = res.mensaje;
-          await refreshAllData();
-        }
-      } catch (err: any) {
-        console.warn('[cancelBooking] Error al cancelar en backend:', err?.message);
-      }
+    if (!Number.isInteger(numId) || numId <= 0) {
+      throw new Error('No se pudo identificar la reserva.');
     }
 
-    setBookings((prev) =>
-      prev.map((b) => (b.id === bookingId ? { ...b, status: 'Cancelada', aplicaDevolucion: isRefundable } : b))
+    // Si el backend falla, la excepción se propaga al componente.
+    const res: {
+      estado?: string;
+      aplicaDevolucion?: boolean;
+      montoSenaDevuelto?: number | string;
+      mensaje?: string;
+    } = await reservasApi.cancelar(
+      numId,
+      'Cancelado por solicitud del cliente'
     );
 
-    let msg = '';
-    const depositToReturn = isRefundable ? deposit : 0;
-    if (isRefundable) {
-      msg = serverMessage || `Reserva cancelada con más de 24 hs de anticipación. Se reintegra el 100% de la seña ($${deposit.toLocaleString()}) al medio de pago original.`;
-      addNotification('Cancelación con Reembolso', msg, 'reserva');
-      logAudit('Cancelación con Reintegro', `Reserva #${bookingId} cancelada con reintegro de seña de $${deposit}.`, 'reserva');
-    } else {
-      msg = serverMessage || `Reserva cancelada con menos de 24 hs de anticipación. De acuerdo a la política del complejo, no corresponde reintegro de la seña ($${deposit.toLocaleString()}).`;
-      addNotification('Cancelación sin Reintegro', msg, 'sancion');
-      logAudit('Cancelación Fuera de Término', `Reserva #${bookingId} cancelada sin reintegro. Seña de $${deposit} retenida como compensación.`, 'sancion');
+    if (!res || res.estado !== 'CANCELADA') {
+      throw new Error(
+        'El servidor no confirmó la cancelación de la reserva.'
+      );
     }
 
-    return { refunded: isRefundable, depositAmount: depositToReturn, message: msg };
+    // Utilizamos los datos reales devueltos por el backend.
+    const isRefundable = Boolean(res.aplicaDevolucion);
+    const depositToReturn = Number(res.montoSenaDevuelto ?? 0);
+
+    const msg = res.mensaje ||
+      'La reserva se canceló correctamente.';
+
+    // Recién ahora actualizamos la pantalla.
+    setBookings((prev) =>
+      prev.map((b) =>
+        b.id === bookingId
+          ? {
+              ...b,
+              status: 'Cancelada',
+              aplicaDevolucion: isRefundable
+            }
+          : b
+      )
+    );
+
+    addNotification('Reserva Cancelada', msg, 'reserva');
+
+    logAudit(
+      'Cancelación de Reserva',
+      `Reserva #${bookingId} cancelada. Reintegro: $${depositToReturn}.`,
+      'reserva'
+    );
+
+    return {
+      refunded: isRefundable,
+      depositAmount: depositToReturn,
+      message: msg
+    };
   };
 
-  // Lista de espera
-  const joinWaitlist = async (courtName: string, date: string, time: string, userName: string, userPhone: string): Promise<number> => {
-    const position = waitlist.length + 1;
-    const cleanHour = time.replace(' hs', '').trim() + ':00';
-    let cleanDate = date === 'Hoy' ? new Date().toISOString().split('T')[0] : date;
 
-    try {
-      const canchaTarget = courts.find(c => c.name.toLowerCase() === courtName.toLowerCase());
-      const cId = canchaTarget ? parseInt(canchaTarget.id, 10) : 1;
-      await listaEsperaApi.unirse({ canchaId: cId, fecha: cleanDate, hora: cleanHour });
-    } catch (err: any) {
-      console.warn('[joinWaitlist] API error:', err?.message);
+
+  // Lista de espera: registrar solo si el backend confirma.
+  const joinWaitlist = async (
+    courtName: string,
+    date: string,
+    time: string,
+    userName: string,
+    userPhone: string
+  ): Promise<number> => {
+    const cancha = courts.find(
+      c => c.name.toLowerCase() === courtName.toLowerCase()
+    );
+
+    if (!cancha) {
+      throw new Error('No se encontró la cancha seleccionada.');
     }
 
+    const canchaId = Number(cancha.id);
+
+    if (!Number.isInteger(canchaId) || canchaId <= 0) {
+      throw new Error('La cancha no tiene un identificador válido.');
+    }
+
+    const fecha = date === 'Hoy'
+      ? new Intl.DateTimeFormat('sv-SE', {
+          timeZone: 'America/Argentina/Buenos_Aires',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }).format(new Date())
+      : date;
+
+    const hora = time.replace(/\s*hs\.?$/i, '').trim();
+
+    // Si la API falla, el error se propaga al modal.
+    const respuesta: { id?: number } = await listaEsperaApi.unirse({
+      canchaId,
+      fecha,
+      hora: hora.length === 5 ? `${hora}:00` : hora
+    });
+
+    if (!respuesta?.id) {
+      throw new Error(
+        'El servidor no confirmó la inscripción en la lista de espera.'
+      );
+    }
+
+    // Esta posición es solo una referencia local.
+    // No representa la posición oficial en MySQL.
+    const position = waitlist.length + 1;
+
     const entry: WaitlistEntry = {
-      id: 'w-' + Date.now(),
+      id: String(respuesta.id),
       courtName,
-      date: cleanDate,
+      date: fecha,
       time,
       userName,
       userPhone,
       position
     };
-    setWaitlist((prev) => [...prev, entry]);
-    addNotification('Anotado en Lista de Espera', `Estás en la posición #${position} para ${courtName} a las ${time}.`, 'info');
+
+    setWaitlist(prev => [...prev, entry]);
+
+    addNotification(
+      'Anotado en Lista de Espera',
+      `Tu inscripción para ${courtName}, ${fecha} a las ${time}, fue registrada.`,
+      'info'
+    );
+
     return position;
   };
+
 
   // Gestión de canchas en MySQL
   const addCourt = async (courtData: Omit<Court, 'id' | 'nextSlot'>) => {
@@ -837,110 +955,63 @@ export const ComplejoProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  // Inscripción de equipos y control de participación en MySQL
+
+  // La inscripción solo se confirma si el backend la registra.
   const registerTeam = async (
     tournamentId: string,
     teamName: string,
     players: { name: string; dni: string; position: string }[]
   ): Promise<{ success: boolean; error?: string }> => {
     const numTorneoId = parseInt(tournamentId.replace(/\D/g, ''), 10);
-    try {
-      if (!isNaN(numTorneoId)) {
-        try {
-          await equiposApi.inscribir({
-            torneoId: numTorneoId,
-            nombreEquipo: teamName,
-            players: players.map(p => ({ name: p.name, dni: p.dni, position: p.position }))
-          });
-          await refreshAllData();
-          await fetchTorneoData(numTorneoId);
-          await refreshAllData();
 
-          logAudit('Inscripción de Equipo', `Equipo "${teamName}" inscripto con éxito (${players.length} jugadores registrados).`, 'torneo');
-          addNotification('Equipo Inscripto', `Tu equipo "${teamName}" fue admitido en el torneo.`, 'torneo');
-          return { success: true };
-        } catch (apiErr: any) {
-          // Si el backend retornó un error de validación de negocio (ej: 400 o 409)
-          if (apiErr?.statusCode && apiErr.statusCode >= 400 && apiErr.statusCode < 500) {
-            return {
-              success: false,
-              error: apiErr.message || 'Error al inscribir equipo'
-            };
-          }
-          console.warn('[registerTeam] Backend API no disponible, aplicando fallback local:', apiErr?.message);
-        }
-      }
-
-      // Fallback local: verificar nombre único y que ningún jugador pertenezca ya a otro equipo del mismo torneo
-      const targetTourneyLocal = tournaments.find(t => t.id === tournamentId || t.id === `t${numTorneoId}`);
-      if (targetTourneyLocal && Array.isArray(targetTourneyLocal.registeredTeams)) {
-        for (const existingTeam of targetTourneyLocal.registeredTeams) {
-          if (existingTeam.name.trim().toLowerCase() === teamName.trim().toLowerCase()) {
-            return { success: false, error: 'Ya existe un equipo con ese nombre en este torneo' };
-          }
-          for (const p of players) {
-            const pDni = p.dni.trim();
-            const exists = (existingTeam.players || []).some(ep => ep.dni.trim() === pDni);
-            if (exists) {
-              return {
-                success: false,
-                error: `El jugador "${p.name}" (DNI: ${pDni}) ya se encuentra inscripto en el equipo "${existingTeam.name}" en este mismo torneo. No se permite participar en más de un equipo por certamen.`
-              };
-            }
-          }
-        }
-      }
-
-      // Registrar equipo en el estado local de React
-      setTournaments((prev) =>
-        prev.map((t) => {
-          if (t.id === tournamentId) {
-            const newTeam: TournamentTeam = {
-              id: 'eq-' + Date.now(),
-              name: teamName,
-              captain: players[0]?.name || 'Capitán',
-              captainEmail: 'capitan@gmail.com',
-              playersCount: players.length,
-              players: players.map((p) => ({ name: p.name, dni: p.dni, position: p.position }))
-            };
-            return {
-              ...t,
-              registeredTeams: [...(t.registeredTeams || []), newTeam]
-            };
-          }
-          return t;
-        })
-      );
-
-      const newPartLocal: UserTeamParticipation = {
-        id: 'part-' + Date.now(),
-        teamName: teamName,
-        tournamentName: targetTourneyLocal?.name || 'Torneo Oficial',
-        sport: targetTourneyLocal?.sport,
-        role: 'Capitán',
-        status: 'Activo',
-        isCaptain: true,
-        year: new Date().getFullYear().toString()
-      };
-      setUserParticipations(prev => {
-        const exists = prev.some(
-          p => p.teamName.trim().toLowerCase() === teamName.trim().toLowerCase() &&
-               p.tournamentName.trim().toLowerCase() === newPartLocal.tournamentName.trim().toLowerCase()
-        );
-        if (exists) return prev;
-        return [newPartLocal, ...prev];
-      });
-
-      logAudit('Inscripción de Equipo', `Equipo "${teamName}" inscripto con éxito (${players.length} jugadores registrados).`, 'torneo');
-      addNotification('Equipo Inscripto', `Tu equipo "${teamName}" fue admitido en el certamen.`, 'torneo');
-      return { success: true };
-    } catch (err: any) {
-      console.error('[registerTeam] Error inesperado en el flujo de inscripción:', err);
+    if (Number.isNaN(numTorneoId)) {
       return {
         success: false,
-        error: err?.message || 'Error inesperado al inscribir equipo'
+        error: 'El torneo seleccionado no es válido.'
       };
     }
+
+    try {
+      await equiposApi.inscribir({
+        torneoId: numTorneoId,
+        nombreEquipo: teamName,
+        players: players.map(p => ({
+          name: p.name,
+          dni: p.dni,
+          position: p.position
+        }))
+      });
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message ||
+          'No se pudo inscribir el equipo. Comprobá la conexión y volvé a intentarlo.'
+      };
+    }
+
+    try {
+      await refreshAllData();
+      await fetchTorneoData(numTorneoId);
+    } catch (err) {
+      console.warn(
+        '[registerTeam] El equipo se registró, pero falló la actualización de la pantalla:',
+        err
+      );
+    }
+
+    logAudit(
+      'Inscripción de Equipo',
+      `Equipo "${teamName}" inscripto con éxito (${players.length} jugadores registrados).`,
+      'torneo'
+    );
+
+    addNotification(
+      'Equipo Inscripto',
+      `Tu equipo "${teamName}" fue admitido en el torneo.`,
+      'torneo'
+    );
+
+    return { success: true };
   };
 
   // RF-15: Aceptación o rechazo asíncrono de invitaciones a equipos

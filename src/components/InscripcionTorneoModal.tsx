@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import { SQUAD_LIMITS } from '../data/mockData';
 import { equiposApi } from '../api/endpoints';
+import './InscripcionTorneoModal.css';
 
 export interface TournamentPlayer {
   id: string;
@@ -47,11 +48,18 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
 }) => {
   const { tournaments, registerTeam, currentUser, userRole } = useComplejo();
 
+  const inscribibles = React.useMemo(() => tournaments.filter(
+    t => t.status === 'Inscripciones abiertas' &&
+      (t.registeredTeams || []).length < t.maxTeams
+  ), [tournaments]);
+
+
   const getInitialTourneyId = () => {
-    if (tournamentId) return tournamentId;
-    const openT = tournaments.find(t => t.status === 'Inscripciones abiertas');
-    return openT ? openT.id : (tournaments[0]?.id || '1');
+    return inscribibles.find(t => t.id === tournamentId)?.id ||
+      inscribibles[0]?.id ||
+      '';
   };
+
 
   const [selectedTourneyId, setSelectedTourneyId] = useState<string>(getInitialTourneyId);
   const [teamName, setTeamName] = useState('');
@@ -70,28 +78,46 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     ];
   }, [currentUser]);
 
-  // Synchronize modal state on open or tournament selection
+  
+  // Limpia el formulario al abrir, sin borrar lo escrito
+  // cuando el contexto actualiza la lista de torneos.
+  const estabaAbierto = React.useRef(false);
+
   React.useEffect(() => {
-    if (!isOpen) return;
-
-    let target = tournamentId ? tournaments.find(t => t.id === tournamentId) : null;
-    // If specific tournament is closed, prefer the open one
-    if (!target || target.status !== 'Inscripciones abiertas') {
-      const openT = tournaments.find(t => t.status === 'Inscripciones abiertas');
-      if (openT) target = openT;
-      else if (!target && tournaments.length > 0) target = tournaments[0];
+    if (!isOpen) {
+      estabaAbierto.current = false;
+      return;
     }
 
-    if (target) {
+    const target =
+      inscribibles.find(t => t.id === tournamentId) ||
+      inscribibles[0];
+
+    if (!estabaAbierto.current) {
+      estabaAbierto.current = true;
+
+      setSelectedTourneyId(target?.id || '');
+      setTeamName('');
+      setPlayers(getInitialSquad(target?.sport || 'Fútbol 5'));
+      setErrorMessage(null);
+      setSuccessMessage(null);
+    } else if (!selectedTourneyId && target) {
+      // Los torneos llegaron de la API después de abrir la tarjeta.
       setSelectedTourneyId(target.id);
-      const sp = target.sport || 'Fútbol 5';
-      setPlayers(getInitialSquad(sp));
+      setPlayers(getInitialSquad(target.sport));
     }
-    setErrorMessage(null);
-    setSuccessMessage(null);
-  }, [tournamentId, isOpen, tournaments, getInitialSquad]);
+  }, [
+    isOpen,
+    tournamentId,
+    inscribibles,
+    selectedTourneyId,
+    getInitialSquad
+  ]);
 
-  const currentTourney = tournaments.find((t) => t.id === selectedTourneyId) || tournaments[0];
+
+  const currentTourney = tournaments.find(
+  (t) => t.id === selectedTourneyId
+  );
   const sport = currentTourney?.sport || 'Fútbol 5';
   const limits = SQUAD_LIMITS[sport] || { min: 5, max: 12 };
 
@@ -224,21 +250,51 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
     );
   };
 
+  
   const handleTournamentSelect = (newTourneyId: string) => {
     setSelectedTourneyId(newTourneyId);
+
     const target = tournaments.find(t => t.id === newTourneyId);
+
     if (target) {
       const sp = target.sport || 'Fútbol 5';
       const lim = SQUAD_LIMITS[sp] || { min: 2, max: 10 };
-      if (players.length < lim.min || players.length > lim.max) {
+
+      if (
+        sport !== sp ||
+        players.length < lim.min ||
+        players.length > lim.max
+      ) {
         setPlayers(getInitialSquad(sp));
       }
     }
   };
 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+
+    if (!currentTourney || currentTourney.status !== 'Inscripciones abiertas') {
+      setErrorMessage(
+        'Este torneo no admite inscripciones. Elegí un torneo abierto.'
+      );
+      return;
+    }
+
+    if ((currentTourney.registeredTeams || []).length >= currentTourney.maxTeams) {
+      setErrorMessage('El torneo ya completó el cupo de equipos.');
+      return;
+    }
+
+    if (players.length > limits.max) {
+      setErrorMessage(
+        `El plantel supera el máximo de ${limits.max} jugadores para ${sport}.`
+      );
+      return;
+    }
+
 
     if (userRole === 'arbitro' || currentUser?.rol === 'Arbitro') {
       setErrorMessage('Un usuario con rol Árbitro no tiene permitido inscribir equipos ni participar en torneos.');
@@ -340,25 +396,32 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
   // Safe early return strictly AFTER all hooks and callback declarations
   if (!isOpen) return null;
 
-  const isTorneoCerrado = currentTourney && currentTourney.status !== 'Inscripciones abiertas';
+  
+  const isTorneoCerrado =
+    !currentTourney ||
+    currentTourney.status !== 'Inscripciones abiertas';
+
+  const isCupoLleno = Boolean(
+    currentTourney &&
+    (currentTourney.registeredTeams || []).length >= currentTourney.maxTeams
+  );
+
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(17, 26, 16, 0.8)' }}
+      className="ub-modal-backdrop"
       onClick={(e) => !isSubmitting && e.target === e.currentTarget && onClose()}
     >
-      <div
-        className="bg-[#1e281d] rounded-2xl border border-[#5a7056] w-full max-w-[620px] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-white font-['Inter',sans-serif]"
-        style={{ animation: 'modalIn 0.25s ease-out' }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#5a7056]">
+      <div className="ub-modal-panel inscripcion-modal__panel">
+        {/* Encabezado */}
+        <div className="inscripcion-modal__header">
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-bold text-lg text-white">Inscripción de Equipo a Torneo</h2>
+            <div className="inscripcion-modal__header-title-row">
+              <h2 className="inscripcion-modal__title">
+                Inscripción de Equipo a Torneo
+              </h2>
             </div>
-            <p className="text-xs text-[#a0a0a0] mt-0.5">
+            <p className="inscripcion-modal__subtitle">
               Control automático de cupo por deporte y control de jugador único.
             </p>
           </div>
@@ -366,58 +429,71 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="text-[#a0a0a0] hover:text-white cursor-pointer bg-transparent border-none text-base disabled:opacity-40"
+            className="inscripcion-modal__close"
           >
             ✕
           </button>
         </div>
 
-        {/* Content Form */}
-        <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4 overflow-y-auto flex-1">
+        {/* Formulario */}
+        <form onSubmit={handleSubmit} className="inscripcion-modal__form">
           {successMessage && (
-            <div className="bg-[rgba(101,197,86,0.15)] border border-[#65c556] rounded-xl p-3 text-xs text-[#65c556] flex items-center gap-2 font-bold">
+            <div className="inscripcion-modal__alert inscripcion-modal__alert--success">
               <span>✅</span>
               <span>{successMessage}</span>
             </div>
           )}
 
           {(userRole === 'arbitro' || currentUser?.rol === 'Arbitro') && (
-            <div className="bg-[#7f1d1d]/85 border border-[#ef4444] rounded-xl p-3 text-xs text-[#fecaca] flex items-center gap-2 font-bold shadow-lg">
+            <div className="inscripcion-modal__alert inscripcion-modal__alert--arbitro">
               <span>⚠️</span>
-              <span>Los usuarios con rol Árbitro Oficial no pueden inscribir equipos ni disputar torneos como jugadores.</span>
-            </div>
-          )}
-
-          {isTorneoCerrado && (
-            <div className="bg-amber-500/15 border border-amber-500/40 rounded-xl p-3 text-xs text-amber-300 flex items-center gap-2">
-              <span>ℹ️</span>
               <span>
-                El torneo seleccionado se encuentra <strong>{currentTourney?.status}</strong>. Selecciona un certamen con <strong>Inscripciones abiertas</strong> para registrar tu equipo.
+                Los usuarios con rol Árbitro Oficial no pueden inscribir equipos ni disputar torneos como jugadores.
               </span>
             </div>
           )}
 
-          {/* Tournament selector */}
+         
+          {(isTorneoCerrado || isCupoLleno) && (
+            <div className="inscripcion-modal__alert inscripcion-modal__alert--closed">
+              <span>ℹ️</span>
+              <span>
+                {inscribibles.length === 0
+                  ? 'No hay torneos con inscripciones abiertas y cupos disponibles.'
+                  : isCupoLleno
+                    ? 'Este torneo ya completó el cupo de equipos.'
+                    : 'Este torneo no admite nuevas inscripciones.'}
+              </span>
+            </div>
+          )}
+
+
+          {/* Selección del torneo */}
           <div>
-            <label className="text-xs font-semibold text-[#a0a0a0] uppercase block mb-1">
+            <label className="inscripcion-modal__label">
               Torneo Oficial
             </label>
+
             <select
               value={selectedTourneyId}
               onChange={(e) => handleTournamentSelect(e.target.value)}
-              className="w-full bg-[#293827] border border-[#5a7056] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#65c556]"
+              className="inscripcion-modal__select"
             >
-              {tournaments.map((t) => (
+            {inscribibles.length === 0 && (
+                <option value="">No hay torneos disponibles</option>
+              )}
+
+              {inscribibles.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name} ({t.sport}) • {t.status === 'Inscripciones abiertas' ? '🟢 ABIERTO' : `🔒 ${t.status}`} • Inscripción: ${t.entryFee.toLocaleString('es-AR')}
+                  {t.name} ({t.sport}) • 🟢 ABIERTO • Inscripción: ${t.entryFee.toLocaleString('es-AR')}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Team Name */}
+          {/* Nombre del equipo */}
           <div>
-            <label className="text-xs font-semibold text-[#a0a0a0] uppercase block mb-1">
+            <label className="inscripcion-modal__label">
               Nombre del Equipo
             </label>
             <input
@@ -426,59 +502,67 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
               placeholder="Ej: Los Imparables FC"
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
-              className="w-full bg-[#293827] border border-[#5a7056] rounded-xl px-3 py-2 text-sm text-white placeholder-[#71856d] focus:outline-none focus:border-[#65c556]"
+              className="inscripcion-modal__input"
             />
           </div>
 
-          {/* Sport Squad limits card */}
-          <div className="bg-[#293827] border border-[#5a7056] rounded-xl p-3 flex justify-between items-center text-xs">
+          {/* Límites del plantel */}
+          <div className="inscripcion-modal__limits">
             <div>
-              <span className="text-[#a0a0a0] block text-[11px]">Límites de plantel ({currentTourney?.sport}):</span>
-              <span className="font-bold text-white">
+              <span className="inscripcion-modal__limits-label">
+                Límites de plantel ({currentTourney?.sport}):
+              </span>
+              <span className="inscripcion-modal__limits-value">
                 Mínimo: {limits.min} | Máximo: {limits.max} integrantes
               </span>
             </div>
+
             <span
-              className={`font-black text-xs px-2.5 py-1 rounded-lg ${
+              className={`inscripcion-modal__count ${
                 players.length >= limits.min && players.length <= limits.max
-                  ? 'bg-[rgba(101,197,86,0.2)] text-[#65c556]'
-                  : 'bg-[rgba(245,158,11,0.2)] text-[#f59e0b]'
+                  ? 'is-valid'
+                  : 'is-warning'
               }`}
             >
               {players.length} / {limits.max} Jugadores
             </span>
           </div>
 
-          {/* Players Roster */}
-          <div className="flex flex-col gap-2">
-            <div className="flex justify-between items-center">
+          {/* Plantel de jugadores */}
+          <div className="inscripcion-modal__roster">
+            <div className="inscripcion-modal__roster-header">
               <div>
-                <label className="text-xs font-semibold text-[#a0a0a0] uppercase block">
+                <label className="inscripcion-modal__label inscripcion-modal__label--no-margin">
                   Plantel Oficial (DNI y Posición)
                 </label>
-                <span className="text-[11px] text-[#71856d]">
+                <span className="inscripcion-modal__hint">
                   El nombre oficial se obtiene automáticamente de la cuenta registrada en el sistema.
                 </span>
               </div>
+
               <button
                 type="button"
                 onClick={handleAddPlayer}
-                className="text-xs text-[#65c556] font-bold hover:underline cursor-pointer bg-transparent border-none flex items-center gap-1"
+                className="inscripcion-modal__add"
               >
                 + Agregar Jugador
               </button>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="inscripcion-modal__roster">
               {players.map((p, idx) => {
                 const isCaptain = idx === 0;
+
                 return (
                   <div
                     key={p.id}
-                    className="bg-[#293827] p-2.5 rounded-xl border border-[#5a7056] flex flex-col sm:flex-row sm:items-center gap-2 text-xs"
+                    className="inscripcion-modal__player"
                   >
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-gray-400 font-mono w-5 text-center">{idx + 1}.</span>
+                    <div className="inscripcion-modal__player-dni-wrap">
+                      <span className="inscripcion-modal__player-index">
+                        {idx + 1}.
+                      </span>
+
                       <input
                         type="text"
                         required
@@ -488,63 +572,79 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
                         value={p.dni}
                         disabled={isCaptain && Boolean(currentUser?.dni)}
                         onChange={(e) => handleDniChange(p.id, e.target.value)}
-                        className="w-32 bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-[#65c556] disabled:opacity-75 disabled:cursor-not-allowed"
-                        title={isCaptain && currentUser?.dni ? "DNI del Capitán (asociado a la cuenta)" : "Ingresa DNI sin puntos ni espacios"}
+                        className="inscripcion-modal__dni"
+                        title={
+                          isCaptain && currentUser?.dni
+                            ? 'DNI del Capitán (asociado a la cuenta)'
+                            : 'Ingresa DNI sin puntos ni espacios'
+                        }
                       />
                     </div>
 
-                    {/* Nombre oficial verificado desde la BD (Modo solo lectura) */}
-                    <div className="flex-1 min-w-0 bg-[#1e281d] border border-[#5a7056] rounded px-3 py-1.5 flex items-center justify-between">
+                    {/* Nombre verificado desde la BD */}
+                    <div className="inscripcion-modal__player-name-box">
                       {p.statusLookup === 'searching' && (
-                        <span className="text-amber-300 text-xs flex items-center gap-1.5 animate-pulse">
+                        <span className="inscripcion-modal__searching">
                           <span>⏳</span> Buscando en padrón...
                         </span>
                       )}
+
                       {p.statusLookup === 'found' && (
-                        <div className="flex items-center gap-1.5 truncate">
-                          <span className="text-[#65c556] text-xs font-bold">✓</span>
-                          <span className="font-semibold text-white truncate" title={p.name}>
+                        <div className="inscripcion-modal__found">
+                          <span className="inscripcion-modal__check">✓</span>
+                          <span
+                            className="inscripcion-modal__player-name"
+                            title={p.name}
+                          >
                             {p.name}
                           </span>
+
                           {isCaptain && (
-                            <span className="text-[10px] bg-[#65c556]/20 text-[#65c556] font-bold px-1.5 py-0.5 rounded ml-1">
+                            <span className="inscripcion-modal__captain-tag">
                               Capitán
                             </span>
                           )}
                         </div>
                       )}
+
                       {p.statusLookup === 'notFound' && (
-                        <div className="flex items-center gap-1.5 truncate text-[#e53e3e]">
-                          <span className="font-bold text-xs">✕</span>
-                          <span className="text-xs truncate font-medium">
+                        <div className="inscripcion-modal__not-found">
+                          <span className="inscripcion-modal__state-icon">
+                            ✕
+                          </span>
+                          <span className="inscripcion-modal__state-text">
                             No registrado en Complejo UB
                           </span>
                         </div>
                       )}
+
                       {p.statusLookup === 'suspended' && (
-                        <div className="flex items-center gap-1.5 truncate text-amber-400">
-                          <span className="font-bold text-xs">⛔</span>
-                          <span className="text-xs truncate font-medium">
+                        <div className="inscripcion-modal__suspended">
+                          <span className="inscripcion-modal__state-icon">
+                            ⛔
+                          </span>
+                          <span className="inscripcion-modal__state-text">
                             Cuenta suspendida
                           </span>
                         </div>
                       )}
+
                       {(!p.statusLookup || p.statusLookup === 'idle') && (
-                        <span className="text-[#71856d] italic text-xs truncate">
+                        <span className="inscripcion-modal__placeholder">
                           Ingresa DNI para verificar jugador...
                         </span>
                       )}
 
-                      <span className="text-[10px] text-[#71856d] ml-1 uppercase font-mono flex-shrink-0">
+                      <span className="inscripcion-modal__readonly">
                         Solo Lectura
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="inscripcion-modal__player-actions">
                       <select
                         value={p.position}
                         onChange={(e) => handlePositionChange(p.id, e.target.value)}
-                        className="w-32 bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#65c556]"
+                        className="inscripcion-modal__position"
                       >
                         {allowedPositions.map((pos) => (
                           <option key={pos} value={pos}>
@@ -557,7 +657,7 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleRemovePlayer(p.id)}
-                          className="text-[#e53e3e] hover:text-white px-2 py-1 bg-transparent border-none cursor-pointer rounded hover:bg-red-500/20 transition-colors"
+                          className="inscripcion-modal__remove"
                           title="Quitar jugador"
                         >
                           ✕
@@ -570,36 +670,47 @@ export const InscripcionTorneoModal: React.FC<InscripcionTorneoModalProps> = ({
             </div>
           </div>
 
-          <p className="text-[11px] text-[#a0a0a0] italic">
+          <p className="inscripcion-modal__footnote">
             * Solamente se pueden inscribir jugadores que ya tengan cuenta registrada en la plataforma. El sistema verifica que ningún jugador esté inscripto en más de un equipo del mismo torneo.
           </p>
 
-          {/* Mensaje de error posicionado inmediatamente arriba de los botones de acción */}
+          {/* Mensajes de error */}
           {errorMessage && (
-            <div className="bg-[rgba(229,62,62,0.15)] border border-[#e53e3e] rounded-xl p-3 text-xs text-[#e53e3e] flex items-center gap-2 animate-fadeIn">
+            <div className="inscripcion-modal__alert inscripcion-modal__alert--error">
               <span>⚠️</span>
-              <span className="font-medium">{errorMessage}</span>
+              <span className="inscripcion-modal__error-text">
+                {errorMessage}
+              </span>
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex gap-3.5 mt-2">
+          {/* Botones */}
+          <div className="inscripcion-modal__actions">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="flex-1 py-3 px-5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white font-bold text-xs cursor-pointer disabled:opacity-40 min-h-[44px] transition-colors"
+              className="inscripcion-modal__cancel"
             >
               Cancelar
             </button>
+
             <button
               type="submit"
-              disabled={isSubmitting || userRole === 'arbitro' || currentUser?.rol === 'Arbitro'}
-              className="flex-1 py-3 px-6 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-extrabold text-sm cursor-pointer transition-all shadow-lg shadow-[#65c556]/20 disabled:opacity-50 flex items-center justify-center gap-2 min-h-[44px]"
+             
+              disabled={
+                isSubmitting ||
+                isTorneoCerrado ||
+                isCupoLleno ||
+                userRole === 'arbitro' ||
+                currentUser?.rol === 'Arbitro'
+              }
+
+              className="inscripcion-modal__submit"
             >
               {isSubmitting ? (
                 <>
-                  <span className="inline-block w-4 h-4 border-2 border-[#293827] border-t-transparent rounded-full animate-spin" />
+                  <span className="inscripcion-modal__spinner" />
                   <span>Inscribiendo equipo...</span>
                 </>
               ) : (

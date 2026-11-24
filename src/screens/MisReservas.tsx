@@ -1,86 +1,135 @@
 import React, { useState } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import CancelacionConfirmModal from '../components/CancelacionConfirmModal';
-import { type BookingItem } from '../data/mockData';
+import type { BookingItem } from '../data/mockData';
 import { formatTimeAgo } from '../utils/dateUtils';
 import { authApi } from '../api/endpoints';
+import './MisReservas.css';
 
 export interface MisReservasProps {
   onNavigate: (screen: string) => void;
 }
 
+type ReservaTab = 'activos' | 'historial' | 'perfil' | 'notificaciones';
+
+const dinero = (monto: number) => `$${monto.toLocaleString('es-AR')}`;
+
+
+const fechaReservaLegible = (fecha: string) => {
+  const match = String(fecha).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return fecha;
+
+  const [, anio, mes, dia] = match;
+
+  return new Intl.DateTimeFormat('es-AR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  }).format(new Date(Number(anio), Number(mes) - 1, Number(dia), 12));
+};
+
+const nombreCanchaSinDeporte = (nombre: string, deporte: string) => {
+  const sufijo = ` (${deporte})`;
+
+  return nombre.toLocaleLowerCase('es-AR').endsWith(
+    sufijo.toLocaleLowerCase('es-AR')
+  )
+    ? nombre.slice(0, -sufijo.length)
+    : nombre;
+};
+
+
 export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
   const {
-    bookings,
-    cancelBooking,
-    userAbsences,
-    isUserBanned,
-    notifications,
-    markAllNotificationsRead,
-    invitations,
-    responderInvitacion,
-    currentUser,
-    setCurrentUser,
-    userParticipations
+    bookings, cancelBooking, userAbsences, isUserBanned,
+    notifications, markAllNotificationsRead, invitations, responderInvitacion,
+    currentUser, setCurrentUser, userParticipations
   } = useComplejo();
 
-  const [activeTab, setActiveTab] = useState<'activos' | 'historial' | 'perfil' | 'notificaciones'>('activos');
+  const [activeTab, setActiveTab] = useState<ReservaTab>('activos');
   const [bookingToCancel, setBookingToCancel] = useState<BookingItem | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const [isResponding, setIsResponding] = useState<Record<string, boolean>>({});
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-
-  // Estados para carga y edición de DNI en perfil de usuario
   const [isEditingDni, setIsEditingDni] = useState(false);
   const [dniInput, setDniInput] = useState(currentUser?.dni ? String(currentUser.dni).replace(/\D/g, '') : '');
   const [dniUpdating, setDniUpdating] = useState(false);
   const [dniError, setDniError] = useState<string | null>(null);
   const [dniSuccess, setDniSuccess] = useState<string | null>(null);
 
-  const activeBookings = bookings.filter((b) => b.status === 'Confirmada' || b.status === 'Pendiente');
-  const pastBookings = bookings.filter((b) => b.status === 'Completada' || b.status === 'Cancelada');
 
-  const handleConfirmCancel = () => {
-    if (bookingToCancel) {
-      cancelBooking(bookingToCancel.id);
+  const yaPasoLaReserva = (b: BookingItem): boolean => {
+    const fecha = String(b.date).match(/^(\d{4}-\d{2}-\d{2})/)?.[1];
+    const hora = String(b.time).match(/^(\d{1,2}):(\d{2})/);
+
+    if (!fecha || !hora) return false;
+
+    const inicio = new Date(
+      `${fecha}T${hora[1].padStart(2, '0')}:${hora[2]}:00-03:00`
+    );
+
+    if (Number.isNaN(inicio.getTime())) return false;
+
+    // Cada turno dura una hora.
+    const fin = inicio.getTime() + 60 * 60 * 1000;
+
+    return Date.now() >= fin;
+  };
+
+  const activeBookings = bookings.filter(
+    b =>
+      (b.status === 'Confirmada' || b.status === 'Pendiente') &&
+      !yaPasoLaReserva(b)
+  );
+
+  const pastBookings = bookings.filter(
+    b =>
+      b.status === 'Completada' ||
+      b.status === 'Cancelada' ||
+      yaPasoLaReserva(b)
+  );
+
+
+
+  const handleConfirmCancel = async () => {
+    if (!bookingToCancel || isCancelling) return;
+
+    setIsCancelling(true);
+    setCancelError(null);
+
+    try {
+      await cancelBooking(bookingToCancel.id);
+
+      // Cerrar solamente cuando el backend confirmó.
       setBookingToCancel(null);
+    } catch (err: unknown) {
+      setCancelError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo cancelar la reserva. Intentá nuevamente.'
+      );
+    } finally {
+      setIsCancelling(false);
     }
   };
 
-  const handleAcceptInvite = async (id: string, team: string) => {
-    setIsResponding((prev) => ({ ...prev, [id]: true }));
+
+  const handleRespondInvite = async (id: string, team: string, response: 'ACEPTADA' | 'RECHAZADA') => {
+    setIsResponding(prev => ({ ...prev, [id]: true }));
     try {
-      const res = await responderInvitacion(id, 'ACEPTADA');
+      const res = await responderInvitacion(id, response);
       setFeedbackMsg({
-        text: res.message || `¡Aceptaste la invitación para sumarte a "${team}"!`,
+        text: res.message || (response === 'ACEPTADA'
+          ? `¡Aceptaste la invitación para sumarte a "${team}"!`
+          : `Rechazaste la invitación de "${team}".`),
         type: 'success'
       });
       setTimeout(() => setFeedbackMsg(null), 4000);
     } catch (err: any) {
-      setFeedbackMsg({
-        text: err?.message || 'Error al procesar la respuesta a la invitación.',
-        type: 'error'
-      });
+      setFeedbackMsg({ text: err?.message || 'Error al procesar la invitación.', type: 'error' });
     } finally {
-      setIsResponding((prev) => ({ ...prev, [id]: false }));
-    }
-  };
-
-  const handleRejectInvite = async (id: string, team: string) => {
-    setIsResponding((prev) => ({ ...prev, [id]: true }));
-    try {
-      const res = await responderInvitacion(id, 'RECHAZADA');
-      setFeedbackMsg({
-        text: res.message || `Rechazaste la invitación de "${team}".`,
-        type: 'success'
-      });
-      setTimeout(() => setFeedbackMsg(null), 4000);
-    } catch (err: any) {
-      setFeedbackMsg({
-        text: err?.message || 'Error al procesar la respuesta a la invitación.',
-        type: 'error'
-      });
-    } finally {
-      setIsResponding((prev) => ({ ...prev, [id]: false }));
+      setIsResponding(prev => ({ ...prev, [id]: false }));
     }
   };
 
@@ -90,11 +139,11 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
     setDniSuccess(null);
     const cleanDni = dniInput.replace(/\D/g, '').trim();
     if (!cleanDni) {
-      setDniError('Ingresa tu número de DNI.');
+      setDniError('Ingresá tu número de DNI.');
       return;
     }
     if (cleanDni.length < 7 || cleanDni.length > 8) {
-      setDniError('El DNI debe tener exactamente 7 u 8 dígitos numéricos.');
+      setDniError('El DNI debe tener 7 u 8 dígitos numéricos.');
       return;
     }
 
@@ -116,523 +165,360 @@ export const MisReservas: React.FC<MisReservasProps> = ({ onNavigate }) => {
     }
   };
 
+  const iniciales = currentUser?.nombre
+    ? currentUser.nombre.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase()
+    : 'U';
+
   return (
-    <div className="bg-[#293827] min-h-full w-full font-['Inter',sans-serif] text-white flex flex-col">
-      {/* Subheader / Tabs de Mis Reservas */}
-      <div className="px-6 lg:px-12 pt-6 max-w-6xl mx-auto w-full flex items-center justify-between gap-4 flex-wrap border-b border-[#5a7056]/40 pb-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setActiveTab('activos')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer border ${
-              activeTab === 'activos'
-                ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
-                : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
-            }`}
-          >
-            📋 Mis Turnos y Reservas
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('perfil')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer border ${
-              activeTab === 'perfil'
-                ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
-                : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
-            }`}
-          >
-            👤 Mi Perfil
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('notificaciones')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer border flex items-center gap-1.5 ${
-              activeTab === 'notificaciones'
-                ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
-                : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
-            }`}
-          >
-            <span>🔔</span> Notificaciones
+    <div className="mr-page">
+      <header className="mr-header">
+        <div className="mr-header-top">
+          <div>
+            <p className="mr-eyebrow">MI CUENTA</p>
+            <h1 className="mr-title">Mis Reservas</h1>
+            <p className="mr-description">
+              Administrá tus próximos turnos, consultá tu historial y revisá tu perfil.
+            </p>
+          </div>
+          <button type="button" className="mr-book-button" onClick={() => onNavigate('landing')}>
+            + Nueva Reserva
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={() => onNavigate('landing')}
-          className="text-xs font-semibold text-[#a3b89e] hover:text-white transition cursor-pointer flex items-center gap-1.5"
-        >
-          <span>←</span> Volver a Canchas
-        </button>
-      </div>
+        <nav className="mr-tabs" aria-label="Secciones de Mis Reservas">
+          <button type="button" className={`mr-tab${activeTab === 'activos' ? ' is-active' : ''}`}
+            onClick={() => setActiveTab('activos')} aria-pressed={activeTab === 'activos'}>
+            Próximos Turnos ({activeBookings.length})
+          </button>
+          <button type="button" className={`mr-tab${activeTab === 'historial' ? ' is-active' : ''}`}
+            onClick={() => setActiveTab('historial')} aria-pressed={activeTab === 'historial'}>
+            Historial ({pastBookings.length})
+          </button>
+          <button type="button" className={`mr-tab${activeTab === 'perfil' ? ' is-active' : ''}`}
+            onClick={() => setActiveTab('perfil')} aria-pressed={activeTab === 'perfil'}>
+            Mi Perfil y Equipos
+          </button>
+          <button type="button" className={`mr-tab${activeTab === 'notificaciones' ? ' is-active' : ''}`}
+            onClick={() => setActiveTab('notificaciones')} aria-pressed={activeTab === 'notificaciones'}>
+            Notificaciones
+          </button>
+        </nav>
+      </header>
 
-      {/* Main Container */}
-      <div className="px-6 lg:px-12 py-8 flex flex-col gap-6 max-w-6xl mx-auto w-full">
-        {/* Absence Warning Banner */}
+      <main className="mr-main">
         {isUserBanned ? (
-          <div className="bg-[rgba(229,62,62,0.15)] border-2 border-[#e53e3e] rounded-2xl p-5 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">🚫</span>
-              <div>
-                <h3 className="font-bold text-base text-[#e53e3e]">
-                  Cuenta Suspendida para Nuevas Reservas
-                </h3>
-                <p className="text-xs text-[#c0c0c0] mt-0.5">
-                  Has acumulado <strong>3 inasistencias consecutivas</strong> a turnos reservados. De acuerdo a la normativa del complejo, tu cuenta está bloqueada durante 2 semanas.
-                </p>
-              </div>
+          <div className="mr-alert mr-alert--danger" role="alert">
+            <span className="mr-alert-icon" aria-hidden="true">🚫</span>
+            <div className="mr-alert-content">
+              <h2>Cuenta suspendida para nuevas reservas</h2>
+              <p>Has acumulado <strong>3 inasistencias consecutivas</strong>. De acuerdo a la normativa del complejo, tu cuenta está bloqueada durante dos semanas.</p>
             </div>
-            <span className="bg-[#e53e3e] text-white text-xs font-black px-3 py-1 rounded-full uppercase">
-              Sanción Vigente
-            </span>
+            <span className="mr-alert-label">Sanción vigente</span>
           </div>
         ) : userAbsences > 0 ? (
-          <div className="bg-[rgba(245,158,11,0.15)] border border-[#f59e0b] rounded-2xl p-4 flex items-center gap-3 text-xs text-[#f59e0b]">
-            <span className="text-xl">⚠️</span>
-            <span>
-              <strong>Atención:</strong> Registrás <strong>{userAbsences}/3 inasistencias consecutivas</strong>. Si acumulás 3 faltas sin aviso previo, no podrás reservar canchas durante dos semanas.
-            </span>
+          <div className="mr-alert mr-alert--warning" role="status">
+            <span className="mr-alert-icon" aria-hidden="true">⚠️</span>
+            <p><strong>Atención:</strong> registrás <strong>{userAbsences}/3 inasistencias consecutivas</strong>. Si acumulás 3 faltas sin aviso previo, no podrás reservar durante dos semanas.</p>
           </div>
         ) : null}
 
-        {/* Section Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Panel de Cliente y Capitán</h1>
-            <p className="text-xs text-[#a0a0a0] mt-0.5">
-              Gestión de reservas activas, política de seña del 30%, ficha deportiva e invitaciones a equipos.
-            </p>
-          </div>
-
-          {/* Tab buttons */}
-          <div className="flex items-center gap-1.5 bg-[#1e281d] p-1.5 rounded-xl border border-[#5a7056] self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setActiveTab('activos')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                activeTab === 'activos'
-                  ? 'bg-[#65c556] text-[#293827] font-bold'
-                  : 'text-[#a0a0a0] hover:text-white'
-              }`}
-            >
-              Próximos Turnos ({activeBookings.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('historial')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                activeTab === 'historial'
-                  ? 'bg-[#65c556] text-[#293827] font-bold'
-                  : 'text-[#a0a0a0] hover:text-white'
-              }`}
-            >
-              Historial ({pastBookings.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('perfil')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                activeTab === 'perfil'
-                  ? 'bg-[#65c556] text-[#293827] font-bold'
-                  : 'text-[#a0a0a0] hover:text-white'
-              }`}
-            >
-              Mi Ficha & Equipos
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('notificaciones')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                activeTab === 'notificaciones'
-                  ? 'bg-[#65c556] text-[#293827] font-bold'
-                  : 'text-[#a0a0a0] hover:text-white'
-              }`}
-            >
-              Notificaciones
-            </button>
-          </div>
-        </div>
-
-        {/* TAB 1: TURNOS ACTIVOS */}
         {activeTab === 'activos' && (
-          <div className="flex flex-col gap-4">
+          <section className="mr-reservations" aria-label="Próximos turnos">
             {activeBookings.length === 0 ? (
-              <div className="bg-[#1e281d] border border-[#5a7056] rounded-2xl p-10 text-center flex flex-col items-center gap-3">
-                <span className="text-4xl">🏟️</span>
-                <p className="text-base font-bold text-white">No tenés reservas activas en este momento</p>
-                <p className="text-xs text-[#a0a0a0]">Elegí una cancha y horario para realizar tu reserva online.</p>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('landing')}
-                  className="mt-2 px-5 py-2.5 rounded-xl bg-[#65c556] text-[#293827] font-bold text-xs"
-                >
-                  Ver Canchas Disponibles
+              <div className="mr-empty">
+                
+                <h2>No tenés reservas activas en este momento</h2>
+                <p>Elegí una cancha y un horario para realizar tu reserva online.</p>
+                <button type="button" className="mr-primary-btn" onClick={() => onNavigate('landing')}>
+                  Ver canchas disponibles
                 </button>
               </div>
-            ) : (
-              activeBookings.map((b) => {
-                const canRefund = Boolean(b.aplicaDevolucion);
-                return (
-                  <div
-                    key={b.id}
-                    className="bg-[#1e281d] border border-[#5a7056] rounded-2xl p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 hover:border-[#65c556]/60 transition-all"
-                  >
-                    <div className="flex flex-col gap-2 flex-1">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-xs font-extrabold uppercase text-[#65c556]">
-                          {b.sport}
-                        </span>
-                        <span className="text-xs text-[#a0a0a0]">• Código: {b.id}</span>
-                        <span className="bg-[rgba(101,197,86,0.15)] text-[#65c556] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#65c556]/30">
-                          {b.status}
-                        </span>
-                      </div>
+            ) : activeBookings.map(b => (
+              
+            <article className="mr-booking-card" key={b.id}>
+              <div className="mr-booking-top">
+                <div className="mr-booking-info">
+                  <div className="mr-booking-tags">
+                    <span className="mr-sport">{b.sport}</span>
 
-                      <h3 className="text-lg font-bold text-white">{b.courtName}</h3>
+                    <span className="mr-booking-id">
+                      Reserva #{b.id}
+                    </span>
 
-                      <div className="flex items-center gap-4 text-xs text-[#c0c0c0]">
-                        <span>📅 {b.date}</span>
-                        <span>⏰ {b.time}</span>
-                        <span>⏱️ Duración: 1 hora</span>
-                      </div>
-
-                      {/* 30% deposit badge & breakdown */}
-                      <div className="bg-[#293827] border border-[#5a7056] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs mt-1">
-                        <div>
-                          <span className="text-[#a0a0a0] block text-[11px]">Tarifa total fija:</span>
-                          <span className="font-bold text-white">${b.totalPrice.toLocaleString('es-AR')}</span>
-                        </div>
-                        <div>
-                          <span className="text-[#65c556] block text-[11px] font-semibold">Seña abonada (30%):</span>
-                          <span className="font-extrabold text-[#65c556]">${b.depositPaid.toLocaleString('es-AR')}</span>
-                        </div>
-                        <div>
-                          <span className="text-[#a0a0a0] block text-[11px]">Saldo en el predio (70%):</span>
-                          <span className="font-bold text-white">${b.remainingBalance.toLocaleString('es-AR')}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Action & Cancellation Notice */}
-                    <div className="flex flex-col items-start md:items-end gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setBookingToCancel(b)}
-                        className="px-4 py-2.5 rounded-xl border border-[#e53e3e] text-[#e53e3e] hover:bg-[#e53e3e] hover:text-white font-bold text-xs transition-colors cursor-pointer"
-                      >
-                        Cancelar Turno
-                      </button>
-
-                      <span className="text-[11px] text-[#a0a0a0]">
-                        {canRefund ? (
-                          <span className="text-[#65c556]">✓ Reintegro 100% de la seña disponible</span>
-                        ) : (
-                          <span className="text-[#f59e0b]">⚠️ Falta menos de 24h: seña no reembolsable</span>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
-
-        {/* TAB 2: HISTORIAL DE TURNOS */}
-        {activeTab === 'historial' && (
-          <div className="bg-[#1e281d] border border-[#5a7056] rounded-2xl overflow-hidden shadow-xl">
-            <div className="px-6 py-4 border-b border-[#5a7056] flex justify-between items-center bg-[#293827]/40">
-              <span className="font-bold text-sm text-white">Historial de Turnos Pasados</span>
-              <span className="text-xs text-[#a0a0a0]">{pastBookings.length} turnos registrados</span>
-            </div>
-
-            <div className="divide-y divide-[#293827]">
-              {pastBookings.map((b) => (
-                <div key={b.id} className="p-5 flex items-center justify-between gap-4 flex-wrap">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-[#65c556]">{b.sport}</span>
-                      <span className="text-xs text-[#a0a0a0]">• {b.date} • {b.time}</span>
-                    </div>
-                    <p className="text-sm font-bold text-white mt-0.5">{b.courtName}</p>
-                    <p className="text-xs text-[#a0a0a0] mt-0.5">
-                      Tarifa: ${b.totalPrice.toLocaleString('es-AR')} (Seña: ${b.depositPaid.toLocaleString('es-AR')})
-                    </p>
-                  </div>
-
-                  <span
-                    className={`text-xs font-bold px-3 py-1 rounded-full ${
-                      b.status === 'Completada'
-                        ? 'bg-[rgba(101,197,86,0.15)] text-[#65c556]'
-                        : 'bg-[rgba(229,62,62,0.15)] text-[#e53e3e]'
-                    }`}
-                  >
-                    {b.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: FICHA DE JUGADOR & EQUIPOS */}
-        {activeTab === 'perfil' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Player Card */}
-            <div className="bg-[#1e281d] border border-[#5a7056] rounded-2xl p-6 shadow-xl flex flex-col gap-4">
-              <div className="flex items-center gap-4">
-                <div className="size-16 rounded-2xl bg-[#65c556] text-[#293827] font-black text-2xl flex items-center justify-center shrink-0">
-                  {currentUser?.nombre
-                    ? currentUser.nombre
-                        .split(' ')
-                        .filter(Boolean)
-                        .map((n) => n[0])
-                        .join('')
-                        .slice(0, 2)
-                        .toUpperCase()
-                    : 'U'}
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">{currentUser?.nombre || 'Usuario Registrado'}</h3>
-                  <p className="text-xs text-[#65c556] font-semibold">
-                    {userParticipations.some(p => p.isCaptain) ? 'Capitán / Jugador Registrado' : 'Jugador Registrado'}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className="text-xs text-[#a0a0a0]">
-                      DNI: <strong className={currentUser?.dni ? "text-white font-mono" : "text-amber-400 font-bold"}>{currentUser?.dni || 'Sin registrar'}</strong> • {currentUser?.email || 'Sin especificar'}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDniInput(currentUser?.dni ? String(currentUser.dni).replace(/\D/g, '') : '');
-                        setIsEditingDni((prev) => !prev);
-                        setDniError(null);
-                        setDniSuccess(null);
-                      }}
-                      className="text-[11px] text-[#65c556] hover:underline cursor-pointer bg-transparent border-none font-bold"
+                    <span
+                      className={`mr-status ${
+                        b.status === 'Pendiente'
+                          ? 'mr-status--pending'
+                          : 'mr-status--confirmed'
+                      }`}
                     >
+                      {b.status}
+                    </span>
+                  </div>
+
+                  <h2 className="mr-booking-title">
+                    {nombreCanchaSinDeporte(b.courtName, b.sport)}
+                  </h2>
+
+                  <div className="mr-booking-meta">
+                    <span>📅 {fechaReservaLegible(b.date)}</span>
+                    <span>⏰ {b.time} · 1 hora</span>
+                  </div>
+                </div>
+
+                <div className="mr-booking-actions">
+                  <button
+                    type="button"
+                    className="mr-cancel-btn"
+                    onClick={() => {
+                    setCancelError(null);
+                    setBookingToCancel(b);
+                  }}
+                  >
+                    Cancelar turno
+                  </button>
+
+                  <p
+                    className={
+                      b.aplicaDevolucion
+                        ? 'mr-refund mr-refund--yes'
+                        : 'mr-refund mr-refund--no'
+                    }
+                  >
+                    {b.aplicaDevolucion
+                      ? '✓ Reintegro del 100% de la seña disponible'
+                      : '⚠️ Seña no reembolsable (menos de 24 h)'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mr-payment-summary">
+                <div>
+                  <span className="mr-payment-label">Tarifa total</span>
+                  <strong>{dinero(b.totalPrice)}</strong>
+                </div>
+
+                <div className="mr-payment-paid">
+                  <span className="mr-payment-label">
+                    Seña abonada (30%)
+                  </span>
+                  <strong className="mr-payment-accent">
+                    {dinero(b.depositPaid)}
+                  </strong>
+                </div>
+
+                <div>
+                  <span className="mr-payment-label">
+                    Saldo en el predio (70%)
+                  </span>
+                  <strong>{dinero(b.remainingBalance)}</strong>
+                </div>
+              </div>
+            </article>
+
+            ))}
+          </section>
+        )}
+
+        {activeTab === 'historial' && (
+          <section className="mr-panel" aria-label="Historial de turnos">
+            <div className="mr-panel-header">
+              <h2>Historial de turnos pasados</h2>
+              <span>{pastBookings.length} turnos registrados</span>
+            </div>
+            {pastBookings.length === 0 ? (
+              <p className="mr-panel-empty">Todavía no hay reservas finalizadas o canceladas.</p>
+            ) : (
+              <div className="mr-history-list">
+                {pastBookings.map(b => (
+                  <article className="mr-history-item" key={b.id}>
+                    <div>
+                      <div className="mr-history-meta">
+                        <strong>{b.sport}</strong>
+                        <span>• {b.date} • {b.time}</span>
+                      </div>
+                      <h3>{b.courtName}</h3>
+                      <p>Tarifa: {dinero(b.totalPrice)} (Seña: {dinero(b.depositPaid)})</p>
+                    </div>
+                    <span
+                      className={`mr-status ${
+                        b.status === 'Cancelada'
+                          ? 'mr-status--cancelled'
+                          : yaPasoLaReserva(b) && b.status !== 'Completada'
+                            ? 'mr-status--past'
+                            : 'mr-status--confirmed'
+                      }`}
+                    >
+                      {b.status === 'Cancelada'
+                        ? 'Cancelada'
+                        : yaPasoLaReserva(b) && b.status !== 'Completada'
+                          ? 'Turno finalizado'
+                          : b.status}
+                    </span>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeTab === 'perfil' && (
+          <section className="mr-profile-grid" aria-label="Perfil y equipos">
+            <article className="mr-panel mr-panel--padded">
+              <div className="mr-user-heading">
+                <div className="mr-avatar" aria-hidden="true">{iniciales}</div>
+                <div className="mr-user-summary">
+                  <h2>{currentUser?.nombre || 'Usuario Registrado'}</h2>
+                  <p className="mr-user-role">
+                    {userParticipations.some(p => p.isCaptain)
+                      ? 'Capitán / Jugador Registrado'
+                      : 'Jugador Registrado'}
+                  </p>
+                  <div className="mr-user-data">
+                    <p>DNI: <strong className={currentUser?.dni ? '' : 'mr-missing-dni'}>
+                      {currentUser?.dni || 'Sin registrar'}
+                    </strong> • {currentUser?.email || 'Sin especificar'}</p>
+                    <button type="button" className="mr-text-btn" onClick={() => {
+                      setDniInput(currentUser?.dni ? String(currentUser.dni).replace(/\D/g, '') : '');
+                      setIsEditingDni(prev => !prev);
+                      setDniError(null);
+                      setDniSuccess(null);
+                    }}>
                       {currentUser?.dni ? (isEditingDni ? '✕ Cancelar' : '✎ Modificar') : '+ Cargar DNI'}
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Formulario / Aviso de DNI */}
               {(!currentUser?.dni || isEditingDni) && (
-                <form onSubmit={handleSaveDni} className="bg-[#293827] border border-[#5a7056] p-4 rounded-xl flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <span>🪪</span>
-                      <span>{currentUser?.dni ? 'Modificar DNI Oficial' : 'Completar DNI de Cuenta'}</span>
-                    </span>
-                    <span className="text-[11px] text-[#65c556]">7 u 8 dígitos</span>
+                <form className="mr-dni-form" onSubmit={handleSaveDni}>
+                  <div className="mr-dni-heading">
+                    <strong>🪪 {currentUser?.dni ? 'Modificar DNI oficial' : 'Completar DNI de cuenta'}</strong>
+                    <span>7 u 8 dígitos</span>
                   </div>
-
                   {!currentUser?.dni && !isEditingDni && (
-                    <p className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-lg">
-                      ⚠️ Tu cuenta no posee un DNI registrado. Es necesario completarlo para poder ser inscripto en las nóminas oficiales de torneos.
-                    </p>
+                    <p className="mr-dni-notice">⚠️ Necesitás registrar tu DNI para integrar las nóminas oficiales de torneos.</p>
                   )}
-
-                  {dniError && (
-                    <div className="bg-red-950/60 border border-red-500/60 p-2.5 rounded-lg text-xs text-red-200">
-                      {dniError}
-                    </div>
-                  )}
-
-                  {dniSuccess && (
-                    <div className="bg-emerald-950/60 border border-emerald-500/60 p-2.5 rounded-lg text-xs text-emerald-200">
-                      {dniSuccess}
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      required
-                      inputMode="numeric"
-                      maxLength={8}
-                      placeholder="Ej: 38123456"
+                  {dniError && <p className="mr-message mr-message--error" role="alert">{dniError}</p>}
+                  {dniSuccess && <p className="mr-message mr-message--success">{dniSuccess}</p>}
+                  <div className="mr-dni-input-row">
+                    <input type="text" inputMode="numeric" maxLength={8} required
+                      aria-label="Número de DNI" placeholder="Ej.: 38123456"
                       value={dniInput}
-                      onChange={(e) => setDniInput(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                      className="flex-1 bg-[#1e281d] border border-[#5a7056] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-[#65c556]"
-                    />
-                    <button
-                      type="submit"
-                      disabled={dniUpdating}
-                      className="px-4 py-2 bg-[#65c556] hover:bg-[#54b045] text-[#293827] font-bold text-xs rounded-xl shadow transition cursor-pointer border-none disabled:opacity-50"
-                    >
+                      onChange={e => setDniInput(e.target.value.replace(/\D/g, '').slice(0, 8))}/>
+                    <button type="submit" className="mr-primary-btn" disabled={dniUpdating}>
                       {dniUpdating ? 'Guardando...' : 'Guardar DNI'}
                     </button>
                   </div>
                 </form>
               )}
+              {dniSuccess && <p className="mr-message mr-message--success" role="status">{dniSuccess}</p>}
 
-              <div className="border-t border-[#3b4d38] pt-4 flex flex-col gap-2">
-                <span className="text-xs font-bold text-[#a0a0a0] uppercase">
-                  Historial de Equipos y Torneos
-                </span>
+              <div className="mr-team-history">
+                <h3>Historial de equipos y torneos</h3>
                 {userParticipations.length === 0 ? (
-                  <div className="bg-[#293827] p-3.5 rounded-xl border border-[#5a7056] text-center">
-                    <p className="text-xs text-[#a0a0a0] italic">
-                      Aún no integras ningún equipo.
-                    </p>
+                  <p className="mr-panel-empty">Aún no integrás ningún equipo.</p>
+                ) : userParticipations.map(part => (
+                  <div key={part.id} className="mr-team-row">
+                    <div className="mr-team-row-header">
+                      <strong>{part.teamName}</strong>
+                      <span className={part.status === 'Activo' ? 'mr-team-active' : ''}>
+                        {part.status === 'Activo'
+                          ? `Activo (${part.isCaptain ? 'Capitán' : 'Miembro'})`
+                          : `Torneo ${part.year || ''} (${part.status})`}
+                      </span>
+                    </div>
+                    <p>Torneo: {part.tournamentName} • Rol: {part.role}</p>
                   </div>
-                ) : (
-                  userParticipations.map((part) => (
-                    <div key={part.id} className="bg-[#293827] p-3.5 rounded-xl border border-[#5a7056] flex flex-col gap-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-sm text-white">{part.teamName}</span>
-                        <span
-                          className={`text-xs font-bold ${
-                            part.status === 'Activo' ? 'text-[#65c556]' : 'text-gray-400'
-                          }`}
-                        >
-                          {part.status === 'Activo'
-                            ? `Activo (${part.isCaptain ? 'Capitán' : 'Miembro'})`
-                            : `Torneo ${part.year || ''} (${part.status})`}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[#a0a0a0]">
-                        Torneo: {part.tournamentName} • Rol: {part.role}
-                      </p>
-                    </div>
-                  ))
-                )}
+                ))}
               </div>
-            </div>
+            </article>
 
-            {/* Invitations to other teams */}
-            <div className="bg-[#1e281d] border border-[#5a7056] rounded-2xl p-6 shadow-xl flex flex-col gap-4">
-              <div>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-white">Invitaciones de Equipos</h3>
-                </div>
-                <p className="text-xs text-[#a0a0a0] mt-0.5">
-                  Capitanes que te convocaron para sumarte a sus planteles oficiales.
-                </p>
-              </div>
-
+            <article className="mr-panel mr-panel--padded">
+              <h2>Invitaciones de equipos</h2>
+              <p className="mr-section-description">Capitanes que te convocaron para sumarte a sus planteles oficiales.</p>
               {feedbackMsg && (
-                <div
-                  className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
-                    feedbackMsg.type === 'success'
-                      ? 'bg-[rgba(101,197,86,0.15)] border border-[#65c556] text-[#65c556]'
-                      : 'bg-[rgba(229,62,62,0.15)] border border-[#e53e3e] text-[#e53e3e]'
-                  }`}
-                >
-                  <span>{feedbackMsg.type === 'success' ? '✅' : '⚠️'}</span>
-                  <span>{feedbackMsg.text}</span>
-                </div>
+                <p className={`mr-message mr-message--${feedbackMsg.type}`} role="status">
+                  {feedbackMsg.type === 'success' ? '✅' : '⚠️'} {feedbackMsg.text}
+                </p>
               )}
-
-              <div className="flex flex-col gap-3">
+              <div className="mr-invitations">
                 {invitations.length === 0 ? (
-                  <p className="text-xs text-[#a0a0a0] italic py-4 text-center">
-                    No tenés invitaciones pendientes.
-                  </p>
-                ) : (
-                  invitations.map((inv) => (
-                    <div
-                      key={inv.id}
-                      className="bg-[#293827] p-4 rounded-xl border border-[#5a7056] flex flex-col gap-3 shadow-md"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h4 className="font-bold text-sm text-white">{inv.team}</h4>
-                          <p className="text-xs text-[#a0a0a0] mt-0.5">
-                            Capitán: <strong className="text-[#c0c0c0]">{inv.captain}</strong> • {inv.tournament}
-                          </p>
-                        </div>
-                        <span className="bg-[#1e281d] text-[#65c556] text-[10px] font-bold px-2.5 py-1 rounded-lg border border-[#5a7056]">
-                          Posición: {inv.role}
-                        </span>
+                  <p className="mr-panel-empty">No tenés invitaciones pendientes.</p>
+                ) : invitations.map(inv => (
+                  <div key={inv.id} className="mr-invitation-card">
+                    <div className="mr-invitation-heading">
+                      <div>
+                        <h3>{inv.team}</h3>
+                        <p>Capitán: <strong>{inv.captain}</strong> • {inv.tournament}</p>
                       </div>
-
-                      <div className="flex items-center gap-3 pt-2 border-t border-[#3b4d38]">
-                        <button
-                          type="button"
-                          disabled={isResponding[inv.id]}
-                          onClick={() => handleAcceptInvite(inv.id, inv.team)}
-                          className="flex-1 py-2.5 px-4 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-extrabold text-xs cursor-pointer transition-all shadow-md flex items-center justify-center gap-2 min-h-[40px] disabled:opacity-50"
-                        >
-                          {isResponding[inv.id] ? (
-                            <>
-                              <span className="inline-block w-3.5 h-3.5 border-2 border-[#293827] border-t-transparent rounded-full animate-spin" />
-                              <span>Procesando...</span>
-                            </>
-                          ) : (
-                            '✓ Aceptar Invitación'
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isResponding[inv.id]}
-                          onClick={() => handleRejectInvite(inv.id, inv.team)}
-                          className="px-4 py-2.5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white hover:border-[#e53e3e] hover:bg-[rgba(229,62,62,0.15)] font-semibold text-xs cursor-pointer transition-colors min-h-[40px] disabled:opacity-50"
-                        >
-                          ✕ Rechazar
-                        </button>
-                      </div>
+                      <span>Posición: {inv.role}</span>
                     </div>
-                  ))
-                )}
+                    <div className="mr-invitation-actions">
+                      <button type="button" className="mr-primary-btn" disabled={isResponding[inv.id]}
+                        onClick={() => handleRespondInvite(inv.id, inv.team, 'ACEPTADA')}>
+                        {isResponding[inv.id] ? 'Procesando...' : '✓ Aceptar invitación'}
+                      </button>
+                      <button type="button" className="mr-secondary-btn" disabled={isResponding[inv.id]}
+                        onClick={() => handleRespondInvite(inv.id, inv.team, 'RECHAZADA')}>
+                        ✕ Rechazar
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          </div>
+            </article>
+          </section>
         )}
 
-        {/* TAB 4: NOTIFICACIONES */}
         {activeTab === 'notificaciones' && (
-          <div className="bg-[#1e281d] border border-[#5a7056] rounded-2xl p-6 shadow-xl flex flex-col gap-4">
-            <div className="flex items-center justify-between border-b border-[#5a7056] pb-3">
+          <section className="mr-panel mr-panel--padded" aria-label="Notificaciones">
+            <div className="mr-notifications-heading">
               <div>
-                <h3 className="text-base font-bold text-white">Centro de Notificaciones</h3>
-                <p className="text-xs text-[#a0a0a0]">Avisos de reservas, señas, sanciones y torneos.</p>
+                <h2>Centro de notificaciones</h2>
+                <p className="mr-section-description">Avisos de reservas, señas, sanciones y torneos.</p>
               </div>
-              <button
-                type="button"
-                onClick={markAllNotificationsRead}
-                className="text-xs text-[#65c556] font-bold hover:underline cursor-pointer bg-transparent border-none"
-              >
+              <button type="button" className="mr-text-btn" onClick={markAllNotificationsRead}>
                 Marcar todas como leídas
               </button>
             </div>
-
-            <div className="flex flex-col gap-3">
-              {notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={`p-4 rounded-xl border flex items-start gap-3 transition-colors ${
-                    !n.read
-                      ? 'bg-[#293827] border-[#65c556]/60'
-                      : 'bg-[#293827]/40 border-[#5a7056]'
-                  }`}
-                >
-                  <span className="text-xl">
-                    {n.type === 'reserva' ? '⚽' : n.type === 'torneo' ? '🏆' : n.type === 'sancion' ? '⚠️' : 'ℹ️'}
-                  </span>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-sm text-white">{n.title}</h4>
-                      <span className="text-[10px] text-[#a0a0a0] font-mono">{formatTimeAgo(n.createdAt || n.timeAgo)}</span>
+            {notifications.length === 0 ? (
+              <p className="mr-panel-empty">No tenés notificaciones.</p>
+            ) : (
+              <div className="mr-notifications-list">
+                {notifications.map(n => (
+                  <article key={n.id} className={`mr-notification ${n.read ? '' : 'is-unread'}`}>
+                    <span className="mr-notification-icon" aria-hidden="true">
+                      {n.type === 'reserva' ? '⚽' : n.type === 'torneo' ? '🏆' : n.type === 'sancion' ? '⚠️' : 'ℹ️'}
+                    </span>
+                    <div className="mr-notification-body">
+                      <div className="mr-notification-heading">
+                        <h3>{n.title}</h3>
+                        <time>{formatTimeAgo(n.createdAt || n.timeAgo)}</time>
+                      </div>
+                      <p>{n.message}</p>
                     </div>
-                    <p className="text-xs text-[#c0c0c0] mt-1 leading-relaxed">{n.message}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
         )}
-      </div>
+      </main>
 
-      {/* Modal de Cancelación con regla de 24hs centralizada en el backend */}
       <CancelacionConfirmModal
+        errorMessage={cancelError}
+        isSubmitting={isCancelling}
         isOpen={!!bookingToCancel}
         bookingName={bookingToCancel ? `${bookingToCancel.courtName} (${bookingToCancel.date} • ${bookingToCancel.time})` : ''}
         isRefundable={bookingToCancel?.aplicaDevolucion ?? false}
         hoursUntilMatch={bookingToCancel?.hoursUntilMatch}
         depositAmount={bookingToCancel?.depositPaid ?? 5400}
-        onClose={() => setBookingToCancel(null)}
+        onClose={() => {
+          if (isCancelling) return;
+          setCancelError(null);
+          setBookingToCancel(null);
+        }}
         onConfirm={handleConfirmCancel}
       />
     </div>

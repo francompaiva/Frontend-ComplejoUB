@@ -1,0 +1,255 @@
+
+/* Confirmación y pago: solamente los estilos exclusivos de esta ventana.
+   El fondo y panel compartidos vienen de src/styles/components.css. */
+
+.ub-modal-panel.pago-modal__panel {
+  max-width: 550px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+
+.pago-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--ub-color-border);
+  background: var(--ub-color-background);
+}
+
+.pago-modal__heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pago-modal__dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ub-color-primary);
+  animation: pago-modal-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pago-modal-pulse {
+  50% { opacity: 0.5; }
+}
+
+.pago-modal__title {
+  font-weight: 700;
+  font-size: 17px;
+  line-height: normal;
+  color: var(--ub-color-text);
+}
+
+.pago-modal__close {
+  color: var(--ub-color-muted);
+  background: transparent;
+  border: 0;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.pago-modal__close:hover { color: var(--ub-color-text); }
+
+.pago-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+
+.pago-modal__breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--ub-color-background);
+  border: 1px solid var(--ub-color-border);
+  border-radius: 12px;
+}
+
+.pago-modal__detail,
+.pago-modal__deposit,
+.pago-modal__balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pago-modal__detail { font-size: 13px; }
+.pago-modal__muted { color: var(--ub-color-muted); }
+.pago-modal__bold { font-weight: 700; color: var(--ub-color-text); }
+.pago-modal__semibold { font-weight: 600; color: var(--ub-color-text); }
+.pago-modal__medium { font-weight: 500; color: var(--ub-color-text); }
+.pago-modal__accent { font-weight: 600; color: var(--ub-color-primary); }
+
+.pago-modal__rule {
+  height: 1px;
+  margin: 4px 0;
+  background: #3b4d38;
+}
+
+.pago-modal__deposit {
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  background: rgba(101, 197, 86, 0.12);
+}
+
+.pago-modal__deposit-label {
+  font-weight: 700;
+  color: var(--ub-color-primary);
+}
+
+.pago-modal__deposit-amount {
+  color: var(--ub-color-primary);
+  font-weight: 900;
+  font-size: 16px;
+}
+
+.pago-modal__balance {
+  color: var(--ub-color-muted);
+  font-size: 12px;
+}
+
+.pago-modal__payment-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ub-color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pago-modal__method-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pago-modal__method {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--ub-color-border);
+  border-radius: 8px;
+  background: var(--ub-color-background);
+  color: var(--ub-color-muted);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms, border-color 150ms, color 150ms;
+}
+
+.pago-modal__method:not(.is-active):hover { color: var(--ub-color-text); }
+
+.pago-modal__method.is-active {
+  background: rgba(101, 197, 86, 0.2);
+  border-color: var(--ub-color-primary);
+  color: var(--ub-color-primary);
+}
+
+.pago-modal__card-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--ub-color-background);
+  border: 1px solid var(--ub-color-border);
+  border-radius: 8px;
+}
+
+.pago-modal__input-label {
+  display: block;
+  color: var(--ub-color-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.pago-modal__input {
+  width: 100%;
+  padding: 4px 10px;
+  background: var(--ub-color-surface);
+  border: 1px solid var(--ub-color-border);
+  border-radius: 4px;
+  color: var(--ub-color-text);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.pago-modal__input::placeholder { color: #71856d; }
+.pago-modal__input:focus { outline: none; border-color: var(--ub-color-primary); }
+.pago-modal__input--center { text-align: center; }
+
+.pago-modal__field-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.pago-modal__field-fill { flex: 1 1 140px; min-width: 0; }
+.pago-modal__field-expiry { flex: 0 0 82px; }
+.pago-modal__field-cvv { flex: 0 0 64px; }
+
+.pago-modal__error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(229, 62, 62, 0.15);
+  border: 1px solid var(--ub-color-danger);
+  border-radius: 12px;
+  color: var(--ub-color-danger);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.pago-modal__notice {
+  color: var(--ub-color-muted);
+  font-size: 11px;
+  font-style: italic;
+  text-align: center;
+}
+
+.pago-modal__actions {
+  display: flex;
+  gap: 14px;
+  margin: 12px -24px -24px;
+  padding: 16px 24px;
+  background: var(--ub-color-background);
+  border-top: 1px solid var(--ub-color-border);
+}
+
+.pago-modal__action {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: color 150ms, background-color 150ms, border-color 150ms, box-shadow 150ms;
+}
+
+.pago-modal__action--cancel {
+  border: 1px solid var(--ub-color-border);
+  color: var(--ub-color-text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+}
+
+.pago-modal__action--cancel:hover { color: var(--ub-color-text); }
+
+.pago-modal__action--pay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--ub-color-primary);
+  color: var(--ub-color-background);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 800;
+  box-shadow: 0 10px 15px -3px rgba(101,197,86,.2), 0 4px 6px -4px rgba(101,197,86,.2);
+}
+
+.pago-modal__action--pay:hover { background: var(--ub-color-primary-hover); }

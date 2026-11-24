@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
+import './LoginScreen.css';
 import { type UserRole, useComplejo } from '../context/ComplejoContext';
 import { authApi } from '../api/endpoints';
 import { apiClient } from '../api/client';
 import {
-  IconStadium,
   IconMail,
   IconLock,
   IconCheck,
@@ -22,12 +22,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
 
   // Formulario Login
-  const [loginEmail, setLoginEmail] = useState(import.meta.env.VITE_DEMO_CLIENT_EMAIL || '');
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loadingLogin, setLoadingLogin] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [backendOffline, setBackendOffline] = useState(false);
 
   // Formulario Registro
   const [regName, setRegName] = useState('');
@@ -51,83 +50,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   // Validación de formato RFC de email
   const isValidEmail = (email: string): boolean => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  };
-
-  const handleOfflineLogin = (emailToUse?: string) => {
-    const emailTarget = (emailToUse || loginEmail || 'lucas@gmail.com').trim().toLowerCase();
-    let targetRole: UserRole = 'cliente';
-    const clientProfiles: Record<string, { id: number; nombre: string; dni?: string; inasistencias?: number; estado_cuenta?: string; suspension_hasta?: string | null }> = {
-      'lucas@gmail.com': { id: 4, nombre: 'Lucas Díaz (Cliente / Capitán)', dni: '40.123.456', inasistencias: 0, estado_cuenta: 'Activa' },
-      'mateo@gmail.com': { id: 5, nombre: 'Mateo Fernández', inasistencias: 1, estado_cuenta: 'Activa' },
-      'juan@gmail.com': { id: 6, nombre: 'Juan Paiva', inasistencias: 0, estado_cuenta: 'Activa' },
-      'diego@gmail.com': { id: 7, nombre: 'Diego López', inasistencias: 0, estado_cuenta: 'Activa' },
-      'gonzalo@gmail.com': { id: 8, nombre: 'Gonzalo Higuaín', inasistencias: 0, estado_cuenta: 'Activa' },
-      'julian@gmail.com': { id: 9, nombre: 'Julián Álvarez', inasistencias: 0, estado_cuenta: 'Activa' },
-      'enzo@gmail.com': { id: 10, nombre: 'Enzo Fernández', inasistencias: 0, estado_cuenta: 'Activa' },
-      'rodrigo@gmail.com': { id: 11, nombre: 'Rodrigo De Paul', inasistencias: 0, estado_cuenta: 'Activa' },
-      'sancionado@gmail.com': {
-        id: 12,
-        nombre: 'Usuario Sancionado Test',
-        inasistencias: 3,
-        estado_cuenta: 'Suspendida',
-        suspension_hasta: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
-      },
-    };
-
-    const clientMatch = clientProfiles[emailTarget];
-    let userObj: any = {
-      id: clientMatch?.id || 99,
-      nombre: clientMatch?.nombre || emailTarget.split('@')[0],
-      email: emailTarget,
-      rol: 'Cliente',
-      inasistencias: clientMatch?.inasistencias ?? 0,
-      estado_cuenta: clientMatch?.estado_cuenta || 'Activa',
-      suspension_hasta: clientMatch?.suspension_hasta || null,
-    };
-
-    if (emailTarget === 'admin@complejoub.com' || emailTarget === 'complejoub.soporte@gmail.com') {
-      targetRole = 'superadmin';
-      userObj = {
-        id: 15,
-        nombre: 'Superadministrador General',
-        email: emailTarget,
-        rol: 'Superadministrador',
-        inasistencias: 0,
-        estado_cuenta: 'Activa',
-      };
-    } else if (emailTarget === 'operador@complejoub.com') {
-      targetRole = 'admin';
-      userObj = {
-        id: 13,
-        nombre: 'Administrador de Sede',
-        email: 'operador@complejoub.com',
-        rol: 'Administrador',
-        inasistencias: 0,
-        estado_cuenta: 'Activa',
-      };
-    } else if (emailTarget === 'arbitro@complejoub.com') {
-      targetRole = 'arbitro';
-      userObj = {
-        id: 2,
-        nombre: 'Sebastián Norjean (Árbitro)',
-        email: 'arbitro@complejoub.com',
-        rol: 'Arbitro',
-        inasistencias: 0,
-        estado_cuenta: 'Activa',
-      };
-    }
-
-    setCurrentUser(userObj);
-    localStorage.setItem('complejo_user', JSON.stringify(userObj));
-    onLogin(targetRole);
-  };
-
-  const handleQuickFill = (email: string) => {
-    setActiveTab('login');
-    setLoginEmail(email);
-    setLoginPassword('');
-    setLoginError(null);
-    setBackendOffline(false);
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -167,29 +89,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       }
     } catch (err: any) {
       const errMsg = err?.message || 'Error al autenticar.';
+      const messageLower = errMsg.toLowerCase();
       const isConnectionError =
-        errMsg.toLowerCase().includes('failed to fetch') ||
-        errMsg.toLowerCase().includes('networkerror') ||
-        errMsg.toLowerCase().includes('fetch');
+        messageLower.includes('failed to fetch') ||
+        messageLower.includes('networkerror') ||
+        messageLower.includes('fetch');
 
       const isAccountUnverified =
-        err?.statusCode === 403 ||
         err?.details?.requiresVerification === true ||
-        errMsg.toLowerCase().includes('debes activar tu cuenta') ||
-        errMsg.toLowerCase().includes('activación a tu casilla');
+        messageLower.includes('debes activar tu cuenta') ||
+        messageLower.includes('activación a tu casilla');
 
-      if (isConnectionError) {
-        setBackendOffline(true);
-        setLoginError(
-          'No se pudo conectar con el servidor backend en http://localhost:4000. ' +
-          'Asegúrate de ejecutar "npm run dev" en la carpeta Backend-ComplejoUB o ingresa en Modo Demo a continuación.'
-        );
-      } else if (isAccountUnverified) {
+      if (isAccountUnverified) {
         setOtpEmail(emailTrimmed);
         setOtpCode('');
         setOtpError(null);
         setOtpSuccess(errMsg);
         setIsOtpModalOpen(true);
+      } else if (isConnectionError) {
+        setLoginError('No se pudo conectar con el servidor. Intentá nuevamente más tarde.');
       } else {
         setLoginError(errMsg);
       }
@@ -323,23 +241,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="bg-[#141b13] flex flex-col items-center justify-center min-h-screen p-4 text-white font-['Inter',sans-serif] relative overflow-hidden">
+    <div className="login-page">
       {/* Decorative ambient lighting */}
-      <div className="absolute top-0 left-1/4 size-[500px] bg-[#65c556]/10 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 size-[500px] bg-[#22c55e]/10 rounded-full blur-[140px] pointer-events-none" />
+      <div className="login-ambient login-ambient--top" />
+      <div className="login-ambient login-ambient--bottom" />
 
       {/* Main Container */}
-      <div className="bg-[#1e281d] border border-[#5a7056] rounded-3xl p-6 sm:p-10 w-full max-w-xl shadow-2xl relative z-10 flex flex-col gap-6">
+      <div className="login-card">
         {/* Brand header */}
-        <div className="flex flex-col items-center text-center gap-2">
-          <div className="size-14 rounded-2xl bg-[rgba(101,197,86,0.15)] border-2 border-[#65c556] flex items-center justify-center text-[#65c556] shadow-lg shadow-[rgba(101,197,86,0.2)]">
-            <IconStadium size={30} />
+        <div className="login-brand">
+          <div className="login-brand-icon">
+            <img src="/logo-ub.png" alt="Logo Complejo Deportivo UB" />
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">
-            Complejo Deportivo <strong className="text-[#65c556]">UB</strong>
+          <h1 className="login-brand-title">
+            Complejo Deportivo <strong>UB</strong>
           </h1>
-          <p className="text-xs text-[#a0a0a0]">
-            Sistema Integral de Gestión de Reservas, Torneos y Arbitraje
+          <p className="login-brand-subtitle">
+            Pagina de reserva de canchas, torneos y arbitraje
           </p>
         </div>
 
@@ -375,7 +293,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               </div>
             )}
 
-            <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
+            <form onSubmit={handleVerifyOtp} className="login-form">
               <div className="flex flex-col items-center gap-2 my-2">
                 <label className="text-xs font-semibold text-[#a0a0a0]">Código de 6 Dígitos</label>
                 <input
@@ -389,11 +307,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   className="bg-[#293827] border-2 border-[#65c556] rounded-2xl text-center text-3xl font-mono font-bold tracking-[12px] py-3 px-4 text-white focus:outline-none shadow-lg w-full max-w-[280px]"
                 />
                 <span className="text-[11px] text-[#a0a0a0]">Válido durante 15 minutos</span>
-              </div>
-
-              {/* Tips de demo */}
-              <div className="bg-[#293827] p-3 rounded-xl border border-[#5a7056]/60 text-[11px] text-[#a0a0a0] leading-relaxed">
-                💡 <strong className="text-[#65c556]">Verificación de prueba:</strong> Para entornos de prueba o demostración, también puedes ingresar el código universal <strong>123456</strong>.
               </div>
 
               <div className="flex items-center justify-between text-xs pt-2">
@@ -421,7 +334,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               <button
                 type="submit"
                 disabled={loadingOtp || otpCode.length !== 6}
-                className="w-full py-3 rounded-xl bg-[#65c556] hover:bg-[#54b045] text-[#293827] font-black text-sm shadow-lg shadow-[rgba(101,197,86,0.25)] transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 mt-1"
+                className="login-primary-button"
               >
                 {loadingOtp ? (
                   <>
@@ -440,18 +353,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         ) : (
           <>
             {/* Tab Switcher: Iniciar Sesión / Registrarse */}
-            <div className="grid grid-cols-2 p-1.5 bg-[#293827] rounded-2xl border border-[#5a7056]">
+            <div className="login-tabs">
               <button
                 type="button"
                 onClick={() => {
                   setActiveTab('login');
                   setLoginError(null);
                 }}
-                className={`py-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
-                  activeTab === 'login'
-                    ? 'bg-[#65c556] text-[#293827] shadow-md shadow-[rgba(101,197,86,0.25)]'
-                    : 'text-[#a0a0a0] hover:text-white'
-                }`}
+                className={`login-tab ${activeTab === 'login' ? 'login-tab--active' : ''}`}
               >
                 <IconLock size={15} />
                 <span>Iniciar Sesión</span>
@@ -463,11 +372,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   setActiveTab('register');
                   setRegisterError(null);
                 }}
-                className={`py-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
-                  activeTab === 'register'
-                    ? 'bg-[#65c556] text-[#293827] shadow-md shadow-[rgba(101,197,86,0.25)]'
-                    : 'text-[#a0a0a0] hover:text-white'
-                }`}
+                className={`login-tab ${activeTab === 'register' ? 'login-tab--active' : ''}`}
               >
                 <IconMail size={15} />
                 <span>Registrarse</span>
@@ -476,67 +381,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
             {/* TAB 1: Iniciar Sesión */}
             {activeTab === 'login' && (
-              <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
-                {backendOffline && (
-                  <div className="bg-[#241717] border border-[#ef4444] rounded-2xl p-4 flex flex-col gap-3 text-xs text-white shadow-xl animate-fadeIn">
-                    <div className="flex items-start gap-3">
-                      <div className="size-8 rounded-lg bg-red-950/80 border border-red-500/50 flex items-center justify-center shrink-0 text-red-400">
-                        <IconAlert size={18} />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-sm text-[#fca5a5]">El servidor backend no está respondiendo</h4>
-                        <p className="text-[#d1d5db] text-xs mt-1 leading-relaxed">
-                          El frontend se ejecuta en un proceso independiente. Para conectar con MySQL real, abre una terminal y ejecuta:
-                        </p>
-                        <code className="block bg-[#120a0a] border border-[#ef4444]/40 rounded-lg px-3 py-1.5 font-mono text-[11px] text-[#4ade80] my-2 select-all">
-                          cd Backend-ComplejoUB ; npm run dev
-                        </code>
-                      </div>
-                    </div>
-                    <div className="pt-2 border-t border-red-500/20 flex flex-col gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleOfflineLogin(loginEmail)}
-                        className="w-full py-2.5 px-4 rounded-xl bg-[#65c556] hover:bg-[#54b045] text-[#1e281d] font-black text-xs transition cursor-pointer flex items-center justify-center gap-2 shadow-lg"
-                      >
-                        <span>⚡ Continuar en Modo Demo Local (Sin Backend)</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
+              <form onSubmit={handleLoginSubmit} className="login-form">
                 {/* Campo Correo Electrónico con Icono a la izquierda perfectamente espaciado */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold text-[#c0c0c0]">Correo Electrónico Registrado</label>
                   <div
-                    className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
-                    style={{
-                      backgroundColor: '#293827',
-                      padding: '14px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px'
-                    }}
+                    className="login-field"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a0a0a0', flexShrink: 0 }}>
+                    <div className="login-field-icon">
                       <IconMail size={18} />
                     </div>
                     <input
                       type="email"
                       required
-                      placeholder="ejemplo@correo.com"
+                      placeholder="Ingresá tu correo electrónico"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
-                      style={{
-                        width: '100%',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        color: '#ffffff',
-                        fontSize: '14px',
-                        padding: 0
-                      }}
-                      className="placeholder-[#71856d]"
+                      className="login-field-input"
                     />
                   </div>
                 </div>
@@ -548,16 +409,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     <span className="text-[11px] text-[#65c556]">Mínimo 6 caracteres</span>
                   </div>
                   <div
-                    className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
-                    style={{
-                      backgroundColor: '#293827',
-                      padding: '14px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px'
-                    }}
+                    className="login-field"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a0a0a0', flexShrink: 0 }}>
+                    <div className="login-field-icon">
                       <IconLock size={18} />
                     </div>
                     <input
@@ -566,21 +420,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                       placeholder="Ingresa tu contraseña"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
-                      style={{
-                        width: '100%',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        color: '#ffffff',
-                        fontSize: '14px',
-                        padding: 0
-                      }}
-                      className="placeholder-[#71856d]"
+                      className="login-field-input"
                     />
                     <button
                       type="button"
                       onClick={() => setShowLoginPassword((prev) => !prev)}
-                      className="text-[#a0a0a0] hover:text-[#65c556] transition cursor-pointer shrink-0 p-1 flex items-center justify-center"
+                      className="login-password-toggle"
                       title={showLoginPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
                     >
                       {showLoginPassword ? <IconEyeOff size={18} /> : <IconEye size={18} />}
@@ -596,60 +441,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   </div>
                 )}
 
-                {/* Cuentas de Acceso Rápido / Demo */}
-                <div className="bg-[#293827] border border-[#5a7056]/60 rounded-2xl p-3.5 flex flex-col gap-2 mt-1">
-                  <span className="text-[11px] font-bold text-[#65c556] uppercase tracking-wider flex items-center gap-1.5">
-                    <IconCheck size={14} />
-                    Cuentas de Acceso Rápido
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleQuickFill('lucas@gmail.com')}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[11px] font-semibold text-white transition text-center cursor-pointer truncate"
-                      title="Lucas Díaz (Cliente / Capitán)"
-                    >
-                      ⚽ Lucas (Cliente)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickFill('complejoub.soporte@gmail.com')}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[11px] font-semibold text-white transition text-center cursor-pointer truncate"
-                      title="Superadministrador Titular"
-                    >
-                      👑 Superadmin
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickFill('operador@complejoub.com')}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[11px] font-semibold text-white transition text-center cursor-pointer truncate"
-                      title="Administrador de Sede"
-                    >
-                      🛡️ Admin
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickFill('arbitro@complejoub.com')}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#1e281d] hover:bg-[#344732] border border-[#5a7056] text-[11px] font-semibold text-white transition text-center cursor-pointer truncate"
-                      title="Sebastián Norjean (Árbitro)"
-                    >
-                      🟨 Árbitro
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickFill('sancionado@gmail.com')}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#2b1818] hover:bg-[#3f2121] border border-[#ef4444]/60 text-[11px] font-semibold text-red-300 transition text-center cursor-pointer truncate"
-                      title="Usuario Sancionado Test (3 inasistencias consecutivas)"
-                    >
-                      🚫 Sancionado
-                    </button>
-                  </div>
-                </div>
-
                 <button
                   type="submit"
                   disabled={loadingLogin}
-                  className="mt-2 w-full py-3 rounded-xl bg-[#65c556] hover:bg-[#54b045] text-[#293827] font-black text-sm shadow-lg shadow-[rgba(101,197,86,0.25)] transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="login-primary-button"
                 >
                   {loadingLogin ? (
                     <>
@@ -659,7 +454,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   ) : (
                     <>
                       <IconCheck size={18} />
-                      <span>Ingresar a la Plataforma</span>
+                      <span>Ingresar </span>
                     </>
                   )}
                 </button>
@@ -668,7 +463,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
             {/* TAB 2: Registrarse */}
             {activeTab === 'register' && (
-              <form onSubmit={handleRegisterSubmit} className="flex flex-col gap-4">
+              <form onSubmit={handleRegisterSubmit} className="login-form">
                 {registerError && (
                   <div className="bg-[#7f1d1d]/80 border border-[#ef4444] p-3.5 rounded-xl flex items-start gap-2.5 text-xs text-[#fecaca] animate-fadeIn">
                     <IconAlert size={16} className="shrink-0 text-[#ef4444] mt-0.5" />
@@ -680,16 +475,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold text-[#c0c0c0]">Nombre y Apellido</label>
                   <div
-                    className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
-                    style={{
-                      backgroundColor: '#293827',
-                      padding: '14px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px'
-                    }}
+                    className="login-field"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a0a0a0', flexShrink: 0 }}>
+                    <div className="login-field-icon">
                       <IconUsers size={18} />
                     </div>
                     <input
@@ -698,16 +486,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                       placeholder="Ej: Nicolás Paiva"
                       value={regName}
                       onChange={(e) => setRegName(e.target.value)}
-                      style={{
-                        width: '100%',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        color: '#ffffff',
-                        fontSize: '14px',
-                        padding: 0
-                      }}
-                      className="placeholder-[#71856d]"
+                      className="login-field-input"
                     />
                   </div>
                 </div>
@@ -719,16 +498,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     <span className="text-[11px] text-[#65c556]">7 u 8 dígitos numéricos</span>
                   </div>
                   <div
-                    className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
-                    style={{
-                      backgroundColor: '#293827',
-                      padding: '14px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px'
-                    }}
+                    className="login-field"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a0a0a0', flexShrink: 0 }}>
+                    <div className="login-field-icon">
                       <IconCheck size={18} />
                     </div>
                     <input
@@ -736,19 +508,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                       required
                       inputMode="numeric"
                       maxLength={8}
-                      placeholder="Ej: 38456123 (sin puntos ni espacios)"
+                      placeholder="Ej: 45456123 (sin puntos ni espacios)"
                       value={regDni}
                       onChange={(e) => setRegDni(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                      style={{
-                        width: '100%',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        color: '#ffffff',
-                        fontSize: '14px',
-                        padding: 0
-                      }}
-                      className="placeholder-[#71856d] font-mono"
+                      className="login-field-input font-mono"
                     />
                   </div>
                   <span className="text-[11px] text-[#a0a0a0]">
@@ -760,34 +523,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold text-[#c0c0c0]">Correo Electrónico (Válido con dominio)</label>
                   <div
-                    className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
-                    style={{
-                      backgroundColor: '#293827',
-                      padding: '14px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px'
-                    }}
+                    className="login-field"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a0a0a0', flexShrink: 0 }}>
+                    <div className="login-field-icon">
                       <IconMail size={18} />
                     </div>
                     <input
                       type="email"
                       required
-                      placeholder="nombre@ejemplo.com"
+                      placeholder="ejemplo@correo.com"
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
-                      style={{
-                        width: '100%',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        color: '#ffffff',
-                        fontSize: '14px',
-                        padding: 0
-                      }}
-                      className="placeholder-[#71856d]"
+                      className="login-field-input"
                     />
                   </div>
                   <span className="text-[11px] text-[#a0a0a0]">
@@ -800,16 +547,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-[#c0c0c0]">Contraseña</label>
                     <div
-                      className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
-                      style={{
-                        backgroundColor: '#293827',
-                        padding: '14px 20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '16px'
-                      }}
+                      className="login-field"
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a0a0a0', flexShrink: 0 }}>
+                      <div className="login-field-icon">
                         <IconLock size={18} />
                       </div>
                       <input
@@ -819,21 +559,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                         placeholder="Mínimo 6 caracteres"
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
-                        style={{
-                          width: '100%',
-                          backgroundColor: 'transparent',
-                          border: 'none',
-                          outline: 'none',
-                          color: '#ffffff',
-                          fontSize: '14px',
-                          padding: 0
-                        }}
-                        className="placeholder-[#71856d]"
+                        className="login-field-input"
                       />
                       <button
                         type="button"
                         onClick={() => setShowRegPassword((prev) => !prev)}
-                        className="text-[#a0a0a0] hover:text-[#65c556] transition cursor-pointer shrink-0 p-1 flex items-center justify-center"
+                        className="login-password-toggle"
                         title={showRegPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
                       >
                         {showRegPassword ? <IconEyeOff size={18} /> : <IconEye size={18} />}
@@ -843,32 +574,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
                   {/* Campo Teléfono */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-[#c0c0c0]">Teléfono Móvil (Opcional)</label>
+                    <label className="text-xs font-semibold text-[#c0c0c0]">Número de teléfono (opcional)</label>
                     <div
-                      className="rounded-xl border border-[#5a7056] focus-within:border-[#65c556] transition"
-                      style={{
-                        backgroundColor: '#293827',
-                        padding: '14px 20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '16px'
-                      }}
+                      className="login-field"
                     >
                       <input
                         type="tel"
-                        placeholder="+54 11 ..."
+                        placeholder="+54 ..."
                         value={regPhone}
                         onChange={(e) => setRegPhone(e.target.value)}
-                        style={{
-                          width: '100%',
-                          backgroundColor: 'transparent',
-                          border: 'none',
-                          outline: 'none',
-                          color: '#ffffff',
-                          fontSize: '14px',
-                          padding: 0
-                        }}
-                        className="placeholder-[#71856d]"
+                        className="login-field-input"
                       />
                     </div>
                   </div>
@@ -877,7 +592,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                 <button
                   type="submit"
                   disabled={loadingRegister}
-                  className="mt-2 w-full py-3 rounded-xl bg-[#65c556] hover:bg-[#54b045] text-[#293827] font-black text-sm shadow-lg shadow-[rgba(101,197,86,0.25)] transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="login-primary-button"
                 >
                   {loadingRegister ? (
                     <>
@@ -887,7 +602,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   ) : (
                     <>
                       <IconMail size={18} />
-                      <span>Crear Cuenta y Recibir Código</span>
+                      <span>Crear Cuenta</span>
                     </>
                   )}
                 </button>

@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+
+import React, { useEffect, useState } from 'react';
+import './ListaEsperaModal.css';
 
 export interface ListaEsperaModalProps {
   isOpen: boolean;
@@ -6,7 +8,7 @@ export interface ListaEsperaModalProps {
   date: string;
   time: string;
   onClose: () => void;
-  onConfirm: (name: string, phone: string) => void;
+  onConfirm: (name: string, phone: string) => Promise<number>;
 }
 
 export const ListaEsperaModal: React.FC<ListaEsperaModalProps> = ({
@@ -17,133 +19,172 @@ export const ListaEsperaModal: React.FC<ListaEsperaModalProps> = ({
   onClose,
   onConfirm
 }) => {
-  const [name, setName] = useState('Juan Pérez');
-  const [phone, setPhone] = useState('11-4567-8901');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [queuePosition, setQueuePosition] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Reinicia el formulario incluso si el cierre proviene del componente padre.
+  useEffect(() => {
+    if (!isOpen) {
+      setName('');
+      setPhone('');
+      setSubmitted(false);
+      setIsSubmitting(false);
+      setSubmitError(null); 
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onConfirm(name, phone);
-    setQueuePosition(Math.floor(Math.random() * 2) + 1);
-    setSubmitted(true);
-  };
 
-  const handleDone = () => {
-    setSubmitted(false);
-    onClose();
-  };
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  if (isSubmitting) return;
+
+  setIsSubmitting(true);
+  setSubmitError(null);
+
+  try {
+    await onConfirm(name, phone);
+    setSubmitted(true);
+  } catch (err: unknown) {
+    setSubmitError(
+      err instanceof Error
+        ? err.message
+        : 'No se pudo completar la inscripción. Intentá nuevamente.'
+    );
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
+
+const handleDone = () => {
+  if (isSubmitting) return;
+
+  setName('');
+  setPhone('');
+  setSubmitted(false);
+  setSubmitError(null);
+  onClose();
+};
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(17, 26, 16, 0.8)' }}
+      className="ub-modal-backdrop"
       onClick={(e) => e.target === e.currentTarget && handleDone()}
     >
-      <div className="bg-[#1e281d] rounded-[16px] border border-[#5a7056] w-full max-w-[440px] shadow-[0px_20px_25px_rgba(0,0,0,0.5)] overflow-hidden text-white font-['Inter',sans-serif]">
+      <div className="ub-modal-panel espera-modal__panel">
         {!submitted ? (
-          <form onSubmit={handleSubmit} className="p-[28px] flex flex-col gap-[20px]">
+          <form onSubmit={handleSubmit} className="espera-modal__form">
             {/* Header */}
-            <div className="flex items-center gap-[12px]">
-              <div className="size-[44px] rounded-full bg-[rgba(245,158,11,0.15)] border border-[rgba(245,158,11,0.3)] flex items-center justify-center text-[22px]">
+            <div className="espera-modal__heading">
+              <div className="espera-modal__clock">
                 ⏳
               </div>
               <div>
-                <h3 className="font-bold text-[18px] text-white">Lista de Espera</h3>
-                <p className="text-[12px] text-[#a0a0a0]">Aviso de cupo liberado</p>
+                <h3 className="espera-modal__title">Lista de Espera</h3>
+                <p className="espera-modal__subtitle">Aviso de cupo liberado</p>
               </div>
             </div>
 
             {/* Slot Details Card */}
-            <div className="bg-[#293827] rounded-[10px] p-[14px] border border-[#5a7056] flex flex-col gap-[6px]">
-              <div className="flex justify-between items-center text-[13px]">
-                <span className="text-[#a0a0a0]">Cancha:</span>
-                <span className="font-semibold text-white">{courtName}</span>
+            <div className="espera-modal__slot">
+              <div className="espera-modal__detail">
+                <span className="espera-modal__muted">Cancha:</span>
+                <span className="espera-modal__value">{courtName}</span>
               </div>
-              <div className="flex justify-between items-center text-[13px]">
-                <span className="text-[#a0a0a0]">Horario seleccionado:</span>
-                <span className="font-semibold text-[#65c556]">{date} • {time}</span>
+              <div className="espera-modal__detail">
+                <span className="espera-modal__muted">Horario seleccionado:</span>
+                <span className="espera-modal__accent">{date} • {time}</span>
               </div>
-              <div className="flex justify-between items-center text-[13px]">
-                <span className="text-[#a0a0a0]">Estado actual:</span>
-                <span className="bg-[rgba(229,62,62,0.2)] text-[#e53e3e] px-2 py-0.5 rounded text-[11px] font-bold">
+              <div className="espera-modal__detail">
+                <span className="espera-modal__muted">Estado actual:</span>
+                <span className="espera-modal__occupied">
                   Turno Ocupado
                 </span>
               </div>
             </div>
 
-            <p className="text-[13px] text-[#c0c0c0] leading-relaxed">
+            <p className="espera-modal__description">
               Si el usuario actual cancela su turno con más de 24 hs de anticipación, se te notificará de inmediato para que puedas abonar la seña y confirmar la reserva.
             </p>
 
             {/* Inputs */}
-            <div className="flex flex-col gap-[12px]">
+            <div className="espera-modal__fields">
               <div>
-                <label className="text-[12px] font-medium text-[#a0a0a0] block mb-1">
+                <label className="espera-modal__label">
                   Nombre Completo
                 </label>
                 <input
                   type="text"
                   required
+                  placeholder="Ej: Juan Pérez"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-[#293827] border border-[#5a7056] rounded-[8px] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#65c556]"
+                  className="espera-modal__input"
                 />
               </div>
 
               <div>
-                <label className="text-[12px] font-medium text-[#a0a0a0] block mb-1">
+                <label className="espera-modal__label">
                   Teléfono / WhatsApp para aviso urgente
                 </label>
                 <input
                   type="text"
                   required
+                  placeholder="Ej: 11-4567-8901"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full bg-[#293827] border border-[#5a7056] rounded-[8px] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#65c556]"
+                  className="espera-modal__input"
                 />
               </div>
             </div>
 
+            {submitError && (
+              <p className="espera-modal__error" role="alert">
+                {submitError}
+              </p>
+            )}
+
             {/* Action buttons */}
-            <div className="flex items-center gap-[10px] mt-2">
+            <div className="espera-modal__actions">
               <button
                 type="button"
                 onClick={handleDone}
-                className="flex-1 py-2.5 rounded-[8px] border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold text-sm transition-colors cursor-pointer"
+                className="espera-modal__action espera-modal__action--back"
               >
                 Volver
               </button>
               <button
+                disabled={isSubmitting}
                 type="submit"
-                className="flex-1 py-2.5 rounded-[8px] bg-[#f59e0b] hover:bg-[#d97706] text-[#1e281d] font-bold text-sm transition-colors cursor-pointer"
+                className="espera-modal__action espera-modal__action--submit"
               >
-                Anotarme
+               {isSubmitting ? 'Anotando...' : 'Anotarme'}
               </button>
             </div>
           </form>
         ) : (
-          <div className="p-[32px] flex flex-col items-center text-center gap-[16px]">
-            <div className="size-[56px] rounded-full bg-[rgba(101,197,86,0.15)] border border-[#65c556] flex items-center justify-center text-[28px]">
+          <div className="espera-modal__success">
+            <div className="espera-modal__check">
               ✅
             </div>
-            <h3 className="font-bold text-[20px] text-white">¡Anotado en Lista de Espera!</h3>
-            <p className="text-[13px] text-[#c0c0c0]">
-              Has quedado registrado en la posición:
+            <h3 className="espera-modal__success-title">¡Anotado en Lista de Espera!</h3>
+            <p className="espera-modal__success-text">
+              Tu solicitud fue registrada correctamente en la lista de espera.
             </p>
-            <div className="bg-[#293827] border border-[#65c556] rounded-[12px] px-6 py-3">
-              <span className="text-[32px] font-black text-[#65c556]">#{queuePosition}</span>
-              <p className="text-[11px] text-[#a0a0a0]">en la fila de espera para este turno</p>
-            </div>
-            <p className="text-[12px] text-[#a0a0a0]">
-              Te enviaremos un aviso a <strong>{phone}</strong> si el titular cancela la reserva.
+            <p className="espera-modal__success-note">
+              Recibirás una notificación en el sistema si se libera el turno
+              y llega tu oportunidad de reservarlo.
             </p>
             <button
               type="button"
               onClick={handleDone}
-              className="w-full py-2.5 rounded-[8px] bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-bold text-sm transition-colors cursor-pointer mt-2"
+              className="espera-modal__done"
             >
               Entendido
             </button>
@@ -155,4 +196,3 @@ export const ListaEsperaModal: React.FC<ListaEsperaModalProps> = ({
 };
 
 export default ListaEsperaModal;
-

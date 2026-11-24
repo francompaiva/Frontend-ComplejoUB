@@ -1,0 +1,504 @@
+
+/* ==========================================
+   DETALLES DEL TORNEO - VENTANA EMERGENTE
+   ========================================== */
+
+/* FONDO OSCURO */
+
+.ub-modal-backdrop.torneo-detalle__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  padding: 16px;
+}
+
+/* TARJETA PRINCIPAL */
+
+.ub-modal-panel.torneo-detalle__panel {
+  width: 100%;
+  max-width: 720px;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  border-radius: 16px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.7);
+ 
+}
+
+/* ENCABEZADO Y PIE */
+
+.torneo-detalle__header,
+.torneo-detalle__footer {
+  background: var(--ub-color-background);
+  flex-shrink: 0;
+}
+
+.torneo-detalle__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--ub-color-border);
+}
+
+.torneo-detalle__heading {
+  min-width: 0;
+}
+
+/* ETIQUETAS */
+
+.torneo-detalle__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.torneo-detalle__sport,
+.torneo-detalle__status {
+  display: inline-flex;
+  padding: 3px 10px;
+  border: 1px solid;
+  border-radius: 999px;
+
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 700;
+}
+
+.torneo-detalle__sport {
+  background: rgba(101, 197, 86, 0.18);
+  color: var(--ub-color-primary);
+  border-color: rgba(101, 197, 86, 0.3);
+  text-transform: uppercase;
+}
+
+.torneo-detalle__status--progress {
+  background: rgba(101, 197, 86, 0.15);
+  color: var(--ub-color-primary);
+  border-color: rgba(101, 197, 86, 0.4);
+}
+
+.torneo-detalle__status--open {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.torneo-detalle__status--closed {
+  background: rgba(107, 114, 128, 0.2);
+  color: #d1d5db;
+  border-color: rgba(107, 114, 128, 0.4);
+}
+
+/* TÍTULO */
+
+.torneo-detalle__title {
+  color: #fff;
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 900;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+
+.torneo-detalle__dates {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+
+  font-size: 12px;
+  color: var(--ub-color-muted);
+  font-weight: 500;
+}
+
+.torneo-detalle__calendar {
+  color: var(--ub-color-primary);
+  flex-shrink: 0;
+}
+
+.torneo-detalle__close {
+  flex-shrink: 0;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 8px;
+
+  color: var(--ub-color-muted);
+  background: transparent;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.torneo-detalle__close:hover {
+  background: #344732;
+  color: #fff;
+}
+
+/* CUERPO CON SCROLL */
+
+.torneo-detalle__content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+}
+
+/* TARJETAS DE INFORMACIÓN */
+
+.torneo-detalle__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.torneo-detalle__metric {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--ub-color-border);
+  border-radius: 12px;
+  background: var(--ub-color-background);
+}
+
+.torneo-detalle__metric-label {
+  display: block;
+  color: var(--ub-color-muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.torneo-detalle__metric-value {
+  display: block;
+  margin-top: 4px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.torneo-detalle__metric-value--prize {
+  color: var(--ub-color-primary);
+  font-weight: 900;
+}
+
+.torneo-detalle__metric-value--mode {
+  color: var(--ub-color-text-secondary);
+  font-size: 12px;
+}
+
+/* CAPACIDAD DEL TORNEO */
+
+.torneo-detalle__capacity {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+
+  border: 1px solid var(--ub-color-border);
+  border-radius: 12px;
+  background: var(--ub-color-background);
+}
+
+.torneo-detalle__capacity-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  color: var(--ub-color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.torneo-detalle__capacity-numbers {
+  color: #fff;
+  font-weight: 700;
+}
+
+.torneo-detalle__capacity-numbers strong {
+  color: var(--ub-color-primary);
+}
+
+/* BARRA DE PROGRESO */
+
+.torneo-detalle__progress-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ub-color-surface);
+  border: 1px solid rgba(90, 112, 86, 0.5);
+}
+
+.torneo-detalle__progress-fill {
+  height: 100%;
+  background: var(--ub-color-primary);
+  border-radius: inherit;
+  transition: width 500ms;
+}
+
+.torneo-detalle__progress-fill.is-full {
+  background: #fbbf24;
+}
+
+/* EQUIPOS INSCRIPTOS */
+
+.torneo-detalle__teams-section {
+  min-width: 0;
+}
+
+.torneo-detalle__section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.torneo-detalle__section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.torneo-detalle__check {
+  color: var(--ub-color-primary);
+  flex-shrink: 0;
+}
+
+.torneo-detalle__availability {
+  padding: 3px 9px;
+  border: 1px solid rgba(101, 197, 86, 0.3);
+  border-radius: 999px;
+
+  background: rgba(101, 197, 86, 0.1);
+  color: var(--ub-color-primary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.torneo-detalle__availability.is-full {
+  border-color: rgba(251, 191, 36, 0.3);
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+}
+
+/* LISTADO DE EQUIPOS */
+
+.torneo-detalle__team-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.torneo-detalle__team {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+
+  border: 1px solid var(--ub-color-border);
+  border-radius: 12px;
+  background: var(--ub-color-background);
+}
+
+.torneo-detalle__team-info {
+  min-width: 0;
+}
+
+.torneo-detalle__team-name {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.torneo-detalle__captain {
+  color: var(--ub-color-muted);
+  font-size: 11px;
+}
+
+.torneo-detalle__players {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border: 1px solid var(--ub-color-border);
+  border-radius: 8px;
+
+  background: var(--ub-color-surface);
+  color: var(--ub-color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.torneo-detalle__empty {
+  padding: 24px;
+  border: 1px dashed var(--ub-color-border);
+  border-radius: 12px;
+
+  background: rgba(41, 56, 39, 0.4);
+  color: var(--ub-color-muted);
+  text-align: center;
+  font-size: 12px;
+}
+
+/* REGLAMENTO */
+
+.torneo-detalle__rules {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+
+  border: 1px solid rgba(90, 112, 86, 0.6);
+  border-radius: 12px;
+  background: rgba(41, 56, 39, 0.6);
+
+  color: var(--ub-color-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.torneo-detalle__rules h4 {
+  margin-bottom: 4px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+/* BOTONES INFERIORES */
+
+.torneo-detalle__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--ub-color-border);
+}
+
+.torneo-detalle__footer-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.torneo-detalle__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 20px;
+  border-radius: 12px;
+
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+
+  transition: background-color 150ms, color 150ms;
+}
+
+.torneo-detalle__button--close {
+  border: 1px solid var(--ub-color-border);
+  color: var(--ub-color-text-secondary);
+}
+
+.torneo-detalle__button--close:hover {
+  color: #fff;
+}
+
+.torneo-detalle__button--fixture {
+  border: 1px solid var(--ub-color-border);
+  background: var(--ub-color-surface);
+  color: var(--ub-color-primary);
+}
+
+.torneo-detalle__button--fixture:hover {
+  background: #344732;
+}
+
+.torneo-detalle__button--join {
+  border: 0;
+  background: var(--ub-color-primary);
+  color: var(--ub-color-background);
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 10px 15px -3px rgba(101, 197, 86, 0.2);
+}
+
+.torneo-detalle__button--join:hover {
+  background: #54b045;
+}
+
+
+
+/* PANTALLAS GRANDES */
+
+@media (min-width: 640px) {
+  .torneo-detalle__metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .torneo-detalle__team-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* PANTALLAS PEQUEÑAS */
+
+@media (max-width: 560px) {
+  .torneo-detalle__header,
+  .torneo-detalle__content {
+    padding: 16px;
+  }
+
+  .torneo-detalle__footer {
+    padding: 12px 16px;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .torneo-detalle__footer-actions {
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .torneo-detalle__button,
+  .torneo-detalle__footer-actions > .torneo-detalle__button {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .torneo-detalle__progress-fill {
+    transition: none;
+  }
+}

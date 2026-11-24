@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import { type FixtureMatch } from '../data/mockData';
+import { estadoVisiblePartido } from '../utils/partidos';
 
 export interface ArbitroPanelProps {
   onNavigate?: (screen: any) => void;
@@ -192,7 +193,7 @@ export const ArbitroPanel: React.FC<ArbitroPanelProps> = ({ onNavigate }) => {
                           : 'bg-[rgba(245,158,11,0.2)] text-[#f59e0b]'
                       }`}
                     >
-                      {m.status}
+                      {estadoVisiblePartido(m)}
                     </span>
                   </div>
 

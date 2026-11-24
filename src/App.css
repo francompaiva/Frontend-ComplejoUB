@@ -133,6 +133,7 @@
     .button-icon {
       height: 18px;
       width: 18px;
+      
     }
   }
 
@@ -181,4 +182,12 @@
     right: 0;
     border-right-color: var(--border);
   }
+}
+
+.app-header-logo {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
 }

@@ -1,4 +1,7 @@
+
 import React from 'react';
+import { createPortal } from 'react-dom';
+import './CancelacionConfirmModal.css';
 
 export interface CancelacionConfirmModalProps {
   isOpen: boolean;
@@ -6,113 +9,190 @@ export interface CancelacionConfirmModalProps {
   isRefundable?: boolean;
   hoursUntilMatch?: number;
   depositAmount?: number;
+  errorMessage?: string | null;
+  isSubmitting?: boolean;
   onClose: () => void;
   onConfirm: () => void;
 }
 
-export const CancelacionConfirmModal: React.FC<CancelacionConfirmModalProps> = ({
+export const CancelacionConfirmModal: React.FC<
+  CancelacionConfirmModalProps
+> = ({
   isOpen,
   bookingName,
   isRefundable = false,
   hoursUntilMatch,
   depositAmount = 5400,
+  errorMessage = null,
+  isSubmitting = false,
   onClose,
   onConfirm
 }) => {
   if (!isOpen) return null;
 
-  return (
+  const horasRestantes =
+    hoursUntilMatch !== undefined
+      ? Math.max(0, Math.round(hoursUntilMatch))
+      : null;
+
+  const montoFormateado = depositAmount.toLocaleString('es-AR');
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(17, 26, 16, 0.8)' }}
+      className="ub-modal-backdrop cancelacion-modal__overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div
-        className="bg-[#1e281d] rounded-[16px] border border-[#5a7056] w-full max-w-[440px] shadow-[0px_20px_25px_rgba(0,0,0,0.5)] overflow-hidden text-white font-['Inter',sans-serif]"
-        style={{ animation: 'modalIn 0.25s ease-out' }}
+      <section
+        className="ub-modal-panel cancelacion-modal__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cancelacion-modal-title"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-[28px] pt-[28px] pb-[20px] flex flex-col gap-[14px]">
-          {/* Header icon badge */}
-          <div className="flex items-center gap-[12px]">
-            <div
-              className={`size-[48px] rounded-full flex items-center justify-center text-[24px] border ${
+        {/* ENCABEZADO */}
+        <header className="cancelacion-modal__header">
+          <div className="cancelacion-modal__heading">
+            <span
+              className={`cancelacion-modal__icon ${
                 isRefundable
-                  ? 'bg-[rgba(101,197,86,0.15)] border-[rgba(101,197,86,0.3)] text-[#65c556]'
-                  : 'bg-[rgba(229,62,62,0.15)] border-[rgba(229,62,62,0.3)] text-[#e53e3e]'
+                  ? 'cancelacion-modal__icon--refund'
+                  : 'cancelacion-modal__icon--warning'
               }`}
+              aria-hidden="true"
             >
-              {isRefundable ? '↩️' : '⚠️'}
-            </div>
+              {isRefundable ? '↩' : '!'}
+            </span>
+
             <div>
-              <h3 className="font-bold text-[18px] text-white">¿Confirmar Cancelación?</h3>
-              <p className="text-[12px] text-[#a0a0a0]">Política de Cancelaciones</p>
+              <h2
+                id="cancelacion-modal-title"
+                className="cancelacion-modal__title"
+              >
+                ¿Confirmar cancelación?
+              </h2>
+
+              <p className="cancelacion-modal__subtitle">
+                Política de cancelaciones
+              </p>
             </div>
           </div>
 
+          <button
+            type="button"
+            className="cancelacion-modal__close"
+            onClick={onClose}
+            aria-label="Cerrar ventana"
+            disabled={isSubmitting}
+          >
+            ✕
+          </button>
+        </header>
+
+        {/* CONTENIDO */}
+        <div className="cancelacion-modal__body">
           {bookingName && (
-            <div className="bg-[#293827] rounded-[8px] p-[12px] border border-[#5a7056]">
-              <span className="text-[11px] text-[#a0a0a0] block uppercase font-medium">Turno seleccionado</span>
-              <p className="font-bold text-[14px] text-white mt-0.5">{bookingName}</p>
+            <div className="cancelacion-modal__booking">
+              <span className="cancelacion-modal__label">
+                TURNO SELECCIONADO
+              </span>
+
+              <strong>{bookingName}</strong>
             </div>
           )}
 
-          {/* Bloque de verificación determinado centralizadamente por el backend */}
           {isRefundable ? (
-            <div className="bg-[rgba(101,197,86,0.12)] border border-[#65c556] rounded-[10px] p-[14px] flex flex-col gap-1.5">
-              <div className="flex items-center gap-1.5 text-[#65c556] font-bold text-[13px]">
-                <span>✓ Reintegro total de seña {hoursUntilMatch !== undefined ? `(Anticipación: ${Math.round(hoursUntilMatch)} hs restantes)` : ''}</span>
-              </div>
-              <p className="text-[12px] text-[#c0c0c0] leading-relaxed">
-                Corresponde la <strong>devolución íntegra de la seña abonada</strong> según la política del complejo (&gt;24 hs). Se acreditará a tu medio de pago original.
+            <div className="cancelacion-modal__notice cancelacion-modal__notice--refund">
+              <h3>
+                ✓ Reintegro total de la seña
+              </h3>
+
+              {horasRestantes !== null && (
+                <p className="cancelacion-modal__hours">
+                  Anticipación: {horasRestantes} horas
+                </p>
+              )}
+
+              <p>
+                Corresponde la devolución íntegra de la seña
+                abonada, según la política del complejo para
+                cancelaciones con más de 24 horas de anticipación.
               </p>
-              <div className="flex justify-between items-center text-[13px] pt-1 border-t border-[rgba(101,197,86,0.2)]">
-                <span className="text-[#a0a0a0]">Monto a reintegrar:</span>
-                <span className="font-extrabold text-[15px] text-[#65c556]">
-                  ${depositAmount.toLocaleString('es-AR')}
-                </span>
+
+              <div className="cancelacion-modal__amount">
+                <span>Monto a reintegrar</span>
+                <strong>${montoFormateado}</strong>
               </div>
             </div>
           ) : (
-            <div className="bg-[rgba(229,62,62,0.12)] border border-[#e53e3e] rounded-[10px] p-[14px] flex flex-col gap-1.5">
-              <div className="flex items-center gap-1.5 text-[#e53e3e] font-bold text-[13px]">
-                <span>⚠️ Retención de seña {hoursUntilMatch !== undefined ? `(Anticipación: ${Math.max(0, Math.round(hoursUntilMatch))} hs restantes)` : ''}</span>
-              </div>
-              <p className="text-[12px] text-[#c0c0c0] leading-relaxed">
-                Por cancelarse con menos de 24 horas de antelación, <strong>la seña de ${depositAmount.toLocaleString('es-AR')} no será devuelta (devolución: $0)</strong> y queda retenida como compensación por el turno no ocupado.
+            <div className="cancelacion-modal__notice cancelacion-modal__notice--warning">
+              <h3>
+                ! Seña no reembolsable
+              </h3>
+
+              {horasRestantes !== null && (
+                <p className="cancelacion-modal__hours">
+                  Anticipación: {horasRestantes} horas
+                </p>
+              )}
+
+              <p>
+                Al cancelar con menos de 24 horas de
+                anticipación, la seña abonada no será
+                reintegrada.
               </p>
+
+              <div className="cancelacion-modal__amount">
+                <span>Seña retenida</span>
+                <strong>${montoFormateado}</strong>
+              </div>
             </div>
           )}
 
-          <p className="text-[11px] text-[#a0a0a0]">
-            Al confirmar, el turno se liberará de inmediato para los usuarios en lista de espera y el público general.
+          <p className="cancelacion-modal__description">
+            Al confirmar, el turno se liberará para que otros
+            usuarios puedan reservarlo.
           </p>
+
+          {errorMessage && (
+            <div
+              className="cancelacion-modal__notice cancelacion-modal__notice--warning"
+              role="alert"
+            >
+              <h3>No se pudo confirmar la cancelación</h3>
+              <p>{errorMessage}</p>
+            </div>
+          )}
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-[10px] px-[28px] pb-[24px]">
+        {/* PIE DE LA VENTANA */}
+        <footer className="cancelacion-modal__footer">
           <button
             type="button"
+            className="cancelacion-modal__button cancelacion-modal__button--back"
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-[8px] border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold text-xs transition-colors cursor-pointer"
+            disabled={isSubmitting}
           >
-            No, mantener turno
+            Mantener turno
           </button>
+
           <button
             type="button"
-            onClick={onConfirm}
-            className={`flex-1 py-2.5 rounded-[8px] font-bold text-xs transition-colors cursor-pointer ${
+            className={`cancelacion-modal__button ${
               isRefundable
-                ? 'bg-[#65c556] hover:bg-[#57ef40] text-[#293827]'
-                : 'bg-[#e53e3e] hover:bg-[#c53030] text-white'
+                ? 'cancelacion-modal__button--confirm'
+                : 'cancelacion-modal__button--danger'
             }`}
+            onClick={onConfirm}
+            disabled={isSubmitting}
           >
-            Sí, cancelar turno
+            {isSubmitting ? 'Cancelando...' : 'Cancelar turno'}
           </button>
-        </div>
-      </div>
-    </div>
+        </footer>
+      </section>
+    </div>,
+    document.body
   );
 };
 

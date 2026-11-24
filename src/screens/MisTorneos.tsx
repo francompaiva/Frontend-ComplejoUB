@@ -1,365 +1,471 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useEffect, useMemo, useState } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
-import type { StandingRow, FixtureMatch, Tournament } from '../data/mockData';
+import type { FixtureMatch, StandingRow, Tournament } from '../data/mockData';
 import { IconPlus } from '../components/Icons';
 import TorneoDetalleModal from '../components/TorneoDetalleModal';
+import './MisTorneos.css';
+import { estadoVisiblePartido } from '../utils/partidos';
 
 interface MisTorneosProps {
-  onNavigate: (screen: any) => void;
+  onNavigate: (screen: string) => void;
   onOpenInscripcion: (tournamentId?: string) => void;
 }
 
-export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscripcion }) => {
-  const { tournaments, standings, fixtures, userRole, fetchTorneoData } = useComplejo();
-  const [selectedTorneoId, setSelectedTorneoId] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'posiciones' | 'fixture'>('posiciones');
+type FiltroTorneos = 'actuales' | 'abiertos' | 'en-curso' | 'finalizados';
+type PestanaDetalle = 'posiciones' | 'fixture';
+
+const admiteInscripciones = (torneo: Tournament) =>
+  torneo.status === 'Inscripciones abiertas' &&
+  (torneo.registeredTeams || []).length < (torneo.maxTeams || 8);
+
+const claseEstado = (estado: Tournament['status']) =>
+  estado === 'Inscripciones abiertas'
+    ? 'is-open'
+    : estado === 'En curso'
+      ? 'is-progress'
+      : 'is-finished';
+
+export const MisTorneos: React.FC<MisTorneosProps> = ({
+  onOpenInscripcion
+}) => {
+  const {
+    tournaments,
+    standings,
+    fixtures,
+    userRole,
+    fetchTorneoData
+  } = useComplejo();
+
+  const [filtro, setFiltro] = useState<FiltroTorneos>('actuales');
+  const [selectedTorneoId, setSelectedTorneoId] = useState('');
+  const [activeTab, setActiveTab] = useState<PestanaDetalle>('posiciones');
   const [detailModalTorneo, setDetailModalTorneo] = useState<Tournament | null>(null);
 
-  useEffect(() => {
-    if (tournaments.length > 0) {
-      const exists = tournaments.some(t => t.id === selectedTorneoId);
-      const defaultTorneo = tournaments.find(t => t.status === 'En curso') || tournaments[0];
-      const targetId = exists ? selectedTorneoId : defaultTorneo.id;
-      if (targetId !== selectedTorneoId) {
-        setSelectedTorneoId(targetId);
-      }
-      fetchTorneoData(targetId);
-    }
-  }, [tournaments, selectedTorneoId, fetchTorneoData]);
-
-  const selectedTorneo = tournaments.find(t => t.id === selectedTorneoId) || tournaments[0] || {
-    id: '1',
-    name: 'Copa Verano - Fútbol 5',
-    sport: 'Fútbol 5',
-    status: 'En curso',
-    dates: '20 - 25 Oct',
-    maxTeams: 6,
-    registeredTeams: [],
-    entryFee: 50000,
-    matchFee: 8000,
-    prize: 'Trofeo y $200.000',
-    format: 'Liga (Todos contra todos)',
-  };
-
-  const filteredFixtures = fixtures.filter(
-    f => String(f.tournamentId) === String(selectedTorneo.id) || Boolean(f.tournamentName && selectedTorneo?.name && f.tournamentName.includes(selectedTorneo.name))
+  // Torneos abiertos que todavía tienen cupos.
+  const torneosAbiertos = useMemo(
+    () => tournaments.filter(admiteInscripciones),
+    [tournaments]
   );
 
-  return (
-    <div className="flex flex-col min-h-screen bg-[#293827] text-white font-['Inter',sans-serif]">
+  // Filtrado de torneos según su estado.
+  const torneosVisibles = useMemo(() => tournaments.filter((torneo) => {
+    if (filtro === 'actuales') {
+      return torneo.status !== 'Finalizado';
+    }
 
-      {/* Main Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 lg:px-12 py-10">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    if (filtro === 'abiertos') {
+      return torneo.status === 'Inscripciones abiertas';
+    }
+
+    if (filtro === 'en-curso') {
+      return torneo.status === 'En curso';
+    }
+
+    return torneo.status === 'Finalizado';
+  }), [tournaments, filtro]);
+
+  // Selecciona un torneo real dentro del filtro actual.
+  const selectedTorneo =
+    torneosVisibles.find(t => t.id === selectedTorneoId) ||
+    torneosVisibles[0] ||
+    null;
+
+  // Obtiene el fixture y las posiciones del torneo seleccionado.
+  useEffect(() => {
+    if (selectedTorneo) {
+      void fetchTorneoData(selectedTorneo.id);
+    }
+  }, [selectedTorneo?.id, fetchTorneoData]);
+
+  const filteredFixtures = selectedTorneo
+    ? fixtures.filter(f =>
+        String(f.tournamentId) === String(selectedTorneo.id) ||
+        Boolean(
+          f.tournamentName &&
+          f.tournamentName.includes(selectedTorneo.name)
+        )
+      )
+    : [];
+
+  const handleSelectTorneo = (id: string) => {
+    setSelectedTorneoId(id);
+
+    document
+      .getElementById('torneo-activo-detalle')
+      ?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const abrirInscripcion = () => {
+    const elegido =
+      selectedTorneo && admiteInscripciones(selectedTorneo)
+        ? selectedTorneo
+        : torneosAbiertos[0];
+
+    if (elegido) {
+      onOpenInscripcion(elegido.id);
+    }
+  };
+
+  return (
+    <div className="mt-page">
+      <main className="mt-main">
+
+        {/* ENCABEZADO */}
+        <header className="mt-page-header">
           <div>
-            <h1 className="text-3xl font-black text-white">Torneos del Complejo</h1>
-            <p className="text-[#a3b89e] mt-1 text-sm">
-              Competencias oficiales modalidad liga. Consulta tablas de posiciones, fixtures e inscribe a tu equipo.
+            <h1 className="mt-page-title">
+              Torneos del Complejo
+            </h1>
+
+            <p className="mt-page-description">
+              Competencias oficiales modalidad liga. Consultá posiciones,
+              fixtures e inscribí a tu equipo.
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => onNavigate('landing')}
-              className="inline-flex items-center justify-center gap-2 bg-[#1e281d] hover:bg-[#3b4d38] border border-[#5a7056] text-[#c0c0c0] hover:text-white font-semibold px-5 py-3 rounded-xl transition cursor-pointer text-xs min-h-[44px]"
-            >
-              ← Volver a Canchas
-            </button>
-            {userRole !== 'arbitro' && (
+
+        </header>
+
+        {/* FILTROS DE TORNEOS */}
+        <div className="mt-filters" aria-label="Filtrar torneos">
+          <button
+            type="button"
+            className={`mt-filter${filtro === 'actuales' ? ' is-active' : ''}`}
+            onClick={() => setFiltro('actuales')}
+          >
+            Actuales
+          </button>
+
+          <button
+            type="button"
+            className={`mt-filter${filtro === 'abiertos' ? ' is-active' : ''}`}
+            onClick={() => setFiltro('abiertos')}
+          >
+            Inscripciones abiertas
+          </button>
+
+          <button
+            type="button"
+            className={`mt-filter${filtro === 'en-curso' ? ' is-active' : ''}`}
+            onClick={() => setFiltro('en-curso')}
+          >
+            En curso
+          </button>
+
+          <button
+            type="button"
+            className={`mt-filter${filtro === 'finalizados' ? ' is-active' : ''}`}
+            onClick={() => setFiltro('finalizados')}
+          >
+            Historial (finalizados)
+          </button>
+
+          <div className="mt-page-actions">
+        
+            {userRole !== 'arbitro' && torneosAbiertos.length > 0 && (
               <button
-                onClick={() => {
-                  const openTorneo = tournaments.find(t => t.status === 'Inscripciones abiertas');
-                  const targetId = selectedTorneo?.status === 'Inscripciones abiertas' ? selectedTorneo.id : (openTorneo?.id || selectedTorneo?.id);
-                  onOpenInscripcion(targetId);
-                }}
-                className="inline-flex items-center justify-center gap-2 bg-[#65c556] hover:bg-[#54b045] text-[#141b13] font-black px-6 py-3 rounded-xl shadow-lg shadow-[#65c556]/20 transition cursor-pointer text-sm min-h-[44px]"
+                type="button"
+                onClick={abrirInscripcion}
+                className="mt-button mt-button--join"
               >
-                <IconPlus size={18} className="shrink-0" />
+                <IconPlus size={18} />
                 Inscribir Mi Equipo
               </button>
             )}
           </div>
         </div>
 
-        {/* Torneos Grid Cards (Figma 242:1726) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {tournaments.map((torneo) => {
-            const isSelected = torneo.id === selectedTorneoId;
-            return (
-              <div
-                key={torneo.id}
-                onClick={() => {
-                  setSelectedTorneoId(torneo.id);
-                  document.getElementById('torneo-activo-detalle')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className={`bg-[#344732] rounded-xl border p-5 flex flex-col justify-between transition cursor-pointer hover:border-[#65c556] ${
-                  isSelected ? 'border-[#65c556] ring-1 ring-[#65c556] shadow-lg' : 'border-[#445941]'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-bold px-2.5 py-1 rounded bg-[#3c503a] text-[#65c556]">
-                      {torneo.sport}
-                    </span>
-                    <span
-                      className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                        torneo.status === 'En curso'
-                          ? 'bg-[#65c556]/20 text-[#65c556]'
-                          : torneo.status === 'Inscripciones abiertas'
-                          ? 'bg-blue-400/20 text-blue-300'
-                          : 'bg-gray-500/20 text-gray-300'
-                      }`}
-                    >
-                      {torneo.status}
-                    </span>
-                  </div>
-
-                  <h3 className="font-extrabold text-lg text-white mb-1 line-clamp-1">{torneo.name}</h3>
-                  <p className="text-xs text-[#a3b89e] mb-4">
-                    📅 {torneo.dates} | 👥 {(torneo.registeredTeams || []).length}/{torneo.maxTeams || 8} Equipos
-                  </p>
-                </div>
-
-                <div className="pt-4 border-t border-[#445941] flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#a3b89e]">Modalidad Liga</span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedTorneoId(torneo.id);
-                      setDetailModalTorneo(torneo);
-                    }}
-                    className="text-xs font-bold text-[#65c556] hover:text-[#54b045] underline flex items-center gap-1 cursor-pointer py-1"
-                  >
-                    <span>Ver Detalles</span>
-                    <span>→</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Torneo Activo: Pestañas de Posiciones y Fixture */}
-        <div id="torneo-activo-detalle" className="bg-[#344732] rounded-xl border border-[#445941] overflow-hidden shadow-xl">
-          <div className="p-6 border-b border-[#445941] flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-2xl font-black text-white">{selectedTorneo.name}</h2>
-                <span className="text-xs font-bold px-2.5 py-1 rounded bg-[#293827] text-[#65c556] border border-[#445941]">
-                  {selectedTorneo.sport}
-                </span>
-              </div>
-              <p className="text-xs text-[#a3b89e] mt-1">
-                Fechas: {selectedTorneo.dates} — Sistema de puntos: Victoria 3 pts, Empate 1 pt, Derrota 0 pts.
-              </p>
-            </div>
-
-            <div className="flex bg-[#293827] p-1.5 rounded-xl border border-[#445941] gap-1">
-              <button
-                type="button"
-                onClick={() => setActiveTab('posiciones')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-                  activeTab === 'posiciones'
-                    ? 'bg-[#65c556] text-[#141b13] font-black shadow-sm'
-                    : 'text-[#a3b89e] hover:text-white hover:bg-[#344732]'
-                }`}
-              >
-                Tabla de Posiciones
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('fixture')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-                  activeTab === 'fixture'
-                    ? 'bg-[#65c556] text-[#141b13] font-black shadow-sm'
-                    : 'text-[#a3b89e] hover:text-white hover:bg-[#344732]'
-                }`}
-              >
-                Fixture & Partidos
-              </button>
-            </div>
+        {/* LISTADO DE TORNEOS */}
+        {torneosVisibles.length === 0 ? (
+          <div className="mt-empty-list" role="status">
+            {tournaments.length === 0
+              ? 'Todavía no hay torneos para mostrar.'
+              : filtro === 'finalizados'
+                ? 'Todavía no hay torneos finalizados.'
+                : 'No hay torneos en esta categoría.'}
           </div>
+        ) : (
+          <>
+            <div className="mt-tournament-grid">
+              {torneosVisibles.map((torneo) => {
+                const isSelected = torneo.id === selectedTorneo?.id;
 
-          {/* TAB 1: Tabla de Posiciones */}
-          {activeTab === 'posiciones' && (
-            <div className="p-6 overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#445941] text-[#a3b89e] text-xs uppercase tracking-wider">
-                    <th className="py-3 px-4">#</th>
-                    <th className="py-3 px-4">Equipo</th>
-                    <th className="py-3 px-4 text-center">PTS</th>
-                    <th className="py-3 px-4 text-center">PJ</th>
-                    <th className="py-3 px-4 text-center">PG</th>
-                    <th className="py-3 px-4 text-center">PE</th>
-                    <th className="py-3 px-4 text-center">PP</th>
-                    <th className="py-3 px-4 text-center">GF</th>
-                    <th className="py-3 px-4 text-center">GC</th>
-                    <th className="py-3 px-4 text-center">DG</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#445941]">
-                  {standings.map((team: StandingRow, idx: number) => {
-                    const diffGoles = team.gf - team.gc;
-                    return (
-                      <tr
-                        key={team.team}
-                        className={`hover:bg-[#3c503a]/50 transition ${
-                          idx === 0 ? 'bg-[#65c556]/5' : ''
-                        }`}
-                      >
-                        <td className="py-3 px-4 font-black">
-                          <span
-                            className={`size-6 rounded-full inline-flex items-center justify-center text-xs ${
-                              idx === 0
-                                ? 'bg-[#65c556] text-[#141b13] font-black'
-                                : idx === 1
-                                ? 'bg-amber-400 text-[#141b13] font-black'
-                                : 'text-[#a3b89e]'
-                            }`}
-                          >
-                            {team.pos}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 font-bold text-white flex items-center gap-2">
-                          {team.team}
-                          {idx === 0 && (
-                            <span className="text-[10px] bg-[#65c556]/20 text-[#65c556] px-1.5 py-0.5 rounded font-extrabold">
-                              Líder
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-center font-black text-[#65c556] text-base">
-                          {team.pts}
-                        </td>
-                        <td className="py-3 px-4 text-center text-[#a3b89e] font-medium">{team.pj}</td>
-                        <td className="py-3 px-4 text-center font-medium">{team.pg}</td>
-                        <td className="py-3 px-4 text-center font-medium">{team.pe}</td>
-                        <td className="py-3 px-4 text-center font-medium">{team.pp}</td>
-                        <td className="py-3 px-4 text-center text-[#a3b89e] font-medium">{team.gf}</td>
-                        <td className="py-3 px-4 text-center text-[#a3b89e] font-medium">{team.gc}</td>
-                        <td
-                          className={`py-3 px-4 text-center font-bold ${
-                            diffGoles > 0
-                              ? 'text-[#65c556]'
-                              : diffGoles < 0
-                              ? 'text-red-400'
-                              : 'text-white'
-                          }`}
-                        >
-                          {diffGoles > 0 ? `+${diffGoles}` : diffGoles}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* TAB 2: Fixture */}
-          {activeTab === 'fixture' && (
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredFixtures.map((match: FixtureMatch) => (
+                return (
                   <div
-                    key={match.id}
-                    className="bg-[#293827] rounded-xl border border-[#445941] p-5 flex flex-col justify-between"
+                    key={torneo.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleSelectTorneo(torneo.id)}
+                    onKeyDown={(e) => {
+                      if (
+                        e.target === e.currentTarget &&
+                        (e.key === 'Enter' || e.key === ' ')
+                      ) {
+                        e.preventDefault();
+                        handleSelectTorneo(torneo.id);
+                      }
+                    }}
+                    className={`mt-tournament-card${isSelected ? ' is-selected' : ''}`}
                   >
-                    <div className="flex items-center justify-between text-xs text-[#a3b89e] mb-3">
-                      <span className="font-bold text-[#65c556]">{match.round} - {match.date} {match.time}</span>
-                      <span className="bg-[#344732] px-2 py-0.5 rounded border border-[#445941]">
-                        {match.court}
-                      </span>
-                    </div>
+                    <div>
+                      <div className="mt-card-topline">
+                        <span className="mt-sport-tag">
+                          {torneo.sport}
+                        </span>
 
-                    <div className="flex items-center justify-between py-3">
-                      <div className="flex-1 text-right">
-                        <span className="font-extrabold text-base text-white">{match.homeTeam}</span>
-                      </div>
-
-                      <div className="px-5 text-center">
-                        {match.status === 'Disputado' ? (
-                          <div className="bg-[#344732] px-3 py-1 rounded border border-[#445941] font-black text-lg text-[#65c556]">
-                            {match.homeScore} - {match.awayScore}
-                          </div>
-                        ) : match.isFreeDate ? (
-                          <div className="text-xs font-bold text-amber-400 bg-[#344732] px-3 py-1 rounded">
-                            Fecha Libre
-                          </div>
-                        ) : (
-                          <div className="text-xs font-bold text-[#a3b89e] bg-[#344732] px-3 py-1 rounded">
-                            VS
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex-1 text-left">
-                        <span className="font-extrabold text-base text-white">
-                          {match.isFreeDate ? '(Descanso)' : match.awayTeam}
+                        <span
+                          className={`mt-status-tag ${claseEstado(torneo.status)}`}
+                        >
+                          {torneo.status}
                         </span>
                       </div>
+
+                      <h3 className="mt-card-title" title={torneo.name}>
+                        {torneo.name}
+                      </h3>
+
+                      <p className="mt-card-description">
+                        📅 {torneo.dates} | 👥 {' '}
+                        {(torneo.registeredTeams || []).length}/
+                        {torneo.maxTeams || 8} Equipos
+                      </p>
                     </div>
 
-                    <div className="pt-3 border-t border-[#445941] flex items-center justify-between text-xs">
-                      <span className="text-[#a3b89e]">Árbitro: {match.refereeName || 'Designado por el complejo'}</span>
-                      <span
-                        className={`font-bold px-2 py-0.5 rounded text-[11px] ${
-                          match.status === 'Disputado'
-                            ? 'bg-[#65c556]/20 text-[#65c556]'
-                            : 'bg-amber-400/20 text-amber-400'
-                        }`}
+                    <div className="mt-card-footer">
+                      <span>Modalidad Liga</span>
+
+                      <button
+                        type="button"
+                        className="mt-details-link"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedTorneoId(torneo.id);
+                          setDetailModalTorneo(torneo);
+                        }}
                       >
-                        {match.status}
-                      </span>
+                        Ver Detalles
+                        <span aria-hidden="true">→</span>
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          )}
-        </div>
+
+            {/* DETALLE DEL TORNEO SELECCIONADO */}
+            {selectedTorneo && (
+              <section
+                id="torneo-activo-detalle"
+                className="mt-tournament-detail"
+              >
+                <div className="mt-detail-header">
+                  <div>
+                    <div className="mt-detail-heading">
+                      <h2>{selectedTorneo.name}</h2>
+
+                      <span className="mt-detail-sport">
+                        {selectedTorneo.sport}
+                      </span>
+                    </div>
+
+                    <p className="mt-detail-dates">
+                      Fechas: {selectedTorneo.dates} — Sistema de puntos:
+                      Victoria 3 pts, Empate 1 pt, Derrota 0 pts.
+                    </p>
+                  </div>
+
+                  <div className="mt-detail-tabs">
+                    <button
+                      type="button"
+                      className={`mt-detail-tab${
+                        activeTab === 'posiciones' ? ' is-active' : ''
+                      }`}
+                      onClick={() => setActiveTab('posiciones')}
+                    >
+                      Tabla de Posiciones
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`mt-detail-tab${
+                        activeTab === 'fixture' ? ' is-active' : ''
+                      }`}
+                      onClick={() => setActiveTab('fixture')}
+                    >
+                      Fixture & Partidos
+                    </button>
+                  </div>
+                </div>
+
+                {/* TABLA DE POSICIONES */}
+                {activeTab === 'posiciones' && (
+                  <div className="mt-table-scroll">
+                    {standings.length === 0 ? (
+                      <p className="mt-empty-detail">
+                        Todavía no hay posiciones registradas para este torneo.
+                      </p>
+                    ) : (
+                      <table className="mt-standings-table">
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>Equipo</th>
+                            <th>PTS</th>
+                            <th>PJ</th>
+                            <th>PG</th>
+                            <th>PE</th>
+                            <th>PP</th>
+                            <th>GF</th>
+                            <th>GC</th>
+                            <th>DG</th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {standings.map((team: StandingRow, idx: number) => {
+                            const diferencia = team.gf - team.gc;
+
+                            return (
+                              <tr
+                                key={team.team}
+                                className={idx === 0 ? 'is-leader' : ''}
+                              >
+                                <td>
+                                  <span
+                                    className={`mt-rank${
+                                      idx === 0
+                                        ? ' is-first'
+                                        : idx === 1
+                                          ? ' is-second'
+                                          : ''
+                                    }`}
+                                  >
+                                    {team.pos}
+                                  </span>
+                                </td>
+
+                                <td className="mt-team-name">
+                                  {team.team}
+
+                                  {idx === 0 && (
+                                    <span className="mt-leader-label">
+                                      Líder
+                                    </span>
+                                  )}
+                                </td>
+
+                                <td className="mt-points">{team.pts}</td>
+                                <td>{team.pj}</td>
+                                <td>{team.pg}</td>
+                                <td>{team.pe}</td>
+                                <td>{team.pp}</td>
+                                <td>{team.gf}</td>
+                                <td>{team.gc}</td>
+
+                                <td
+                                  className={
+                                    diferencia > 0
+                                      ? 'mt-positive'
+                                      : diferencia < 0
+                                        ? 'mt-negative'
+                                        : ''
+                                  }
+                                >
+                                  {diferencia > 0
+                                    ? `+${diferencia}`
+                                    : diferencia}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+
+                {/* FIXTURE Y PARTIDOS */}
+                {activeTab === 'fixture' && (
+                  <div className="mt-fixture-content">
+                    {filteredFixtures.length === 0 ? (
+                      <p className="mt-empty-detail">
+                        Todavía no hay partidos programados para este torneo.
+                      </p>
+                    ) : (
+                      <div className="mt-fixture-grid">
+                        {filteredFixtures.map((match: FixtureMatch) => (
+                          <div
+                            key={match.id}
+                            className="mt-match-card"
+                          >
+                            <div className="mt-match-topline">
+                              <span className="mt-match-round">
+                                {match.round} - {match.date} {match.time}
+                              </span>
+
+                              <span className="mt-match-court">
+                                {match.court}
+                              </span>
+                            </div>
+
+                            <div className="mt-match-teams">
+                              <div className="mt-match-home">
+                                {match.homeTeam}
+                              </div>
+
+                              <div className="mt-match-score">
+                                {match.status === 'Disputado' ? (
+                                  <span className="mt-score">
+                                    {match.homeScore} - {match.awayScore}
+                                  </span>
+                                ) : match.isFreeDate ? (
+                                  <span className="mt-free-date">
+                                    Fecha Libre
+                                  </span>
+                                ) : (
+                                  <span className="mt-versus">
+                                    VS
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="mt-match-away">
+                                {match.isFreeDate
+                                  ? '(Descanso)'
+                                  : match.awayTeam}
+                              </div>
+                            </div>
+
+                            <div className="mt-match-footer">
+                              <span>
+                                Árbitro: {match.refereeName ||
+                                  'Designado por el complejo'}
+                              </span>
+
+                              <span
+                                className={`mt-match-status${
+                                  match.status === 'Disputado'
+                                    ? ' is-played'
+                                    : ''
+                                }`}
+                              >
+                                {estadoVisiblePartido(match)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
+          </>
+        )}
       </main>
 
-      {/* Footer (Figma 242:1726) */}
-      <footer className="bg-[#293827] border-t border-[#445941] py-12 px-6 lg:px-12 mt-12 text-[#a3b89e] text-xs">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-          <div>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="size-8 bg-[#65c556] rounded flex items-center justify-center font-black text-[#141b13]">
-                UB
-              </div>
-              <span className="font-extrabold text-white text-base">Complejo Deportivo UB</span>
-            </div>
-            <p className="leading-relaxed">
-              La mejor infraestructura deportiva de la región. Canchas de fútbol, tenis y pádel de última generación.
-            </p>
-          </div>
 
-          <div>
-            <h4 className="font-bold text-white text-sm mb-3">Contacto</h4>
-            <p className="mb-1">Tel: (555) 123-4567</p>
-            <p className="mb-1">info@complejoub.com</p>
-            <p>Av. Deporte 432, Mendoza</p>
-          </div>
-
-          <div>
-            <h4 className="font-bold text-white text-sm mb-3">Horarios del Predio</h4>
-            <p className="mb-1">Lunes a Sábados: 08:00 a 00:00 hs</p>
-            <p>Domingos: 09:00 a 22:00 hs</p>
-          </div>
-        </div>
-
-        <div className="max-w-7xl mx-auto pt-6 border-t border-[#445941] flex flex-col md:flex-row items-center justify-between gap-4">
-          <p>© 2026 Complejo Deportivo UB. Todos los derechos reservados.</p>
-          <div className="flex gap-6">
-            <a href="#" className="hover:text-white transition">Términos de servicio</a>
-            <a href="#" className="hover:text-white transition">Políticas de privacidad</a>
-          </div>
-        </div>
-      </footer>
-
-      {/* Modal de Detalle de Torneo */}
+      {/* MODAL DE DETALLES DEL TORNEO */}
       <TorneoDetalleModal
         isOpen={!!detailModalTorneo}
         torneo={detailModalTorneo}
@@ -370,9 +476,20 @@ export const MisTorneos: React.FC<MisTorneosProps> = ({ onNavigate, onOpenInscri
         }}
         onVerFixture={(id) => {
           setSelectedTorneoId(id);
+          setActiveTab('fixture');
           setDetailModalTorneo(null);
+          setFiltro('actuales');
+
+          if (
+            tournaments.find(t => t.id === id)?.status === 'Finalizado'
+          ) {
+            setFiltro('finalizados');
+          }
+
           setTimeout(() => {
-            document.getElementById('torneo-activo-detalle')?.scrollIntoView({ behavior: 'smooth' });
+            document
+              .getElementById('torneo-activo-detalle')
+              ?.scrollIntoView({ behavior: 'smooth' });
           }, 150);
         }}
       />

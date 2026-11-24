@@ -1,0 +1,271 @@
+/* ==========================================
+   CANCELACIÓN DE RESERVAS
+   ========================================== */
+
+/* TARJETA PRINCIPAL */
+
+.ub-modal-panel.cancelacion-modal__panel {
+  width: 100%;
+  max-width: 550px;
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+/* ENCABEZADO */
+
+.cancelacion-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  background: var(--ub-color-background);
+  border-bottom: 1px solid var(--ub-color-border);
+  flex-shrink: 0;
+}
+
+.cancelacion-modal__heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cancelacion-modal__icon {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid;
+  border-radius: 50%;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.cancelacion-modal__icon--refund {
+  color: #65c556;
+  background: rgba(101, 197, 86, 0.12);
+  border-color: rgba(101, 197, 86, 0.35);
+}
+
+.cancelacion-modal__icon--warning {
+  color: #ff7373;
+  background: rgba(229, 62, 62, 0.12);
+  border-color: rgba(229, 62, 62, 0.35);
+}
+
+.cancelacion-modal__title {
+  margin: 0;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.cancelacion-modal__subtitle {
+  margin: 4px 0 0;
+  color: var(--ub-color-muted);
+  font-size: 12px;
+}
+
+.cancelacion-modal__close {
+  align-self: flex-start;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ub-color-muted);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.cancelacion-modal__close:hover {
+  color: #fff;
+  background: #344732;
+}
+
+/* CONTENIDO */
+
+.cancelacion-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.cancelacion-modal__booking {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--ub-color-background);
+  border: 1px solid var(--ub-color-border);
+  border-radius: 10px;
+}
+
+.cancelacion-modal__label {
+  color: var(--ub-color-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.cancelacion-modal__booking strong {
+  color: #fff;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+/* INFORMACIÓN DE REINTEGRO */
+
+.cancelacion-modal__notice {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid;
+  border-radius: 12px;
+}
+
+.cancelacion-modal__notice--refund {
+  background: rgba(101, 197, 86, 0.1);
+  border-color: rgba(101, 197, 86, 0.5);
+}
+
+.cancelacion-modal__notice--warning {
+  background: rgba(229, 62, 62, 0.1);
+  border-color: rgba(229, 62, 62, 0.5);
+}
+
+.cancelacion-modal__notice h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.cancelacion-modal__notice--refund h3 {
+  color: #65c556;
+}
+
+.cancelacion-modal__notice--warning h3 {
+  color: #ff7373;
+}
+
+.cancelacion-modal__notice p {
+  margin: 0;
+  color: var(--ub-color-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.cancelacion-modal__notice .cancelacion-modal__hours {
+  color: var(--ub-color-muted);
+}
+
+.cancelacion-modal__amount {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(160, 160, 160, 0.2);
+}
+
+.cancelacion-modal__amount span {
+  color: var(--ub-color-muted);
+  font-size: 12px;
+}
+
+.cancelacion-modal__amount strong {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.cancelacion-modal__notice--refund .cancelacion-modal__amount strong {
+  color: #65c556;
+}
+
+.cancelacion-modal__description {
+  margin: 0;
+  color: var(--ub-color-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* PIE DE LA VENTANA */
+
+.cancelacion-modal__footer {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--ub-color-background);
+  border-top: 1px solid var(--ub-color-border);
+  flex-shrink: 0;
+}
+
+.cancelacion-modal__button {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    background-color 150ms,
+    color 150ms;
+}
+
+.cancelacion-modal__button--back {
+  color: var(--ub-color-text-secondary);
+  border-color: var(--ub-color-border);
+  background: transparent;
+}
+
+.cancelacion-modal__button--back:hover {
+  background: #344732;
+  color: #fff;
+}
+
+.cancelacion-modal__button--confirm {
+  color: #141b13;
+  background: #65c556;
+}
+
+.cancelacion-modal__button--confirm:hover {
+  background: #54b045;
+}
+
+.cancelacion-modal__button--danger {
+  color: #fff;
+  background: #e53e3e;
+}
+
+.cancelacion-modal__button--danger:hover {
+  background: #c53030;
+}
+
+/* CELULARES */
+
+@media (max-width: 480px) {
+  .cancelacion-modal__header,
+  .cancelacion-modal__body,
+  .cancelacion-modal__footer {
+    padding-inline: 16px;
+  }
+
+  .cancelacion-modal__footer {
+    flex-direction: column;
+  }
+
+  .cancelacion-modal__button {
+    width: 100%;
+  }
+}

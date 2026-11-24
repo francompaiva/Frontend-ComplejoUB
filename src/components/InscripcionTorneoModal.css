@@ -1,0 +1,519 @@
+
+/* INSCRIPCIÓN DE EQUIPOS A TORNEOS */
+/* El fondo y la base de la tarjeta se reutilizan
+   desde los estilos globales de components.css. */
+
+/* TARJETA PRINCIPAL */
+
+.ub-modal-panel.inscripcion-modal__panel {
+  max-width: 620px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+}
+
+/* ENCABEZADO */
+
+.inscripcion-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--ub-color-border);
+  background: var(--ub-color-background);
+}
+
+.inscripcion-modal__header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inscripcion-modal__title {
+  color: #fff;
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.inscripcion-modal__subtitle {
+  margin-top: 2px;
+  color: var(--ub-color-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.inscripcion-modal__close {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--ub-color-muted);
+  font-size: 16px;
+  line-height: 24px;
+  cursor: pointer;
+}
+
+.inscripcion-modal__close:hover {
+  color: #fff;
+}
+
+.inscripcion-modal__close:disabled,
+.inscripcion-modal__cancel:disabled {
+  opacity: 0.4;
+}
+
+/* FORMULARIO */
+
+.inscripcion-modal__form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+/* MENSAJES Y ALERTAS */
+
+.inscripcion-modal__alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.inscripcion-modal__alert--success {
+  border-color: var(--ub-color-primary);
+  background: rgba(101, 197, 86, 0.15);
+  color: var(--ub-color-primary);
+  font-weight: 700;
+}
+
+.inscripcion-modal__alert--arbitro {
+  border-color: #ef4444;
+  background: rgba(127, 29, 29, 0.85);
+  color: #fecaca;
+  font-weight: 700;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.inscripcion-modal__alert--closed {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.15);
+  color: #fcd34d;
+}
+
+.inscripcion-modal__alert--error {
+  border-color: var(--ub-color-danger);
+  background: rgba(229, 62, 62, 0.15);
+  color: var(--ub-color-danger);
+}
+
+.inscripcion-modal__error-text {
+  font-weight: 500;
+}
+
+/* CAMPOS DE DATOS */
+
+.inscripcion-modal__label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ub-color-muted);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.inscripcion-modal__label--no-margin {
+  margin-bottom: 0;
+}
+
+.inscripcion-modal__select,
+.inscripcion-modal__input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--ub-color-border);
+  border-radius: 12px;
+  background: var(--ub-color-background);
+  color: #fff;
+}
+
+.inscripcion-modal__select {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.inscripcion-modal__input {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.inscripcion-modal__input::placeholder {
+  color: #71856d;
+}
+
+.inscripcion-modal__select:focus,
+.inscripcion-modal__input:focus,
+.inscripcion-modal__dni:focus,
+.inscripcion-modal__position:focus {
+  outline: none;
+  border-color: var(--ub-color-primary);
+}
+
+/* LÍMITES DEL PLANTEL */
+
+.inscripcion-modal__limits {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid var(--ub-color-border);
+  border-radius: 12px;
+  background: var(--ub-color-background);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.inscripcion-modal__limits-label {
+  display: block;
+  color: var(--ub-color-muted);
+  font-size: 11px;
+}
+
+.inscripcion-modal__limits-value {
+  color: #fff;
+  font-weight: 700;
+}
+
+.inscripcion-modal__count {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 900;
+}
+
+.inscripcion-modal__count.is-valid {
+  background: rgba(101, 197, 86, 0.2);
+  color: var(--ub-color-primary);
+}
+
+.inscripcion-modal__count.is-warning {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--ub-color-warning);
+}
+
+/* PLANTEL DE JUGADORES */
+
+.inscripcion-modal__roster {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inscripcion-modal__roster-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inscripcion-modal__hint {
+  color: #71856d;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.inscripcion-modal__add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ub-color-primary);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.inscripcion-modal__add:hover {
+  text-decoration: underline;
+}
+
+/* FILAS DE JUGADORES */
+
+.inscripcion-modal__player {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--ub-color-border);
+  border-radius: 12px;
+  background: var(--ub-color-background);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.inscripcion-modal__player-dni-wrap,
+.inscripcion-modal__player-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inscripcion-modal__player-dni-wrap {
+  flex-shrink: 0;
+}
+
+.inscripcion-modal__player-index {
+  width: 20px;
+  color: #9ca3af;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* DNI Y POSICIÓN */
+
+.inscripcion-modal__dni,
+.inscripcion-modal__position {
+  width: 128px;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--ub-color-border);
+  border-radius: 4px;
+  background: var(--ub-color-surface);
+  color: #fff;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.inscripcion-modal__dni {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.inscripcion-modal__dni:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+/* NOMBRE VERIFICADO */
+
+.inscripcion-modal__player-name-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--ub-color-border);
+  border-radius: 4px;
+  background: var(--ub-color-surface);
+}
+
+.inscripcion-modal__searching,
+.inscripcion-modal__found,
+.inscripcion-modal__not-found,
+.inscripcion-modal__suspended {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.inscripcion-modal__searching {
+  color: #fcd34d;
+  animation: inscripcion-pulse 2s ease-in-out infinite;
+}
+
+.inscripcion-modal__found,
+.inscripcion-modal__not-found,
+.inscripcion-modal__suspended,
+.inscripcion-modal__placeholder,
+.inscripcion-modal__player-name,
+.inscripcion-modal__state-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inscripcion-modal__not-found {
+  color: var(--ub-color-danger);
+}
+
+.inscripcion-modal__suspended {
+  color: #fbbf24;
+}
+
+.inscripcion-modal__check {
+  color: var(--ub-color-primary);
+  font-weight: 700;
+}
+
+.inscripcion-modal__player-name {
+  color: #fff;
+  font-weight: 600;
+}
+
+.inscripcion-modal__state-icon {
+  font-weight: 700;
+}
+
+.inscripcion-modal__state-text {
+  font-weight: 500;
+}
+
+.inscripcion-modal__captain-tag {
+  margin-left: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(101, 197, 86, 0.2);
+  color: var(--ub-color-primary);
+  font-size: 10px;
+  line-height: 15px;
+  font-weight: 700;
+}
+
+.inscripcion-modal__placeholder {
+  color: #71856d;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.inscripcion-modal__readonly {
+  flex-shrink: 0;
+  margin-left: 4px;
+  color: #71856d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  line-height: 15px;
+  text-transform: uppercase;
+}
+
+/* QUITAR JUGADOR */
+
+.inscripcion-modal__remove {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ub-color-danger);
+  cursor: pointer;
+  transition: background-color 150ms, color 150ms;
+}
+
+.inscripcion-modal__remove:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fff;
+}
+
+/* TEXTO INFORMATIVO */
+
+.inscripcion-modal__footnote {
+  color: var(--ub-color-muted);
+  font-size: 11px;
+  line-height: 16px;
+  font-style: italic;
+}
+
+/* BOTONES INFERIORES */
+
+.inscripcion-modal__actions {
+  display: flex;
+  gap: 14px;
+  margin: 8px -24px -24px;
+  padding: 16px 24px;
+  background: var(--ub-color-background);
+  border-top: 1px solid var(--ub-color-border);
+}
+
+.inscripcion-modal__cancel,
+.inscripcion-modal__submit {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.inscripcion-modal__cancel {
+  padding: 12px 20px;
+  border: 1px solid var(--ub-color-border);
+  color: var(--ub-color-text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  transition: color 150ms;
+}
+
+.inscripcion-modal__cancel:hover {
+  color: #fff;
+}
+
+.inscripcion-modal__submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: 0;
+  background: var(--ub-color-primary);
+  color: var(--ub-color-background);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 800;
+  box-shadow: 0 10px 15px -3px rgba(101,197,86,.2);
+  transition: background-color 150ms, opacity 150ms;
+}
+
+.inscripcion-modal__submit:hover {
+  background: var(--ub-color-primary-hover);
+}
+
+.inscripcion-modal__submit:disabled {
+  opacity: 0.5;
+}
+
+/* INDICADOR DE PROCESAMIENTO */
+
+.inscripcion-modal__spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--ub-color-background);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: inscripcion-spin 1s linear infinite;
+}
+
+/* ANIMACIONES */
+
+@keyframes inscripcion-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes inscripcion-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* PANTALLAS MEDIANAS Y GRANDES */
+
+@media (min-width: 640px) {
+  .inscripcion-modal__player {
+    flex-direction: row;
+    align-items: center;
+  }
+}

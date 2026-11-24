@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+
+import React, { useEffect, useState } from 'react';
+import './ConfirmacionPagoModal.css';
 
 export interface BookingSlotInfo {
   court: string;
@@ -25,9 +27,36 @@ export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
   const [method, setMethod] = useState<'tarjeta' | 'mercadopago'>('tarjeta');
   const [cardNum, setCardNum] = useState('');
   const [cardHolder, setCardHolder] = useState('');
-  const [cardExpiryCvv, setCardExpiryCvv] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
   const [cardError, setCardError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Limpia también cuando el componente se cierra desde App.tsx,
+  // por ejemplo después de confirmar la reserva.
+  useEffect(() => {
+    if (!isOpen) {
+      setMethod('tarjeta');
+      setCardNum('');
+      setCardHolder('');
+      setCardExpiry('');
+      setCardCvv('');
+      setCardError(null);
+      setIsProcessing(false);
+    }
+  }, [isOpen]);
+
+  // Los cierres manuales limpian los campos inmediatamente.
+  const handleClose = () => {
+    setMethod('tarjeta');
+    setCardNum('');
+    setCardHolder('');
+    setCardExpiry('');
+    setCardCvv('');
+    setCardError(null);
+    setIsProcessing(false);
+    onClose();
+  };
 
   if (!isOpen || !slot) return null;
 
@@ -55,83 +84,74 @@ export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(17, 26, 16, 0.8)' }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      className="ub-modal-backdrop"
+      onClick={(e) => e.target === e.currentTarget && handleClose()}
     >
-      <div className="bg-[#1e281d] rounded-[16px] border border-[#5a7056] w-full max-w-[430px] shadow-[0px_20px_25px_rgba(0,0,0,0.5)] overflow-hidden text-white font-['Inter',sans-serif]">
+      <div className="ub-modal-panel pago-modal__panel">
         {/* Header */}
-        <div className="px-[24px] pt-[20px] pb-[16px] border-b border-[#5a7056] flex justify-between items-center">
-          <div className="flex items-center gap-[8px]">
-            <div className="size-[10px] rounded-full bg-[#65c556] animate-pulse" />
-            <h3 className="font-bold text-[17px] text-white">
+        <div className="pago-modal__header">
+          <div className="pago-modal__heading">
+            <div className="pago-modal__dot" />
+            <h3 className="pago-modal__title">
               Confirmación y Pago de Seña (30%)
             </h3>
           </div>
           <button
-            onClick={onClose}
-            className="text-[#a0a0a0] hover:text-white cursor-pointer bg-transparent border-none text-[16px]"
+            onClick={handleClose}
+            className="pago-modal__close"
           >
             ✕
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-[24px] flex flex-col gap-[16px]">
+        <div className="pago-modal__body">
           {/* Reservation Breakdown */}
-          <div className="bg-[#293827] rounded-[12px] p-[16px] border border-[#5a7056] flex flex-col gap-[8px]">
-            <div className="flex justify-between items-center text-[13px]">
-              <span className="text-[#a0a0a0]">Instalación:</span>
-              <span className="font-bold text-white">{slot.court}</span>
+          <div className="pago-modal__breakdown">
+            <div className="pago-modal__detail">
+              <span className="pago-modal__muted">Instalación:</span>
+              <span className="pago-modal__bold">{slot.court}</span>
             </div>
-            <div className="flex justify-between items-center text-[13px]">
-              <span className="text-[#a0a0a0]">Fecha y Hora:</span>
-              <span className="font-semibold text-[#65c556]">{slot.date} • {slot.time}</span>
+            <div className="pago-modal__detail">
+              <span className="pago-modal__muted">Fecha y Hora:</span>
+              <span className="pago-modal__accent">{slot.date} • {slot.time}</span>
             </div>
-            <div className="flex justify-between items-center text-[13px]">
-              <span className="text-[#a0a0a0]">Duración:</span>
-              <span className="font-medium text-white">1 hora fija</span>
+            <div className="pago-modal__detail">
+              <span className="pago-modal__muted">Duración:</span>
+              <span className="pago-modal__medium">1 hora fija</span>
             </div>
-            <div className="h-px bg-[#3b4d38] my-1" />
-            <div className="flex justify-between items-center text-[13px]">
-              <span className="text-[#a0a0a0]">Tarifa fija total:</span>
-              <span className="font-semibold text-white">${totalPrice.toLocaleString('es-AR')}</span>
+            <div className="pago-modal__rule" />
+            <div className="pago-modal__detail">
+              <span className="pago-modal__muted">Tarifa fija total:</span>
+              <span className="pago-modal__semibold">${totalPrice.toLocaleString('es-AR')}</span>
             </div>
-            <div className="flex justify-between items-center text-[14px] bg-[rgba(101,197,86,0.12)] p-2 rounded-[6px]">
-              <span className="font-bold text-[#65c556]">Seña a abonar hoy (30%):</span>
-              <span className="font-black text-[16px] text-[#65c556]">${deposit.toLocaleString('es-AR')}</span>
+            <div className="pago-modal__deposit">
+              <span className="pago-modal__deposit-label">Seña a abonar hoy (30%):</span>
+              <span className="pago-modal__deposit-amount">${deposit.toLocaleString('es-AR')}</span>
             </div>
-            <div className="flex justify-between items-center text-[12px] text-[#a0a0a0]">
+            <div className="pago-modal__balance">
               <span>Saldo a cancelar en mesa de entrada (70%):</span>
-              <span className="font-medium text-white">${remaining.toLocaleString('es-AR')}</span>
+              <span className="pago-modal__medium">${remaining.toLocaleString('es-AR')}</span>
             </div>
           </div>
 
           {/* Payment Method Selector */}
           <div>
-            <label className="text-[12px] font-semibold text-[#c0c0c0] block mb-2">
+            <label className="pago-modal__payment-label">
               Medio de Pago (Simulación Aprobada)
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="pago-modal__method-grid">
               <button
                 type="button"
                 onClick={() => setMethod('tarjeta')}
-                className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-[8px] text-xs font-semibold border cursor-pointer transition-colors ${
-                  method === 'tarjeta'
-                    ? 'bg-[rgba(101,197,86,0.2)] border-[#65c556] text-[#65c556]'
-                    : 'bg-[#293827] border-[#5a7056] text-[#a0a0a0] hover:text-white'
-                }`}
+                className={`pago-modal__method${method === 'tarjeta' ? ' is-active' : ''}`}
               >
                 <span>💳</span> Tarjeta Crédito/Débito
               </button>
               <button
                 type="button"
                 onClick={() => setMethod('mercadopago')}
-                className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-[8px] text-xs font-semibold border cursor-pointer transition-colors ${
-                  method === 'mercadopago'
-                    ? 'bg-[rgba(101,197,86,0.2)] border-[#65c556] text-[#65c556]'
-                    : 'bg-[#293827] border-[#5a7056] text-[#a0a0a0] hover:text-white'
-                }`}
+                className={`pago-modal__method${method === 'mercadopago' ? ' is-active' : ''}`}
               >
                 <span>📱</span> Mercado Pago
               </button>
@@ -140,36 +160,84 @@ export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
 
           {/* Card Form */}
           {method === 'tarjeta' && (
-            <div className="bg-[#293827] p-3 rounded-[8px] border border-[#5a7056] flex flex-col gap-2">
+            <div className="pago-modal__card-form">
               <div>
-                <span className="text-[10px] text-[#a0a0a0] uppercase block">Número de tarjeta</span>
+                <span className="pago-modal__input-label">Número de tarjeta</span>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  maxLength={19}
                   placeholder="•••• •••• •••• 4242"
                   value={cardNum}
-                  onChange={(e) => setCardNum(e.target.value)}
-                  className="w-full bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1 text-xs text-white placeholder-[#71856d] focus:outline-none focus:border-[#65c556]"
+                  onChange={(e) => {
+                    const numeros = e.target.value
+                      .replace(/\D/g, '')
+                      .slice(0, 16);
+
+                    const formateado = numeros
+                      .replace(/(.{4})/g, '$1 ')
+                      .trim();
+
+                    setCardNum(formateado);
+                  }}
+                  className="pago-modal__input"
                 />
               </div>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <span className="text-[10px] text-[#a0a0a0] uppercase block">Titular</span>
+              <div className="pago-modal__field-row">
+                <div className="pago-modal__field-fill">
+                  <span className="pago-modal__input-label">Titular</span>
                   <input
                     type="text"
                     placeholder="JUAN PEREZ"
                     value={cardHolder}
                     onChange={(e) => setCardHolder(e.target.value)}
-                    className="w-full bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1 text-xs text-white placeholder-[#71856d] focus:outline-none focus:border-[#65c556]"
+                    className="pago-modal__input"
                   />
                 </div>
-                <div className="w-24">
-                  <span className="text-[10px] text-[#a0a0a0] uppercase block">Venc / CVV</span>
+                <div className="pago-modal__field-expiry">
+                  <span className="pago-modal__input-label">Vencimiento</span>
                   <input
                     type="text"
-                    placeholder="MM/AA • 123"
-                    value={cardExpiryCvv}
-                    onChange={(e) => setCardExpiryCvv(e.target.value)}
-                    className="w-full bg-[#1e281d] border border-[#5a7056] rounded px-2.5 py-1 text-xs text-white text-center placeholder-[#71856d] focus:outline-none focus:border-[#65c556]"
+                    inputMode="numeric"
+                    autoComplete="cc-exp"
+                    maxLength={5}
+                    placeholder="MM/AA"
+                    value={cardExpiry}
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      const numeros = valor.replace(/\D/g, '').slice(0, 4);
+
+                      // Permitir borrar la barra con Backspace.
+                      if (
+                        valor.length < cardExpiry.length &&
+                        cardExpiry.endsWith('/') &&
+                        numeros.length === 2
+                      ) {
+                        setCardExpiry(numeros);
+                        return;
+                      }
+
+                      const formateado =
+                        numeros.length >= 2
+                          ? `${numeros.slice(0, 2)}/${numeros.slice(2)}`
+                          : numeros;
+
+                      setCardExpiry(formateado);
+                    }}
+                    className="pago-modal__input pago-modal__input--center"
+                  />
+                </div>
+                <div className="pago-modal__field-cvv">
+                  <span className="pago-modal__input-label">CVV</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="cc-csc"
+                    maxLength={4}
+                    placeholder="123"
+                    value={cardCvv}
+                    onChange={(e) => setCardCvv(e.target.value)}
+                    className="pago-modal__input pago-modal__input--center"
                   />
                 </div>
               </div>
@@ -177,24 +245,24 @@ export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
           )}
 
           {cardError && (
-            <div className="bg-[rgba(229,62,62,0.15)] border border-[#e53e3e] rounded-xl p-2.5 text-xs text-[#e53e3e] flex items-center gap-2">
+            <div className="pago-modal__error">
               <span>⚠️</span>
               <span>{cardError}</span>
             </div>
           )}
 
           {/* Scope notice */}
-          <p className="text-[11px] text-[#a0a0a0] italic text-center">
+          <p className="pago-modal__notice">
             * La seña se procesa de manera inmediata y segura para confirmar tu reserva en el sistema.
           </p>
 
           {/* Actions */}
-          <div className="flex gap-3.5 mt-3">
+          <div className="pago-modal__actions">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isProcessing}
-              className="flex-1 py-3 px-5 rounded-xl border border-[#5a7056] text-[#c0c0c0] hover:text-white font-bold text-xs cursor-pointer min-h-[44px] transition-colors"
+              className="pago-modal__action pago-modal__action--cancel"
             >
               Cancelar
             </button>
@@ -202,7 +270,7 @@ export const ConfirmacionPagoModal: React.FC<ConfirmacionPagoModalProps> = ({
               type="button"
               onClick={handlePay}
               disabled={isProcessing}
-              className="flex-1 py-3 px-5 rounded-xl bg-[#65c556] hover:bg-[#57ef40] text-[#293827] font-extrabold text-sm transition-all shadow-lg shadow-[#65c556]/20 cursor-pointer flex items-center justify-center gap-2 min-h-[44px]"
+              className="pago-modal__action pago-modal__action--pay"
             >
               {isProcessing ? 'Procesando seña...' : `Pagar Seña $${deposit.toLocaleString('es-AR')}`}
             </button>

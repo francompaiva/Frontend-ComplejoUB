@@ -30,6 +30,8 @@ import {
   IconWhistle,
   IconLogout
 } from './components/Icons';
+import './App.css';
+import SiteFooter from './components/SiteFooter';
 
 export type ScreenId =
   | 'login'
@@ -243,7 +245,7 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const currentAccount = ACCOUNTS[userRole] || ACCOUNTS.cliente;
+ 
   const isAdminOrSuper = userRole === 'admin' || userRole === 'superadmin';
 
   return (
@@ -270,29 +272,17 @@ const AppContent: React.FC = () => {
             className="flex items-center gap-2.5 cursor-pointer select-none group"
             title="Complejo Deportivo UB - Ir al inicio"
           >
-            <div className="size-9 rounded-xl bg-[rgba(101,197,86,0.15)] border border-[#65c556] flex items-center justify-center text-[#65c556] shadow-sm group-hover:scale-105 transition-transform">
-              <IconStadium size={20} />
-            </div>
+            <img
+              src="/logo-ub.png"
+              alt="Logo Complejo Deportivo UB"
+              className="app-header-logo"
+            />
             <span className="font-extrabold text-sm sm:text-base text-white tracking-tight">
               Complejo Deportivo <strong className="text-[#65c556]">UB</strong>
             </span>
           </div>
 
-          {currentScreen !== 'login' && (
-            <div className="bg-[#1e281d] text-white px-3 py-1.5 rounded-xl border border-[#5a7056] flex items-center gap-2 shadow-sm">
-              <span>{currentAccount.iconNode}</span>
-              <span className="font-semibold">{currentUser?.nombre || currentAccount.name}</span>
-              <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase ${
-                  userRole === 'superadmin'
-                    ? 'bg-amber-400/20 text-yellow-300 border-amber-400/40'
-                    : 'bg-[#293827] text-[#65c556] border-[#65c556]/40'
-                }`}
-              >
-                {currentAccount.badge}
-              </span>
-            </div>
-          )}
+          
         </div>
 
         {/* Center: Action Navigation Buttons based on Role (Spacious gap-3, vector icons) */}
@@ -308,26 +298,25 @@ const AppContent: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('landing')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
+                  className={`px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
                     currentScreen === 'landing'
                       ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <IconStadium size={16} />
-                  <span>Canchas & Turnos</span>
+                <span>Canchas & Turnos</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('mis-reservas')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
+                  className={`px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
                     currentScreen === 'mis-reservas'
                       ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <IconClipboard size={16} />
+                  
                   <span>Mis Reservas</span>
                   {unreadNotifsCount > 0 && (
                     <span className="bg-[#e53e3e] text-white px-1.5 py-0.2 rounded-full text-[10px] font-black">
@@ -339,13 +328,13 @@ const AppContent: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setCurrentScreen('mis-torneos')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
+                  className={`px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 border ${
                     currentScreen === 'mis-torneos'
                       ? 'bg-[#65c556] text-[#293827] border-[#65c556] shadow-md shadow-[rgba(101,197,86,0.2)]'
                       : 'bg-[#1e281d] text-[#c0c0c0] border-[#3b4d38] hover:border-[#65c556] hover:text-white'
                   }`}
                 >
-                  <IconTrophy size={16} />
+                  
                   <span>Torneos & Fixture</span>
                 </button>
               </>
@@ -530,7 +519,7 @@ const AppContent: React.FC = () => {
 
           {currentScreen === 'landing' && (
             <LandingPage
-              onNavigate={(screen) => setCurrentScreen(screen as ScreenId)}
+             
               onOpenInscripcion={handleOpenInscripcion}
               onOpenPago={handleOpenPago}
             />
@@ -603,6 +592,14 @@ const AppContent: React.FC = () => {
           )}
         </main>
       </ErrorBoundary>
+
+            {/* Footer compartido en todas las pantallas con sesión iniciada */}
+      {currentScreen !== 'login' && (
+        <SiteFooter
+          userRole={userRole}
+          onNavigate={(screen) => setCurrentScreen(screen)}
+        />
+      )}
 
       {/* Global Modals */}
       <InscripcionTorneoModal

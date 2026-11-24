@@ -1,0 +1,233 @@
+/* Lista de espera: estilos propios.
+   El contenedor compartido está en components.css. */
+
+.ub-modal-panel.espera-modal__panel {
+  width: 100%;
+  max-width: 550px;
+}
+.espera-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px;
+}
+
+.espera-modal__heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -28px -28px 0;
+  padding: 20px 28px;
+  background: var(--ub-color-background);
+  border-bottom: 1px solid var(--ub-color-border);
+}
+
+.espera-modal__clock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.15);
+  font-size: 22px;
+}
+
+.espera-modal__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ub-color-text);
+}
+
+.espera-modal__subtitle {
+  color: var(--ub-color-muted);
+  font-size: 12px;
+}
+
+.espera-modal__slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--ub-color-border);
+  border-radius: 10px;
+  background: var(--ub-color-background);
+}
+
+.espera-modal__detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.espera-modal__muted {
+  color: var(--ub-color-muted);
+}
+.espera-modal__value {
+  color: var(--ub-color-text);
+  font-weight: 600;
+}
+.espera-modal__accent {
+  color: var(--ub-color-primary);
+  font-weight: 600;
+}
+
+.espera-modal__occupied {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(229, 62, 62, 0.2);
+  color: var(--ub-color-danger);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.espera-modal__description {
+  color: var(--ub-color-text-secondary);
+  font-size: 13px;
+  line-height: 1.625;
+}
+
+.espera-modal__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.espera-modal__label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ub-color-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.espera-modal__input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--ub-color-border);
+  border-radius: 8px;
+  background: var(--ub-color-background);
+  color: var(--ub-color-text);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.espera-modal__input:focus {
+  outline: none;
+  border-color: var(--ub-color-primary);
+}
+
+.espera-modal__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px -28px -28px;
+  padding: 16px 28px;
+  background: var(--ub-color-background);
+  border-top: 1px solid var(--ub-color-border);
+}
+
+.espera-modal__action {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 0;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  cursor: pointer;
+  transition:
+    background-color 150ms,
+    color 150ms;
+}
+
+.espera-modal__action--back {
+  border: 1px solid var(--ub-color-border);
+  color: var(--ub-color-text-secondary);
+  font-weight: 600;
+}
+
+.espera-modal__action--back:hover {
+  color: var(--ub-color-text);
+}
+
+.espera-modal__action--submit {
+  background: var(--ub-color-primary);
+  color: var(--ub-color-background);
+  font-weight: 700;
+}
+
+.espera-modal__action--submit:hover {
+  background: var(--ub-color-primary-hover);
+}
+
+.espera-modal__success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px;
+  text-align: center;
+}
+
+.espera-modal__check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--ub-color-primary);
+  border-radius: 50%;
+  background: rgba(101, 197, 86, 0.15);
+  font-size: 28px;
+}
+
+.espera-modal__success-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ub-color-text);
+}
+
+.espera-modal__success-text {
+  font-size: 13px;
+  color: var(--ub-color-text-secondary);
+}
+
+.espera-modal__success-note {
+  font-size: 12px;
+  color: var(--ub-color-muted);
+}
+
+.espera-modal__done {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 0;
+  border-radius: 8px;
+  background: var(--ub-color-primary);
+  color: var(--ub-color-background);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 150ms;
+}
+
+.espera-modal__done:hover {
+  background: var(--ub-color-primary-hover);
+}
+
+.espera-modal__error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(229, 62, 62, 0.5);
+  border-radius: 8px;
+  background: rgba(229, 62, 62, 0.12);
+  color: #ff9898;
+  font-size: 12px;
+}
+
+.espera-modal__action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

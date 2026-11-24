@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useComplejo } from '../context/ComplejoContext';
 import { IconTrophy, IconBall, IconCalendar, IconCheck, IconClipboard, IconWhistle } from '../components/Icons';
+import { estadoVisiblePartido } from '../utils/partidos';
 
 export const AdminResultados: React.FC = () => {
   const { fixtures, saveMatchResult } = useComplejo();
@@ -226,7 +227,9 @@ export const AdminResultados: React.FC = () => {
                           borderColor: 'rgba(245,158,11,0.4)'
                         }}
                       >
-                        ⏳ Por Disputar
+                       {estadoVisiblePartido(match) === 'Programado'
+                        ? '⏳ Por disputar'
+                        : `⏳ ${estadoVisiblePartido(match)}`}
                       </span>
                     )}
                   </div>
